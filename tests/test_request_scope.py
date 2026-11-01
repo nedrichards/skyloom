@@ -1,5 +1,6 @@
 import unittest
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 from skyloom.request_scope import guard, submit
 
@@ -49,6 +50,23 @@ class RequestScopeTests(unittest.TestCase):
         self.callbacks[1][0]("new")
         self.assertEqual(self.events, ["new"])
         self.assertNotIn("page", self.window.page_requests)
+
+    def test_foreground_request_preempts_prefetch_and_rejects_its_queued_result(self):
+        submit(
+            self.window, "thread-prefetch", self.request(), self.events.append, self.events.append
+        )
+        speculative = self.window.page_requests["thread-prefetch"]
+        speculative.cancel = Mock()
+        foreground = submit(
+            self.window, "page", self.request(), self.events.append, self.events.append
+        )
+        speculative.cancel.assert_called_once()
+        self.assertNotIn("thread-prefetch", self.window.page_requests)
+        self.callbacks[0][0]("late prefetch")
+        self.assertFalse(self.events)
+        self.assertIs(self.window.page_requests["page"], foreground)
+        self.callbacks[1][0]("foreground")
+        self.assertEqual(self.events, ["foreground"])
 
     def test_replaced_or_closed_content_is_retired_before_page_detachment(self):
         for replaced in (False, True):

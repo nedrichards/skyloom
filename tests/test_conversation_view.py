@@ -93,7 +93,7 @@ class ConversationViewTests(unittest.TestCase):
         before = messages()
         for index, post in enumerate(self.state.posts, start=1):
             pill = before[post.uri].position_pill
-            self.assertEqual(pill.get_label(), f"{index}/3+")
+            self.assertEqual(pill.get_label(), f"{index}/3")
             self.assertIn("known messages in reading order", pill.get_tooltip_text())
             self.assertIn("incomplete", pill.get_tooltip_text())
             self.assertFalse(pill.get_focusable())

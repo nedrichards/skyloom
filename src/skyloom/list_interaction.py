@@ -39,7 +39,7 @@ class ListInteraction:
         item = self.view.store.get_selected_item()
         return item.post if item is not None else None
 
-    def visible_rows(self):
+    def visible_rows(self, margin=0):
         result = []
         for row in list(self.view.rows):
             if not row.get_mapped() or row._value is None:
@@ -47,8 +47,8 @@ class ListInteraction:
             valid, bounds = row.compute_bounds(self.view.scroll)
             if (
                 valid
-                and bounds.origin.y + bounds.size.height > 0
-                and bounds.origin.y < self.view.scroll.get_height()
+                and bounds.origin.y + bounds.size.height > -self.view.scroll.get_height() * margin
+                and bounds.origin.y < self.view.scroll.get_height() * (1 + margin)
             ):
                 result.append((bounds.origin.y, row))
         return sorted(result, key=lambda pair: pair[0])

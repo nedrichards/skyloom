@@ -24,6 +24,11 @@ def guard(window, page, callback):
 
 
 def submit(window, key, coro, done, failed, *, page=None):
+    # Speculative reads yield the serialised service connection to foreground work.
+    if key != "thread-prefetch":
+        speculative = window.page_requests.pop("thread-prefetch", None)
+        if speculative:
+            speculative.cancel()
     previous = window.page_requests.pop(key, None)
     if previous:
         previous.cancel()

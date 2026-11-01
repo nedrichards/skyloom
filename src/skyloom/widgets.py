@@ -321,9 +321,12 @@ class PostPositions:
         self.rows = WeakSet()
 
     def remember(self, posts, *, incomplete=None, parents=None):
+        previous = self.context.positions
         if self.context.remember(posts, incomplete=incomplete, parents=parents):
             for row in tuple(self.rows):
-                row.update_position(self.context.positions.get(row.post.uri))
+                position = self.context.positions.get(row.post.uri)
+                if position != previous.get(row.post.uri):
+                    row.update_position(position)
 
     def bind(self, row):
         self.remember((row.post,))
@@ -390,6 +393,8 @@ class FeedView(Gtk.Box):
         self.header_binding = None
         self.header_focus = None
         self.check_start = lambda: False
+        self.viewport_changed = lambda: None
+        self.prefetch_reconsider = lambda: None
         self.model = Gio.ListStore.new(PostObject)
         self.entries = {}
         self.footer_model = Gio.ListStore.new(PostObject)
@@ -648,6 +653,7 @@ class FeedView(Gtk.Box):
         if self.check_pending or self.paging.closed or not self.paging_ready:
             return
         self.check_pending = True
+        self.viewport_changed()
         frames = 0
 
         def check(_widget, _clock):
@@ -1113,7 +1119,7 @@ class PostRow(Gtk.Box):
         if position is None:
             return
         index, total, partial = position
-        self.position_pill.set_label(f"{index}/{total}{'+' if partial else ''}")
+        self.position_pill.set_label(f"{index}/{total}")
         description = f"Post {index} of {total} known messages in reading order."
         if partial:
             description += " The conversation is incomplete."

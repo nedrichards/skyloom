@@ -89,14 +89,47 @@ per account session, without post text, authors, media or persistence. Unioned
 parent/root references connect known fragments; iterative parent-first traversal
 keeps oldest sibling branches together, independently of feed display order.
 Missing parent/root references, unmatched reply counts, explicit conversation
-frontiers/gaps/unavailable/limited state and malformed cycles mark counts with `+`.
-Standalone posts have no pill unless explicitly opened as a conversation.
+frontiers/gaps/unavailable/limited state and malformed cycles mark context as
+incomplete in tooltips/accessibility; visible pills have no `+` suffix.
+Pills require at least two known connected posts, even when an isolated post
+has replies, missing references or has been opened as a conversation.
 `PostPositions` shares this knowledge between native post cards across feeds,
 profiles, search, embedded quotes and conversations, using weak row registrations.
 Quotes receive their own position and never become edges of the containing post.
-Mounted labels update in place; no card rebind, media restart, focus stop or extra
-network request is required. Sign-out/account shell replacement resets the owner.
+Mounted labels update in place without card rebinds, media restarts or focus stops.
+Sign-out/account shell replacement resets the owner.
 Tooltips/accessibility describe known messages, not a guaranteed server total.
+
+`thread_prefetch.py` owns a 32-entry session snapshot cache (120-second freshness),
+a 128-root attempt ledger (300-second cooldown) and six Home requests per rolling
+minute. Home viewport events debounce for 350 ms; only visible posts with reply
+evidence qualify, complete known groups are skipped, and a single shared request
+slot yields to foreground reads. Results enrich PostPositions without changing
+the feed model. Unmapping/closure/ineligibility cancels owned work; request-scope
+account/generation guards reject stale completions. Automatic failure does not
+retry. Conversation initial loading reuses a fresh snapshot containing its exact
+anchor; explicit refresh always requests the service. Branch/ancestor fragments
+do not replace full initial snapshots. Conversation loading examines native rows
+one viewport beyond visibility and shares a three-request lookahead budget across
+ancestor/reply continuations, retaining the existing 250-post cap and retry controls.
+
+Adversarial review tightened cache ownership: immutable snapshots retain the actual
+request anchor, original network timestamp and an indexed set of fetched-subtree
+URIs. Ancestors included only for context do not qualify for cache reuse, so opening
+them fetches their missing sibling replies. Cache hits merge under the original
+response anchor while keeping the user's selected post as the UI anchor, and never
+renew freshness. Local reaction revisions patch existing snapshots and reconcile
+older in-flight responses; requests begun after an acknowledged change can accept
+new server reaction state. Pending reactions remain protected. The revision ledger
+stores only four reaction fields per URI and is bounded to 2,000 records.
+
+Home requests the exact visible post while deduplicating attempts by conversation
+root. Policy/worker reconsideration resumes blocked work without resetting a
+viewport debounce. Scoped foreground reads and mutations cancel the shared
+speculative request; request-slot identity rejects late results. Controllers recover
+when global cancellation removes their slot, and sign-out clears snapshots and
+reaction state. PostPositions updates only mounted pills whose projected position
+actually changed, rather than setting GTK/accessibility properties for every row.
 
 Alt+Up/Down select the loaded parent/first direct reply only in conversation list context; header buttons provide the same actions. Existing list/post commands are shared. Return to opened post appears when its row is outside the viewport and has Undo. Reactivation of the current anchor focuses its visible body without pushing a duplicate page. Merges preserve a URI/pixel viewport anchor and selection, and restore a replaced descendant control by semantic identity after allocation; busy loaders retain logical control focus and keep Enter from opening the previously selected post, without changing the reading position; errors restore their retry button, and disappearing loaders return to their parent or nearest visible message. Only actual presentation changes rebind retained rows: increased graph depth alone does not restart media work. Completion/error announcements use GTK’s polite accessible announcement API on mapped pages; actual Orca acceptance remains a human gate.
 

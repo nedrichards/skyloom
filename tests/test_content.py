@@ -101,6 +101,34 @@ class ContentTests(unittest.TestCase):
         GLib.timeout_add(milliseconds, lambda: (loop.quit(), False)[1])
         loop.run()
 
+    def test_unrelated_prefetch_does_not_rewrite_unchanged_mounted_pills(self):
+        from test_conversation import node
+
+        from skyloom.domain import post_from
+        from skyloom.widgets import PostPositions
+
+        class Row:
+            def __init__(self, post):
+                self.post = post
+                self.updates = []
+
+            def update_position(self, position):
+                self.updates.append(position)
+
+        owner = PostPositions()
+        plain = post_from(node("independent")["post"])
+        owner.remember([plain])
+        row = Row(plain)
+        owner.rows.add(row)
+        root_node = node("root", reply_count=1)
+        posts = [post_from(root_node["post"]), post_from(node("child", root_node)["post"])]
+        owner.remember(posts)
+        self.assertEqual(row.updates, [])
+        connected = Row(posts[0])
+        owner.rows.add(connected)
+        owner.remember([replace(posts[0], replies=3)])
+        self.assertEqual(connected.updates, [(1, 2, True)])
+
     def test_profile_and_label_targets_match_visible_controls_at_both_widths(self):
         from skyloom.content import LabelledContent
         from skyloom.widgets import PostRow

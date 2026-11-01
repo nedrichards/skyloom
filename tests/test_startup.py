@@ -106,6 +106,167 @@ class StartupTests(unittest.TestCase):
         self.app.service.account = self.account
         return self.account
 
+    def test_home_prefetch_enriches_visible_posts_and_opening_reuses_snapshot(self):
+        from test_conversation import node
+
+        from skyloom.conversation import ThreadPage
+        from skyloom.domain import post_from
+
+        self.open(self.restored_account)
+        self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
+        self.wait(lambda: not self.window.page_requests)
+        window = self.window
+        window.is_active = lambda: True
+        root_node = node("prefetch-root", reply_count=1)
+        root = post_from(root_node["post"])
+        child = post_from(node("prefetch-child", root_node)["post"])
+        calls = []
+
+        async def thread(uri, **_kwargs):
+            calls.append(uri)
+            return ThreadPage((root, child))
+
+        self.app.service.thread = thread
+        view = window.feed_views["following"]
+        view.set_posts([root])
+        view.list.grab_focus()
+        view.queue_check()
+        self.wait(lambda: window.thread_cache.get(child.uri) is not None)
+        self.assertEqual(calls, [root.uri])
+        self.assertEqual(view.model.get_n_items(), 1)
+        self.assertEqual(window.post_positions.context.positions[root.uri], (1, 2, False))
+        window.thread(child.uri)
+        self.wait(lambda: window.nav.get_visible_page().get_title() == "Conversation")
+        self.wait(lambda: not window.page_requests)
+        conversation = window.nav.get_visible_page().content_view
+        self.assertEqual([post.uri for post in conversation.state.posts], [root.uri, child.uri])
+        self.assertEqual(conversation.state.anchor, child.uri)
+        self.assertEqual(calls, [root.uri])
+
+    def test_opening_cached_ancestor_fetches_its_own_replies_and_preserves_sibling(self):
+        from test_conversation import node
+
+        from skyloom.conversation import ThreadPage, thread_from
+        from skyloom.domain import post_from
+
+        self.open(self.restored_account)
+        self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
+        self.wait(lambda: not self.window.page_requests)
+        window = self.window
+        window.is_active = lambda: False
+        root_node = node("ancestor-root", reply_count=2)
+        child_node = node("ancestor-child", root_node)
+        root = post_from(root_node["post"])
+        child = post_from(child_node["post"])
+        sibling = post_from(node("ancestor-sibling", root_node)["post"])
+        window.thread_cache.put(child.uri, thread_from(child_node))
+        window.feed_views["following"].set_posts([root, child])
+        calls = []
+
+        async def thread(uri, **_kwargs):
+            calls.append(uri)
+            return ThreadPage((root, child, sibling))
+
+        self.app.service.thread = thread
+        window.thread(root.uri)
+        self.wait(lambda: window.nav.get_visible_page().get_title() == "Conversation")
+        self.wait(lambda: not window.page_requests)
+        state = window.nav.get_visible_page().content_view.state
+        self.assertEqual(calls, [root.uri])
+        self.assertEqual(state.anchor, root.uri)
+        self.assertEqual({post.uri for post in state.posts}, {root.uri, child.uri, sibling.uri})
+
+    def test_cached_child_keeps_original_fetch_identity_and_unloaded_replies(self):
+        from test_conversation import node
+
+        from skyloom.conversation import ThreadPage
+        from skyloom.domain import post_from
+
+        self.open(self.restored_account)
+        self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
+        self.wait(lambda: not self.window.page_requests)
+        window = self.window
+        window.is_active = lambda: False
+        root_node = node("cached-root", reply_count=1)
+        root = post_from(root_node["post"])
+        child = post_from(node("cached-child", root_node, reply_count=1)["post"])
+        window.thread_cache.put(root.uri, ThreadPage((root, child), branches=(child.uri,)))
+        window.feed_views["following"].set_posts([root, child])
+        window.thread(child.uri)
+        self.wait(lambda: window.nav.get_visible_page().get_title() == "Conversation")
+        self.wait(lambda: not window.page_requests)
+        state = window.nav.get_visible_page().content_view.state
+        self.assertEqual(state.anchor, child.uri)
+        self.assertEqual(state.fetched, {root.uri})
+        self.assertEqual(state.branches, [child.uri])
+        self.assertFalse(state.unavailable)
+
+    def test_opening_cached_descendant_does_not_renew_snapshot_freshness(self):
+        from unittest.mock import Mock
+
+        from test_conversation import node
+
+        from skyloom.conversation import ThreadPage
+        from skyloom.domain import post_from
+
+        self.open(self.restored_account)
+        self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
+        self.wait(lambda: not self.window.page_requests)
+        window = self.window
+        window.is_active = lambda: False
+        clock = Mock(return_value=1000)
+        window.thread_cache.clock = clock
+        root_node = node("expiring-root", reply_count=1)
+        root = post_from(root_node["post"])
+        child = post_from(node("expiring-child", root_node)["post"])
+        window.thread_cache.pages.clear()
+        window.thread_cache.put(root.uri, ThreadPage((root, child)))
+        window.feed_views["following"].set_posts([root, child])
+        clock.return_value = 1110
+        window.thread(child.uri)
+        self.wait(lambda: window.nav.get_visible_page().get_title() == "Conversation")
+        self.wait(lambda: not window.page_requests)
+        self.assertEqual(len(window.thread_cache.pages), 1)
+        snapshot = window.thread_cache.get_snapshot(child.uri)
+        self.assertEqual(snapshot.created, 1000)
+        self.assertEqual(snapshot.anchor, root.uri)
+        clock.return_value = 1121
+        self.assertIsNone(window.thread_cache.get(child.uri))
+
+    def test_opening_prefetched_post_preserves_latest_local_reactions(self):
+        from dataclasses import replace
+
+        from test_conversation import node
+
+        from skyloom.conversation import ThreadPage
+        from skyloom.domain import post_from
+
+        self.open(self.restored_account)
+        self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
+        self.wait(lambda: not self.window.page_requests)
+        window = self.window
+        window.is_active = lambda: False
+        root_node = node("reaction-root", reply_count=1)
+        root = post_from(root_node["post"])
+        child = post_from(node("reaction-child", root_node)["post"])
+        window.thread_cache.put(root.uri, ThreadPage((root, child)))
+        window.feed_views["following"].set_posts([root])
+        latest = replace(
+            root,
+            likes=7,
+            like_uri="at://invented/like/confirmed",
+            reposts=3,
+            repost_uri="at://invented/repost/confirmed",
+        )
+        window.update_post(latest)
+        window.thread(root.uri)
+        self.wait(lambda: window.nav.get_visible_page().get_title() == "Conversation")
+        self.wait(lambda: not window.page_requests)
+        state = window.nav.get_visible_page().content_view.state
+        actual = next(post for post in state.posts if post.uri == root.uri)
+        self.assertEqual((actual.likes, actual.like_uri), (latest.likes, latest.like_uri))
+        self.assertEqual((actual.reposts, actual.repost_uri), (latest.reposts, latest.repost_uri))
+
     def test_dense_feed_resize_renders_sidebar_slide_after_content_reflow(self):
         from dataclasses import replace
 

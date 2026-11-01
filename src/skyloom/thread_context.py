@@ -76,10 +76,7 @@ class ThreadContext:
         positions = {}
         for messages in groups.values():
             known = {message.uri: message for message in messages}
-            if len(known) == 1 and not any(
-                message.parent or message.root or message.replies or message.conversation
-                for message in messages
-            ):
+            if len(known) < 2:
                 continue
             children = {}
             for message in messages:

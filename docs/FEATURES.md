@@ -40,16 +40,28 @@ The local archive targets 10,000 posts per feed/50,000 per account, with automat
 
 Conversation cards in feeds, profiles, search, quotes and conversations show a
 quiet position pill beside the timestamp, such as `1/6`, counting known messages
-in reading order across branches. `1/6+` means
-the conversation is incomplete (more context, unavailable messages or a loading
-limit). Loading controls, missing-message placeholders and embedded quotes do
-not count as posts. Position knowledge is shared across views and updates mounted
-pills without rebuilding cards. It retains only bounded relationship metadata
-for this account session and makes no extra network requests. Unknown context
-can initially show `1/1+`; other independently known conversations have separate
-counts, and ordinary standalone posts have no pill. Tooltips and accessible
-labels explain that these are known-message counts, not a guaranteed server-wide
-total. Account changes/sign-out clear this knowledge.
+in reading order across branches. Pills require two known connected posts; there
+is no `+` suffix. Tooltips and accessible labels explain incomplete context and
+that counts are known messages, not a guaranteed server total. Loading controls,
+missing-message placeholders and embedded quotes do not count as posts.
+Knowledge is shared across views and updates mounted pills without rebuilding
+cards. Account changes/sign-out clear it.
+
+Home prefetches confirmed visible conversations after a 350 ms pause in viewport
+changes, one request at a time, at most six per minute across Home feeds and at
+most once per root in five minutes. Other foreground page requests take priority.
+A bounded session cache (32 snapshots, two-minute freshness measured from the
+network response) supplies context when opening a prefetched post. Home fetches
+around the exact visible reply while deduplicating by root. Cache reuse preserves
+unloaded reply continuations; ancestry-only context triggers its own request when
+opened. Local reactions survive older responses, and foreground work cancels
+speculative reads. Prefetch does not insert replies into the feed or
+change its order. Opening a conversation loads ancestors and replies normally;
+continuations within one viewport ahead can consume up to three additional
+lookahead requests per page. Visible continuation/manual retry behaviour remains.
+Automatic work respects activity, connection/cost and power restrictions; Home
+prefetch cancels on unmapping or loss of eligibility. Errors preserve content and
+explicit opening/retry remains available.
 
 Card text remains selectable. A single click tolerates pointer jitter below the
 desktop's GTK drag threshold and opens after the double-click interval. Deliberate

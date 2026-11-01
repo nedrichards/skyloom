@@ -29,7 +29,7 @@ class ThreadContextTests(unittest.TestCase):
     def test_missing_context_is_partial_and_later_pages_enrich_retained_positions(self):
         root, first, second, child = self.posts
         self.context.remember([first])
-        self.assertEqual(self.context.positions[first.uri], (1, 1, True))
+        self.assertNotIn(first.uri, self.context.positions)
         self.context.remember([second])
         self.assertEqual(self.context.positions[first.uri], (1, 2, True))
         self.context.remember([root, child])
@@ -37,20 +37,27 @@ class ThreadContextTests(unittest.TestCase):
         self.context.remember([first])
         self.assertEqual(self.context.positions[first.uri], (2, 4, False))
 
+    def test_reply_count_alone_does_not_produce_a_pill(self):
+        root = self.posts[0]
+        self.context.remember([root])
+        self.assertNotIn(root.uri, self.context.positions)
+        self.context.remember([self.posts[1]])
+        self.assertEqual(self.context.positions[root.uri], (1, 2, True))
+
     def test_independent_posts_do_not_acquire_pills_and_quotes_are_not_edges(self):
         plain = post_from(node("plain")["post"])
         self.context.remember([replace(plain, quote=self.posts[0]), *self.posts])
         self.assertNotIn(plain.uri, self.context.positions)
         self.assertEqual(self.context.positions[self.posts[0].uri], (1, 4, False))
 
-    def test_conversation_frontiers_and_single_message_context_are_explicit(self):
+    def test_single_message_has_no_pill_even_when_opened_or_incomplete(self):
         plain = post_from(node("plain")["post"])
         self.context.remember([plain], incomplete=True)
-        self.assertEqual(self.context.positions[plain.uri], (1, 1, True))
+        self.assertNotIn(plain.uri, self.context.positions)
         self.context.remember([plain], incomplete=False)
-        self.assertEqual(self.context.positions[plain.uri], (1, 1, False))
+        self.assertNotIn(plain.uri, self.context.positions)
         self.context.remember([plain])
-        self.assertEqual(self.context.positions[plain.uri], (1, 1, False))
+        self.assertNotIn(plain.uri, self.context.positions)
 
     def test_bounded_metadata_eviction_keeps_counts_honest_and_handles_cycles(self):
         context = ThreadContext(limit=2)

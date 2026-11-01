@@ -28,6 +28,7 @@ from .request_scope import guard
 from .request_scope import submit as submit_request
 from .search import SearchView
 from .startup import StartupStack
+from .thread_prefetch import HomeThreadPrefetch, ThreadCache
 from .widgets import (
     FeedView,
     NoticeRow,
@@ -94,6 +95,8 @@ class Window(Adw.ApplicationWindow):
     def connection_changed(self, connection):
         self.interactions.connection_changed(connection)
         self.motion.changed()
+        for view in self.views:
+            view.prefetch_reconsider()
 
     def check_auto_refresh(self, now):
         return self.interactions.check_auto(now)
@@ -378,6 +381,7 @@ class Window(Adw.ApplicationWindow):
             self.refresh_monitor.changed()
 
     def build_shell(self, account):
+        self.thread_cache = ThreadCache()
         self.post_positions = None
         for view in self.views:
             view.close()
@@ -589,6 +593,9 @@ class Window(Adw.ApplicationWindow):
             view.reading = ReadingSession(self, view, feed)
             view.reading.ready = self.demo
             view.check_start = view.feed.autoload_gap
+            prefetch = HomeThreadPrefetch(self, view, self.thread_cache)
+            view.viewport_changed = prefetch.schedule
+            view.prefetch_reconsider = prefetch.reconsider
             view.load_more = lambda: self.load_feed(feed, reset=False)
             view.refresh = self.refresh
             view.auto_key = "feed:" + feed
@@ -997,6 +1004,7 @@ class Window(Adw.ApplicationWindow):
         errors = {}
         active = None
         retry = None
+        lookahead_requests = 0
         view = ConversationView(self, state, lambda **kwargs: load(**kwargs))
         page.content_view = view
         header.pack_end(view.return_button)
@@ -1036,17 +1044,22 @@ class Window(Adw.ApplicationWindow):
             view.paging.begin("Loading earlier messages…" if earlier else "Loading conversation…")
             sync()
 
-            def done(result):
+            request_revision = self.thread_cache.revision
+
+            def done(result, *, fetched_uri=target, cache_result=True):
                 nonlocal older_error, state, received, active, retry
+                result = self.thread_cache.reconcile(result, started=request_revision)
                 if initial:
                     state = Conversation(uri)
                     view.state = state
                     view.post_updated = state.update_post
+                if cache_result and (initial or refresh):
+                    self.thread_cache.put(fetched_uri, result, started=request_revision)
                 received = True
                 active = None
                 retry = None
                 errors.pop(target, None)
-                added = state.merge(result, target, earlier=earlier)
+                added = state.merge(result, fetched_uri, earlier=earlier)
                 if added and not initial and view.get_mapped():
                     view.announce("Messages loaded.", Gtk.AccessibleAnnouncementPriority.MEDIUM)
                 if earlier:
@@ -1082,6 +1095,10 @@ class Window(Adw.ApplicationWindow):
                 sync()
                 view.after_position()
 
+            cached_thread = self.thread_cache.get_snapshot(uri) if initial and not refresh else None
+            if cached_thread is not None:
+                done(cached_thread.page, fetched_uri=cached_thread.anchor, cache_result=False)
+                return True
             submit_request(
                 self,
                 page,
@@ -1097,20 +1114,32 @@ class Window(Adw.ApplicationWindow):
             return True
 
         def check_earlier():
+            nonlocal lookahead_requests
+            if self.automatic_pause_reason():
+                return False
             adjustment = view.scroll.get_vadjustment()
             if (
                 state.earlier
                 and not older_error
                 and not view.paging.busy
                 and adjustment.get_page_size() > 0
-                and adjustment.get_value() <= 160
+                and adjustment.get_value() <= max(160, adjustment.get_page_size())
             ):
-                return load(earlier=True)
-            if not view.paging.busy and not self.automatic_pause_reason():
-                for _y, row in view.interaction.visible_rows():
+                if adjustment.get_value() <= 160:
+                    return load(earlier=True)
+                if lookahead_requests < 3 and len(state.posts) < 250:
+                    lookahead_requests += 1
+                    return load(earlier=True)
+            if not view.paging.busy:
+                visible = {row._value.uri for _y, row in view.interaction.visible_rows()}
+                for _y, row in view.interaction.visible_rows(margin=1):
                     item = row._value
                     if isinstance(item, Continuation) and item.parent not in errors:
-                        return load(branch=item.parent)
+                        if item.uri in visible:
+                            return load(branch=item.parent)
+                        if lookahead_requests < 3 and len(state.posts) < 250:
+                            lookahead_requests += 1
+                            return load(branch=item.parent)
             return False
 
         view.check_start = check_earlier
@@ -1155,6 +1184,9 @@ class Window(Adw.ApplicationWindow):
     def mutate(self, post, kind, remember=True):
         if self.read_only or any(p == post.uri for p, _kind in self.mutations):
             return
+        speculative = self.page_requests.pop("thread-prefetch", None)
+        if speculative:
+            speculative.cancel()
         key = (post.uri, kind)
         self.mutations.add(key)
         if kind == "like":
@@ -1212,6 +1244,7 @@ class Window(Adw.ApplicationWindow):
         return "pending"
 
     def update_post(self, post):
+        self.thread_cache.update_post(post)
         for pager in self.pagers.values():
             pager.posts = [post if p.uri == post.uri else p for p in pager.posts]
         for view in self.views:
@@ -1811,6 +1844,7 @@ class Window(Adw.ApplicationWindow):
         alert.present(preferences)
 
     def signed_out(self, _value):
+        self.thread_cache.clear()
         self.post_positions = None
         self.images.use_account(None)
         for view in self.views:
