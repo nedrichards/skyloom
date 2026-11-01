@@ -2,6 +2,87 @@
 
 Skyloom targets a 16.67 ms frame budget on a 60 Hz display. That is a target, not an unconditional guarantee: the measurements below include missed frames and cold-view construction stalls. Keep tail latency visible when reviewing changes.
 
+## Thread prefetch adversarial pass — 1 November 2026
+
+[Thread prefetch measurements](performance-thread-prefetch.json) retain the exact
+module/probe hashes, unchanged-source checks, deterministic work counts and native
+samples. Three independent adversarial reviewers examined request ownership,
+cache correctness, test gaps and performance. The baseline code was extracted
+from immutable Flatpak commit `e410e2ef` into an ignored directory, rather than
+using a moving installed application. The final installed candidate is
+`46291aea`; both use the same compiled resource hash, GNOME 51 and explicit
+X11/Cairo. No real account was inspected or used.
+
+| Work | Original feature | Reviewed candidate |
+| --- | ---: | ---: |
+| Unchanged mounted-pill updates for one unrelated 250-post prefetch | 1,000 | 0 |
+| Debounce timer adds/removals for 200 unchanged policy notifications | 200 / 199 | 1 / 0 |
+| 1,000 misses across a full 32 × 250-post snapshot cache, wall time | 208.109 ms | 4.339 ms |
+| Median native top-jump action, six samples | 78.396 ms | 79.931 ms |
+| Median top-jump settlement, including polling/layout | 407.885 ms | 421.966 ms |
+
+The first two reductions are deterministic work counts, not timing claims. Cache
+membership uses a set of actually fetched subtree URIs, replacing nested scans;
+ancestors present only for context cannot stand in for a reply fetch. Snapshot
+reaction reconciliation is bounded and versioned, so local mutations survive
+older responses without pinning acknowledged state over newer server requests.
+Foreground reads/mutations cancel speculative work instead of waiting behind its
+serialised service request.
+
+Both native runs used 250 text posts, an 800-pixel window and alternating positions
+45/249 repeated three times. All adjustment samples went directly to zero, all
+Undo anchors matched with zero pixel error, and native row binding ranged from
+zero to 46 in both runs. Destination buffer construction remains expensive: these
+samples do **not** establish a faster jump, universal 60 fps or eliminated
+stuttering. Settlement is three stable checks on a 10 ms poll, not a compositor
+presentation measurement. The shared desktop and six samples do not support
+attributing the small timing difference to a regression or improvement.
+
+Normal feed/prefetch paths already batch relationship additions. The deliberately
+adverse microbenchmark that changes 200 individual records in a full context
+still costs about 1.2 seconds cumulatively; it is not the normal prefetch workload
+and does not justify a speculative graph rewrite. A single bulk addition is
+reported separately in the retained JSON.
+
+Reproduce with `scripts/benchmark-thread-prefetch.py --native --output OUTPUT`
+inside the installed runtime, selecting immutable baseline/candidate code through
+Flatpak's explicit `--env=PYTHONPATH=...`. Run native measurements sequentially,
+separately from tests/smokes, with identical arguments. The probe records module
+hashes before and after and rejects source changes during a run; raw captures
+belong in ignored `build*/` directories.
+
+## Renderer follow-up — 1 November 2026
+
+A fresh empty window in the normal installed sandbox, with no backend/renderer
+options, reports `GDK_BACKEND=None`, `GSK_RENDERER=None`, `GdkWaylandDisplay` and
+`GskVulkanRenderer`. Skyloom's launcher, desktop entry and manifest do not force
+Cairo. The explicit Cairo/X11 arguments belong to functional tests and the
+preceding matched probe; they do not persist into normal launches.
+
+The same native top-jump workload was also measured with Vulkan and OpenGL on
+X11, keeping the installed module hashes identical. The Cairo row below reuses
+the preceding candidate sample. Each sample has six jumps in a 250-post list;
+these are single sequential runs, not confidence intervals.
+
+| Actual renderer | Median action | Median settlement |
+| --- | ---: | ---: |
+| Cairo | 79.931 ms | 421.966 ms |
+| Vulkan | 80.091 ms | 412.860 ms |
+| OpenGL | 85.358 ms | 421.240 ms |
+
+All restore the same Undo key with zero pixel error and bind at most46 destination
+rows. There is no clear improvement for this particular jump from changing the
+renderer. These measurements do not compare continuous scrolling, image upload,
+GPU presentation or power consumption. General GPU drawing benefits cannot be
+quantified from this workload.
+
+Fresh Wayland/Vulkan and Wayland/GL top-jump attempts both fail the existing
+five-second settlement deadline; incomplete attempts are excluded from timings,
+not counted as passes. The X11 figures therefore cannot establish normal Wayland
+performance. Vulkan/X11 emits nonfatal swapchain-suboptimal warnings.
+[Retained evidence](performance-thread-prefetch.json) includes renderer types,
+module hashes, all samples, the default-launch check and failed attempt status.
+
 ## Reproduce
 
 Run `scripts/performance-pass.py` inside the installed Flatpak, exposing this checkout. The runner starts its own demo application with memory preferences and a temporary invented-data store. It never restores an account, reads an account database or makes a network request. Run it separately from tests and other GUI sessions, with the fixture window unobstructed.

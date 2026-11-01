@@ -6,9 +6,9 @@
   "libadwaita": "1.10.0",
   "meson": "1.12.0",
   "atproto": "0.0.73",
-  "tests": 218,
-  "gui": "PASS: installed named conversation scenario at 800/480, normal renderer, invented records; narrow light feed/quote pills visually inspected. All 42 installed modules and compiled resources match source/build. Earlier navigation/full GUI journeys retain historical scope; pointer signal regressions do not establish physical mouse/touch or Orca acceptance.",
-  "app_commit": "540267572ac03c2877ca2ec83a4b99b3cf3d3f026d7b1aed827d370c08f60c07",
+  "tests": 247,
+  "gui": "PASS: installed conversation smoke at800/480 under X11/Cairo, invented records; narrow dark conversation visually inspected. GDK frame-timing warnings remain visible; no physical/live-service/FPS acceptance.",
+  "app_commit": "46291aeadae2a0f797dd6a295a429cee4ab9e675f627f24b253f167d1432623b",
   "runtime_commit": "3fdff711ebbaec7aeb565d33e21a37ea77d848efe0c342f7750bb41634b6b856",
   "sdk_commit": "70f7db725cc410468d49b88af80e93aa805c24aeb72b90d0939793460c32fa8f",
   "bundle": "67de7efb6b4c3164289003d7f5624cec7f82377f09a879ecfc81b9c9e23c3a61  dist/com.nedrichards.Skyloom-0.1.0-x86_64.flatpak",
@@ -111,8 +111,8 @@
     "upper_edge_app_commit": "2c97c0d658fbc5476279520db9e8b39872fd121b3d208db6bbc0a518078d4b0f"
   },
   "motion": "160 ms opacity-only selected-reaction/read-marker feedback, fixed unread envelope and accessible read state; both GTK motion settings, visible clipping, inactive/power/unmap completion, no retained finished animation",
-  "native_suite_app_commit": "6e19dc63842a3c3aa7c8f2482f154359fb163ae2893b9de9835d0cc642630d55",
-  "native_suite_scope": "204 source/default-renderer and installed/Cairo tests, no skips. Full GUI journey ran before a fixture-only popover activation correction; final named preferences scenarios and module/resource parity run on final installation.",
+  "native_suite_app_commit": "46291aeadae2a0f797dd6a295a429cee4ab9e675f627f24b253f167d1432623b",
+  "native_suite_scope": "247 installed GNOME51 native tests under explicit X11/Cairo, zero skips. Additional installed Home/cache integration passes with warnings treated as errors except upstream DeprecationWarnings. Final named conversation smoke passes at800/480; normal launch selects Wayland/Vulkan. Wayland Vulkan/GL jump probes time out and are not counted as passes.",
   "card_interaction": "Natural-width combined avatar/profile target, unused header space opens conversation; wrapping Adw.WrapBox label buttons without grid cells; native pointer selection remains logical without a full-row wash, direct keyboard focus outlines only clamped content, child controls keep local focus rings; caption metadata, consistent symbolic icon/count actions and original outline/filled hearts; profile focus survives content rebind.",
   "full_gui_app_commit": "6e19dc63842a3c3aa7c8f2482f154359fb163ae2893b9de9835d0cc642630d55",
   "test_renderer_limitation": "Source/default-renderer and installed/Cairo functional suites pass. Current standalone X11 30-post timing run has adequate samples; old baseline is rejected for insufficient feedback/different scroll workloads. Physical-input/live-account acceptance and universal 60 fps are not claimed.",
@@ -179,5 +179,31 @@
       "scope": "Separate demo processes. Visible transition evidence, not a frame-rate/performance comparison; initial width reflow still costs hundreds of milliseconds."
     },
     "limits": "Intermittent standalone conversation-focus failures, normal-session feed frame-wait timeouts and native rapid-reversal AdwGizmo allocation warning remain documented. No physical input/live-account acceptance or account-process restart."
+  },
+  "thread_prefetch_validation": {
+    "date": "2026-11-01",
+    "app_commit": "e410e2efae7810f2f04f33b3b88fa8e463045e93701dbcf221b37895c3d725d1",
+    "source_native_suite": 226,
+    "installed_native_suite": 226,
+    "additional_installed_home_cache_integration_tests": 1,
+    "current_test_inventory": 227,
+    "unexpected_skips": 0,
+    "backend": "X11/Cairo",
+    "gui": "PASS: installed conversation scenario at 800/480; narrow cards and expanded conversation pills visually inspected",
+    "source_installed_changed_module_hashes_match": true,
+    "distribution_bundle_rebuilt": false,
+    "limitations": "No live-account prefetch, physical input, frame-rate or hardware power/network acceptance. Existing ReadingSession signal-disconnection teardown warning remains visible; warning-strict diagnostic fails."
+  },
+  "thread_prefetch_review": {
+    "date": "2026-11-01",
+    "app_commit": "46291aeadae2a0f797dd6a295a429cee4ab9e675f627f24b253f167d1432623b",
+    "adversarial_reviewers": 3,
+    "installed_native_tests": 247,
+    "skips": 0,
+    "warning_strict_installed_home_integration": "PASS excluding upstream DeprecationWarnings",
+    "performance": "docs/performance-thread-prefetch.json; immutable e410e2ef baseline; hashes recorded before/after; source and installed candidate modules match",
+    "distribution_bundle_rebuilt": false,
+    "limitations": "Native top-jump destination buffer settlement remains about0.4s in250-post stress case. No live-account, physical input, FPS or hardware-energy acceptance.",
+    "gui_smoke": "PASS: installed conversation at800/480, X11/Cairo"
   }
 }

@@ -1,5 +1,76 @@
 # Delivery report
 
+## Renderer follow-up — 1 November 2026
+
+Normal installed launch was checked with a fresh empty native window: Wayland,
+Vulkan and no GSK_RENDERER/GDK_BACKEND override. Production launch does not force
+Cairo. Matching X11/Vulkan and X11/GL top-jump probes pass with unchanged module
+hashes, exact Undo and similar settlement to Cairo; no renderer speedup is
+established for this workload. Both normal-backend Wayland GPU probe attempts
+time out at the existing five-second settlement deadline and are excluded from
+performance results. See [renderer evidence](PERFORMANCE.md#renderer-follow-up--1-november-2026). No production settings or app code changed.
+
+## Adversarial thread-prefetch correctness/performance review — 1 November 2026
+
+Three independent adversarial agents reviewed cache/request correctness,
+performance and regression coverage. A second correctness review checked the
+fixes and found the additional ancestry-only reuse defect before completion.
+Confirmed findings were fixed:
+
+- Cached descendants now merge under the original response anchor, retaining
+  their unloaded reply continuations. An ancestry-only post is not treated as
+  having fetched reply coverage; opening it requests its missing siblings.
+- Cache reuse keeps the original fetch timestamp and does not insert duplicate
+  descendant aliases. Freshness therefore expires after two minutes even with
+  repeated opening. Local reaction revisions protect existing snapshots and
+  older in-flight responses, while later acknowledged requests may accept newer
+  server state. Pending reactions remain protected.
+- Home fetches around the exact visible post instead of requesting a distant
+  root that can omit deep replies. Root-based cooldown and shared request budgets
+  remain. Foreground reads and mutations cancel speculative work; stale request
+  slots recover, and sign-out clears snapshots/reaction state.
+- Policy/worker notifications no longer restart viewport debounce. Mounted pills
+  update only when their projected position changes; cache membership uses
+  fetched-subtree sets. ReadingSession disconnect callbacks now retain distinct
+  handler IDs, resolving the earlier teardown warning.
+
+The final installed native gate passes **247 tests with zero skips** under
+GNOME 51/X11/Cairo, including the adversarial cache, mutation, lifecycle and
+foreground-preemption regressions. The installed Home/cache integration also
+passes with warnings treated as errors (upstream DeprecationWarnings excluded).
+The final installed conversation smoke passes at 800/480 pixels, including
+branch retry/loading, ordering and selected-message return. Invented-data captures
+are in ignored `build-prefetch-review/`; narrow dark conversation rendering was
+visually inspected. GDK frame-timing warnings remain visible during smoke and
+are not treated as frame-rate acceptance.
+
+Stable/preview Ruff, formatting, SyntaxWarning compilation, shell syntax,
+desktop entry and strict schema validation pass. The normal check wrapper was
+invoked; nested Flatpak instance allocation remains an environment boundary,
+so its native component ran through the documented host bridge without changing
+assertions. The first source-suite attempt exposed an old cache fixture whose
+request anchors were absent from its response; the fixture now uses valid
+anchor/response pairs while preserving its budget/expiry/retention assertions.
+
+The cached-dependency Flatpak rebuild/export and reinstall succeeded at
+`46291aeadae2a0f797dd6a295a429cee4ab9e675f627f24b253f167d1432623b`.
+The performance probe recorded matching source/installed hashes for all twelve
+reviewed modules, before and after unchanged runs. A concurrent installed update
+made an initial baseline unsuitable; the accepted comparison instead uses the
+preserved original `e410e2ef` commit extracted into an ignored directory, without
+reinstalling an older app. Compiled resource hashes match between the builds.
+
+[Performance evidence](PERFORMANCE.md#thread-prefetch-adversarial-pass--1-november-2026)
+and [retained aggregates](performance-thread-prefetch.json) show unchanged-pill
+updates falling from 1,000 to zero, 200 policy notifications creating one timer
+instead of 200, and 1,000 cache misses taking 4.339 ms versus 208.109 ms in these
+samples. Six native long jumps per build go directly to zero and restore Undo
+with zero pixel error. Destination-buffer hydration still takes roughly 0.4 s to
+settle in the 250-post stress case; no faster-jump, FPS or hardware-energy claim
+is made. Live-account prefetch effectiveness, physical scrolling/input, Orca and
+real power/network transitions remain unverified. No real-account process was
+inspected or restarted. The review itself did not publish or tag a release.
+
 ## Arrival notices at the top — 1 November 2026
 
 Feed arrival notices now dismiss when the native vertical adjustment reaches the
@@ -20,6 +91,53 @@ passes the new native arrival-notice regression against `/app/share/skyloom`.
 Manual review of both installed apps was approved by the maintainer.
 The exact staged commit snapshot also passes the arrival-notice regression and
 existing toast/keyboard regression independently of the unrelated working tree.
+
+## Thread prefetch and distant top jumps — 1 November 2026
+
+Numeric position pills remain on Home and conversations without a `+` suffix;
+incomplete context remains explained in tooltips/accessibility. Single-message
+pills are suppressed. Home prefetches visible conversations after a 350 ms pause,
+with one shared request slot, six requests per minute and a five-minute root
+cooldown. A 32-snapshot cache supplies fresh context for two minutes. Foreground
+requests take priority; automatic work obeys activity/network/cost/power gates,
+and owned Home requests cancel on unmap/ineligibility. Replies never enter the
+Home feed model. Conversations examine one viewport beyond visibility, using a
+shared three-request lookahead budget for reply and ancestor continuations.
+
+Top jumps longer than a viewport set the native adjustment directly to zero and
+skip the top-edge bounce. A native 60-post fixture jumps from post 45, observes
+no intermediate nonzero viewport positions, and verifies Undo restores the same
+post and pixel offset. This is functional positioning proof, not a frame-rate
+measurement or physical-input acceptance.
+
+Validation:
+
+- Stable/preview Ruff 0.17.3, formatting, SyntaxWarning compilation, shell syntax,
+  desktop entry and strict settings-schema checks pass. `./scripts/check.sh`
+  reached Flatpak but the nested environment could not allocate an instance;
+  the equivalent native gate ran through `flatpak-spawn --host` with explicit
+  X11/Cairo, preserving all assertions and rejecting unexpected skips.
+- All 226 tests passed against source code in GNOME 51, then all 226 passed
+  against the rebuilt installed code (zero skips). An additional installed-window
+  integration test passed separately: visible Home prefetch enriches the pill
+  without inserting feed rows, then opening the child reuses its cached snapshot
+  without another service request. The current test inventory is 227.
+- The cached-dependency Flatpak rebuild/export and local reinstall succeeded.
+  Installed revision is `e410e2efae7810f2f04f33b3b88fa8e463045e93701dbcf221b37895c3d725d1`;
+  all five changed application modules have identical source/installed SHA-256
+  hashes. The distribution bundle was not regenerated.
+- Installed `--demo --smoke-scenario conversation` passed at 800/480 pixels.
+  Captures are in ignored `build-prefetch-smoke/`; narrow cards and expanded
+  conversation pills were visually inspected. GDK frame-timing warnings remain
+  visible; these captures do not establish smoothness under real workloads.
+
+A warning-as-error diagnostic traced an existing fixture teardown warning to
+`ReadingSession` signal-disconnection ownership in `reading.py`, outside the
+prefetch code. The normal native suites pass with that warning visible; the
+warning-strict diagnostic fails and is not counted as a pass. Live-account
+prefetch effectiveness, physical scrolling smoothness, Orca and actual
+network/power transitions remain unverified. The existing real-account process
+was not restarted or inspected; restart Skyloom to use the installed changes.
 
 ## Ruff 0.17.3 review — 1 November 2026
 
@@ -80,8 +198,8 @@ search and embedded quote cards. A bounded account-session index retains only
 2,000 relationship/time/reply-count records and shares known context between
 views. Discovering ancestors or replies updates mounted pills without rebuilding
 post bodies or fetching extra threads. Independent conversations have separate
-counts; standalone posts have no pill unless opened as a conversation. Partial
-context can initially show `1/1+`. Counts describe known messages, not a guaranteed
+counts. Pills now require at least two known connected posts; isolated posts
+never show `1/1` or `1/1+`, including when opened as a conversation. Counts describe known messages, not a guaranteed
 server-wide total. Account replacement/sign-out resets the index.
 
 Selectable body text now distinguishes pointer jitter from deliberate dragging
@@ -341,3 +459,11 @@ Live-account sign-in/restore/publication/mutations, Orca, physical touch/file po
 Known upstream GI asyncio-policy and HTTPX upload deprecations remain visible. Prepared upload copies are retained until sign-out, including abandoned copies. The archive does not include every profile/conversation/notification. Reactions in loaded feed windows join coalesced checkpoints; records never fetched remain unavailable offline. A forced process termination can lose the last unsaved second of position changes. English is delivered; there are no translation catalogues. No hosted CI/static typing/ShellCheck execution is claimed. See the roadmap for these follow-ups.
 
 The existing real-account process was not restarted, inspected or removed. Restart Skyloom to use the installed update. [DEVELOPMENT.md](DEVELOPMENT.md) and [TESTING.md](TESTING.md) give reproducible commands; installed checks and real-account acceptance are clearly separate.
+
+
+## Single-message position suppression — 1 November 2026
+
+ThreadContext suppresses pills until two connected posts are known, including
+explicitly opened single-post conversations and reply-count-only evidence. The
+six focused regressions pass. The initially unavailable Ruff 0.17.3 tool is now
+available; the later validation below supersedes the earlier tool-version block.

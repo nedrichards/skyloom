@@ -1,0 +1,754 @@
+{
+  "schema": 1,
+  "date": "2026-11-01",
+  "scope": "Invented data only; GNOME 51; sequential separate processes; explicit X11/Cairo; 800x820; 250 posts; six jumps from positions45/249; same compiled resource SHA256 in both builds.",
+  "baseline_app_commit": "e410e2efae7810f2f04f33b3b88fa8e463045e93701dbcf221b37895c3d725d1",
+  "candidate_app_commit": "46291aeadae2a0f797dd6a295a429cee4ab9e675f627f24b253f167d1432623b",
+  "compiled_resource_sha256": "90eaae26ecbfcf08de62ee653c9624899029c1f58ebfe399b5330867edc8ca2d",
+  "limitations": "Single shared-desktop samples; no frame-presentation/FPS comparison, live-account performance or hardware energy measurement. Native settlement includes polling and GTK buffer hydration; no faster-long-jump claim. Changed-singleton projection microbenchmark is deliberately adverse, not the normal batched feed/prefetch path.",
+  "runs": {
+    "baseline": {
+      "module_sha256": {
+        "application": "bc293e95a0f85350712f59cb16153608e92210034d8da93982cb93835c8d742f",
+        "conversation": "bbd2278432042ddfaa908bdda1fb4024fab28d77cc965a75800b201a133d66bf",
+        "list_interaction": "abfce1e27a08cf810b8a2ce3f4fefbde6231b9c2a095b44973c5cb788da4ae8c",
+        "reading": "450b0e4e90989854c53386c384edefbd5ff4a659089623d1d9033b5fc013503f",
+        "refresh_monitor": "37d16ce4ea0ad7ba9348c9538ebddebe1d1d99d44e5bed966ea02119a3c61478",
+        "request_scope": "9a9e4f6eb792dd5df7f76587a5195b88849b3040d12e7f5e7e935421865bade9",
+        "service": "cf386f71b3213c2f73bce0d6de9a40c038cc5c162612ea07fda00668472c4787",
+        "thread_context": "fe7b779e310375fe0850c1c1da55b8a375995a50e13cc5b82cf9d60348e35d1c",
+        "thread_prefetch": "8c2845e6d1e0ed1160c69cc9d5f1d4ba4653cd750ba82888dd2b21461323327e",
+        "widgets": "a9f7f7e00d95c4ef60d1a9babc1d71f765ad841349012570e0d2255a6b745904",
+        "window": "37955614c8d2dd3f485896ef94e4577f8e2dd5423b6bf039a016dc6b6bba05af",
+        "worker": "08c6f6cb0b70ec250901561cd0d8db72be2a242e82699e4391752fee53300175"
+      },
+      "probe_sha256": "5466fe51f79d0294b74bb86b8e0e17d8a1b826fe677a90d57678ef188fa6b9dc",
+      "source_files_unchanged_during_probe": true,
+      "micro": {
+        "context_bulk_2000": {
+          "iterations": 1,
+          "wall_ms": 9.218,
+          "cpu_ms": 9.205
+        },
+        "context_200_changed_single_remembers": {
+          "iterations": 1,
+          "wall_ms": 1237.513,
+          "cpu_ms": 1233.823
+        },
+        "context_200_unchanged_single_remembers": {
+          "iterations": 1,
+          "wall_ms": 0.408,
+          "cpu_ms": 0.409
+        },
+        "cache_1000_oldest_hits": {
+          "iterations": 1000,
+          "wall_ms": 216.017,
+          "cpu_ms": 215.383
+        },
+        "cache_1000_misses": {
+          "iterations": 1000,
+          "wall_ms": 208.109,
+          "cpu_ms": 207.416
+        },
+        "unrelated_prefetch_250": {
+          "iterations": 1,
+          "wall_ms": 1.947,
+          "cpu_ms": 1.947
+        },
+        "unrelated_prefetch_unchanged_row_updates": 1000,
+        "unchanged_connection_dispatches_200": {
+          "iterations": 200,
+          "wall_ms": 0.49,
+          "cpu_ms": 0.488
+        },
+        "unchanged_connection_timer_adds": 200,
+        "unchanged_connection_timer_removes": 199
+      },
+      "native": {
+        "renderer": "GskCairoRenderer",
+        "gtk_enable_animations": true,
+        "posts": 250,
+        "width": 800,
+        "iterations": 3,
+        "settled_ms_scope": "10 ms polling plus three stable checks; not frame-presentation latency",
+        "jumps": [
+          {
+            "source_index": 45,
+            "source_key": "at://invented/jump/42",
+            "source_offset": -166.0,
+            "source_scroll": 9618.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 8.405,
+            "settled_ms": 125.304,
+            "cpu_ms": 44.443,
+            "row_binds": 0,
+            "row_unbinds": 0,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          },
+          {
+            "source_index": 249,
+            "source_key": "at://invented/jump/246",
+            "source_offset": -166.0,
+            "source_scroll": 55518.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 83.208,
+            "settled_ms": 440.257,
+            "cpu_ms": 341.257,
+            "row_binds": 46,
+            "row_unbinds": 45,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          },
+          {
+            "source_index": 45,
+            "source_key": "at://invented/jump/45",
+            "source_offset": 2.0,
+            "source_scroll": 10125.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 70.928,
+            "settled_ms": 375.35,
+            "cpu_ms": 277.738,
+            "row_binds": 43,
+            "row_unbinds": 43,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          },
+          {
+            "source_index": 249,
+            "source_key": "at://invented/jump/246",
+            "source_offset": -166.0,
+            "source_scroll": 55518.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 85.015,
+            "settled_ms": 454.195,
+            "cpu_ms": 344.887,
+            "row_binds": 46,
+            "row_unbinds": 45,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          },
+          {
+            "source_index": 45,
+            "source_key": "at://invented/jump/45",
+            "source_offset": 2.0,
+            "source_scroll": 10125.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 73.584,
+            "settled_ms": 375.512,
+            "cpu_ms": 276.629,
+            "row_binds": 43,
+            "row_unbinds": 43,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          },
+          {
+            "source_index": 249,
+            "source_key": "at://invented/jump/246",
+            "source_offset": -166.0,
+            "source_scroll": 55518.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 87.454,
+            "settled_ms": 446.207,
+            "cpu_ms": 347.453,
+            "row_binds": 46,
+            "row_unbinds": 45,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          }
+        ]
+      }
+    },
+    "candidate": {
+      "module_sha256": {
+        "application": "bc293e95a0f85350712f59cb16153608e92210034d8da93982cb93835c8d742f",
+        "conversation": "bbd2278432042ddfaa908bdda1fb4024fab28d77cc965a75800b201a133d66bf",
+        "list_interaction": "abfce1e27a08cf810b8a2ce3f4fefbde6231b9c2a095b44973c5cb788da4ae8c",
+        "reading": "f22a5e0dbb3722b18042b1dbe5fba85a9fc7123060e20d0db877891283141d38",
+        "refresh_monitor": "37d16ce4ea0ad7ba9348c9538ebddebe1d1d99d44e5bed966ea02119a3c61478",
+        "request_scope": "36dca54ca82a56907b372cc9620911839387fc9bda28a7ad641abc0b31ccad93",
+        "service": "cf386f71b3213c2f73bce0d6de9a40c038cc5c162612ea07fda00668472c4787",
+        "thread_context": "fe7b779e310375fe0850c1c1da55b8a375995a50e13cc5b82cf9d60348e35d1c",
+        "thread_prefetch": "2acbb33946c273d203f8600417be2d694fa5db2b889ee035b86c91edb33b0d9a",
+        "widgets": "c5c20c32e76f67ec8ab0f09adacb1b90ed43ff18852694ef1e8b4b6b13d080e3",
+        "window": "2278d3f3e81909899bf357d8fd238e756d8d8e4f8e9f2c83a007862bc0d2d6a2",
+        "worker": "08c6f6cb0b70ec250901561cd0d8db72be2a242e82699e4391752fee53300175"
+      },
+      "probe_sha256": "5466fe51f79d0294b74bb86b8e0e17d8a1b826fe677a90d57678ef188fa6b9dc",
+      "source_files_unchanged_during_probe": true,
+      "micro": {
+        "context_bulk_2000": {
+          "iterations": 1,
+          "wall_ms": 9.233,
+          "cpu_ms": 9.229
+        },
+        "context_200_changed_single_remembers": {
+          "iterations": 1,
+          "wall_ms": 1145.091,
+          "cpu_ms": 1142.706
+        },
+        "context_200_unchanged_single_remembers": {
+          "iterations": 1,
+          "wall_ms": 0.397,
+          "cpu_ms": 0.397
+        },
+        "cache_1000_oldest_hits": {
+          "iterations": 1000,
+          "wall_ms": 3.972,
+          "cpu_ms": 3.974
+        },
+        "cache_1000_misses": {
+          "iterations": 1000,
+          "wall_ms": 4.339,
+          "cpu_ms": 4.332
+        },
+        "unrelated_prefetch_250": {
+          "iterations": 1,
+          "wall_ms": 1.832,
+          "cpu_ms": 1.831
+        },
+        "unrelated_prefetch_unchanged_row_updates": 0,
+        "unchanged_connection_dispatches_200": {
+          "iterations": 200,
+          "wall_ms": 0.399,
+          "cpu_ms": 0.401
+        },
+        "unchanged_connection_timer_adds": 1,
+        "unchanged_connection_timer_removes": 0
+      },
+      "native": {
+        "renderer": "GskCairoRenderer",
+        "gtk_enable_animations": true,
+        "posts": 250,
+        "width": 800,
+        "iterations": 3,
+        "settled_ms_scope": "10 ms polling plus three stable checks; not frame-presentation latency",
+        "jumps": [
+          {
+            "source_index": 45,
+            "source_key": "at://invented/jump/42",
+            "source_offset": -166.0,
+            "source_scroll": 9618.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 9.456,
+            "settled_ms": 125.386,
+            "cpu_ms": 35.737,
+            "row_binds": 0,
+            "row_unbinds": 0,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          },
+          {
+            "source_index": 249,
+            "source_key": "at://invented/jump/246",
+            "source_offset": -166.0,
+            "source_scroll": 55518.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 85.411,
+            "settled_ms": 452.344,
+            "cpu_ms": 344.493,
+            "row_binds": 46,
+            "row_unbinds": 45,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          },
+          {
+            "source_index": 45,
+            "source_key": "at://invented/jump/45",
+            "source_offset": 2.0,
+            "source_scroll": 10125.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 75.128,
+            "settled_ms": 391.773,
+            "cpu_ms": 283.663,
+            "row_binds": 43,
+            "row_unbinds": 43,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          },
+          {
+            "source_index": 249,
+            "source_key": "at://invented/jump/246",
+            "source_offset": -166.0,
+            "source_scroll": 55518.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 80.493,
+            "settled_ms": 449.328,
+            "cpu_ms": 340.768,
+            "row_binds": 46,
+            "row_unbinds": 45,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          },
+          {
+            "source_index": 45,
+            "source_key": "at://invented/jump/45",
+            "source_offset": 2.0,
+            "source_scroll": 10125.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 79.37,
+            "settled_ms": 394.604,
+            "cpu_ms": 286.456,
+            "row_binds": 43,
+            "row_unbinds": 43,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          },
+          {
+            "source_index": 249,
+            "source_key": "at://invented/jump/246",
+            "source_offset": -166.0,
+            "source_scroll": 55518.0,
+            "adjustment_values": [
+              0.0
+            ],
+            "action_ms": 83.486,
+            "settled_ms": 450.846,
+            "cpu_ms": 343.256,
+            "row_binds": 46,
+            "row_unbinds": 45,
+            "mapped_rows": 4,
+            "undo_key_matches": true,
+            "undo_offset_error": 0.0
+          }
+        ]
+      }
+    }
+  },
+  "renderer_comparison": {
+    "scope": "Same installed code hashes, X11 backend,250 posts,800px, six top jumps each. Cairo reuses preceding candidate sample. No significant-performance or general-rendering conclusion from single runs.",
+    "normal_launch_probe": {
+      "GSK_RENDERER": null,
+      "GDK_BACKEND": null,
+      "display": "GdkWaylandDisplay",
+      "renderer": "GskVulkanRenderer",
+      "scope": "Fresh empty sandbox window; no account process inspected"
+    },
+    "wayland_probe_attempts": {
+      "vulkan": "FAILED: Top jump did not settle within5s",
+      "gl": "FAILED: Top jump did not settle within5s"
+    },
+    "runs": {
+      "cairo": {
+        "module_sha256": {
+          "application": "bc293e95a0f85350712f59cb16153608e92210034d8da93982cb93835c8d742f",
+          "conversation": "bbd2278432042ddfaa908bdda1fb4024fab28d77cc965a75800b201a133d66bf",
+          "list_interaction": "abfce1e27a08cf810b8a2ce3f4fefbde6231b9c2a095b44973c5cb788da4ae8c",
+          "reading": "f22a5e0dbb3722b18042b1dbe5fba85a9fc7123060e20d0db877891283141d38",
+          "refresh_monitor": "37d16ce4ea0ad7ba9348c9538ebddebe1d1d99d44e5bed966ea02119a3c61478",
+          "request_scope": "36dca54ca82a56907b372cc9620911839387fc9bda28a7ad641abc0b31ccad93",
+          "service": "cf386f71b3213c2f73bce0d6de9a40c038cc5c162612ea07fda00668472c4787",
+          "thread_context": "fe7b779e310375fe0850c1c1da55b8a375995a50e13cc5b82cf9d60348e35d1c",
+          "thread_prefetch": "2acbb33946c273d203f8600417be2d694fa5db2b889ee035b86c91edb33b0d9a",
+          "widgets": "c5c20c32e76f67ec8ab0f09adacb1b90ed43ff18852694ef1e8b4b6b13d080e3",
+          "window": "2278d3f3e81909899bf357d8fd238e756d8d8e4f8e9f2c83a007862bc0d2d6a2",
+          "worker": "08c6f6cb0b70ec250901561cd0d8db72be2a242e82699e4391752fee53300175"
+        },
+        "native": {
+          "renderer": "GskCairoRenderer",
+          "gtk_enable_animations": true,
+          "posts": 250,
+          "width": 800,
+          "iterations": 3,
+          "settled_ms_scope": "10 ms polling plus three stable checks; not frame-presentation latency",
+          "jumps": [
+            {
+              "source_index": 45,
+              "source_key": "at://invented/jump/42",
+              "source_offset": -166.0,
+              "source_scroll": 9618.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 9.456,
+              "settled_ms": 125.386,
+              "cpu_ms": 35.737,
+              "row_binds": 0,
+              "row_unbinds": 0,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 249,
+              "source_key": "at://invented/jump/246",
+              "source_offset": -166.0,
+              "source_scroll": 55518.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 85.411,
+              "settled_ms": 452.344,
+              "cpu_ms": 344.493,
+              "row_binds": 46,
+              "row_unbinds": 45,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 45,
+              "source_key": "at://invented/jump/45",
+              "source_offset": 2.0,
+              "source_scroll": 10125.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 75.128,
+              "settled_ms": 391.773,
+              "cpu_ms": 283.663,
+              "row_binds": 43,
+              "row_unbinds": 43,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 249,
+              "source_key": "at://invented/jump/246",
+              "source_offset": -166.0,
+              "source_scroll": 55518.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 80.493,
+              "settled_ms": 449.328,
+              "cpu_ms": 340.768,
+              "row_binds": 46,
+              "row_unbinds": 45,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 45,
+              "source_key": "at://invented/jump/45",
+              "source_offset": 2.0,
+              "source_scroll": 10125.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 79.37,
+              "settled_ms": 394.604,
+              "cpu_ms": 286.456,
+              "row_binds": 43,
+              "row_unbinds": 43,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 249,
+              "source_key": "at://invented/jump/246",
+              "source_offset": -166.0,
+              "source_scroll": 55518.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 83.486,
+              "settled_ms": 450.846,
+              "cpu_ms": 343.256,
+              "row_binds": 46,
+              "row_unbinds": 45,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            }
+          ]
+        },
+        "probe_sha256": "5466fe51f79d0294b74bb86b8e0e17d8a1b826fe677a90d57678ef188fa6b9dc"
+      },
+      "vulkan": {
+        "module_sha256": {
+          "application": "bc293e95a0f85350712f59cb16153608e92210034d8da93982cb93835c8d742f",
+          "conversation": "bbd2278432042ddfaa908bdda1fb4024fab28d77cc965a75800b201a133d66bf",
+          "list_interaction": "abfce1e27a08cf810b8a2ce3f4fefbde6231b9c2a095b44973c5cb788da4ae8c",
+          "reading": "f22a5e0dbb3722b18042b1dbe5fba85a9fc7123060e20d0db877891283141d38",
+          "refresh_monitor": "37d16ce4ea0ad7ba9348c9538ebddebe1d1d99d44e5bed966ea02119a3c61478",
+          "request_scope": "36dca54ca82a56907b372cc9620911839387fc9bda28a7ad641abc0b31ccad93",
+          "service": "cf386f71b3213c2f73bce0d6de9a40c038cc5c162612ea07fda00668472c4787",
+          "thread_context": "fe7b779e310375fe0850c1c1da55b8a375995a50e13cc5b82cf9d60348e35d1c",
+          "thread_prefetch": "2acbb33946c273d203f8600417be2d694fa5db2b889ee035b86c91edb33b0d9a",
+          "widgets": "c5c20c32e76f67ec8ab0f09adacb1b90ed43ff18852694ef1e8b4b6b13d080e3",
+          "window": "2278d3f3e81909899bf357d8fd238e756d8d8e4f8e9f2c83a007862bc0d2d6a2",
+          "worker": "08c6f6cb0b70ec250901561cd0d8db72be2a242e82699e4391752fee53300175"
+        },
+        "native": {
+          "renderer": "GskVulkanRenderer",
+          "gtk_enable_animations": true,
+          "posts": 250,
+          "width": 800,
+          "iterations": 3,
+          "settled_ms_scope": "10 ms polling plus three stable checks; not frame-presentation latency",
+          "jumps": [
+            {
+              "source_index": 45,
+              "source_key": "at://invented/jump/42",
+              "source_offset": -166.0,
+              "source_scroll": 9618.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 6.562,
+              "settled_ms": 125.297,
+              "cpu_ms": 31.555,
+              "row_binds": 0,
+              "row_unbinds": 0,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 249,
+              "source_key": "at://invented/jump/246",
+              "source_offset": -166.0,
+              "source_scroll": 55518.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 85.642,
+              "settled_ms": 438.581,
+              "cpu_ms": 340.14,
+              "row_binds": 46,
+              "row_unbinds": 45,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 45,
+              "source_key": "at://invented/jump/45",
+              "source_offset": 2.0,
+              "source_scroll": 10125.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 77.139,
+              "settled_ms": 397.732,
+              "cpu_ms": 288.076,
+              "row_binds": 43,
+              "row_unbinds": 43,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 249,
+              "source_key": "at://invented/jump/246",
+              "source_offset": -166.0,
+              "source_scroll": 55518.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 77.844,
+              "settled_ms": 427.987,
+              "cpu_ms": 329.743,
+              "row_binds": 46,
+              "row_unbinds": 45,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 45,
+              "source_key": "at://invented/jump/45",
+              "source_offset": 2.0,
+              "source_scroll": 10125.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 82.339,
+              "settled_ms": 382.941,
+              "cpu_ms": 284.258,
+              "row_binds": 43,
+              "row_unbinds": 43,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 249,
+              "source_key": "at://invented/jump/246",
+              "source_offset": -166.0,
+              "source_scroll": 55518.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 97.382,
+              "settled_ms": 453.221,
+              "cpu_ms": 355.15,
+              "row_binds": 46,
+              "row_unbinds": 45,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            }
+          ]
+        },
+        "probe_sha256": "5466fe51f79d0294b74bb86b8e0e17d8a1b826fe677a90d57678ef188fa6b9dc"
+      },
+      "gl": {
+        "module_sha256": {
+          "application": "bc293e95a0f85350712f59cb16153608e92210034d8da93982cb93835c8d742f",
+          "conversation": "bbd2278432042ddfaa908bdda1fb4024fab28d77cc965a75800b201a133d66bf",
+          "list_interaction": "abfce1e27a08cf810b8a2ce3f4fefbde6231b9c2a095b44973c5cb788da4ae8c",
+          "reading": "f22a5e0dbb3722b18042b1dbe5fba85a9fc7123060e20d0db877891283141d38",
+          "refresh_monitor": "37d16ce4ea0ad7ba9348c9538ebddebe1d1d99d44e5bed966ea02119a3c61478",
+          "request_scope": "36dca54ca82a56907b372cc9620911839387fc9bda28a7ad641abc0b31ccad93",
+          "service": "cf386f71b3213c2f73bce0d6de9a40c038cc5c162612ea07fda00668472c4787",
+          "thread_context": "fe7b779e310375fe0850c1c1da55b8a375995a50e13cc5b82cf9d60348e35d1c",
+          "thread_prefetch": "2acbb33946c273d203f8600417be2d694fa5db2b889ee035b86c91edb33b0d9a",
+          "widgets": "c5c20c32e76f67ec8ab0f09adacb1b90ed43ff18852694ef1e8b4b6b13d080e3",
+          "window": "2278d3f3e81909899bf357d8fd238e756d8d8e4f8e9f2c83a007862bc0d2d6a2",
+          "worker": "08c6f6cb0b70ec250901561cd0d8db72be2a242e82699e4391752fee53300175"
+        },
+        "native": {
+          "renderer": "GskGLRenderer",
+          "gtk_enable_animations": true,
+          "posts": 250,
+          "width": 800,
+          "iterations": 3,
+          "settled_ms_scope": "10 ms polling plus three stable checks; not frame-presentation latency",
+          "jumps": [
+            {
+              "source_index": 45,
+              "source_key": "at://invented/jump/42",
+              "source_offset": -166.0,
+              "source_scroll": 9618.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 10.791,
+              "settled_ms": 128.276,
+              "cpu_ms": 42.777,
+              "row_binds": 0,
+              "row_unbinds": 0,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 249,
+              "source_key": "at://invented/jump/246",
+              "source_offset": -166.0,
+              "source_scroll": 55518.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 87.108,
+              "settled_ms": 447.921,
+              "cpu_ms": 358.269,
+              "row_binds": 46,
+              "row_unbinds": 45,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 45,
+              "source_key": "at://invented/jump/45",
+              "source_offset": 2.0,
+              "source_scroll": 10125.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 80.756,
+              "settled_ms": 386.801,
+              "cpu_ms": 288.864,
+              "row_binds": 43,
+              "row_unbinds": 43,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 249,
+              "source_key": "at://invented/jump/246",
+              "source_offset": -166.0,
+              "source_scroll": 55518.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 88.661,
+              "settled_ms": 449.49,
+              "cpu_ms": 351.127,
+              "row_binds": 46,
+              "row_unbinds": 45,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 45,
+              "source_key": "at://invented/jump/45",
+              "source_offset": 2.0,
+              "source_scroll": 10125.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 83.607,
+              "settled_ms": 395.664,
+              "cpu_ms": 297.361,
+              "row_binds": 43,
+              "row_unbinds": 43,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            },
+            {
+              "source_index": 249,
+              "source_key": "at://invented/jump/246",
+              "source_offset": -166.0,
+              "source_scroll": 55518.0,
+              "adjustment_values": [
+                0.0
+              ],
+              "action_ms": 89.993,
+              "settled_ms": 446.815,
+              "cpu_ms": 348.195,
+              "row_binds": 46,
+              "row_unbinds": 45,
+              "mapped_rows": 4,
+              "undo_key_matches": true,
+              "undo_offset_error": 0.0
+            }
+          ]
+        },
+        "probe_sha256": "5466fe51f79d0294b74bb86b8e0e17d8a1b826fe677a90d57678ef188fa6b9dc"
+      }
+    }
+  }
+}
