@@ -353,6 +353,32 @@ class KeyboardTests(unittest.TestCase):
         self.assertEqual(restored.key, place.key)
         self.assertAlmostEqual(restored.offset, place.offset, delta=3)
 
+    def test_distant_top_jump_lands_directly_and_preserves_undo_anchor(self):
+        posts = [replace(self.posts[0], uri=f"at://invented/long/{i}") for i in range(60)]
+        self.view.set_posts(posts)
+        self.view.interaction.select(45)
+        self.pump()
+        adjustment = self.view.scroll.get_vadjustment()
+        self.assertGreater(adjustment.get_value(), adjustment.get_page_size())
+        before = self.view.interaction.capture()
+        observed = []
+        signal = adjustment.connect("value-changed", lambda adj: observed.append(adj.get_value()))
+        try:
+            place = self.view.interaction.top()
+            self.pump()
+        finally:
+            adjustment.disconnect(signal)
+        self.assertEqual(place.key, before.key)
+        self.assertTrue(observed)
+        self.assertTrue(all(value <= 1 for value in observed), observed)
+        self.assertLessEqual(adjustment.get_value(), 1)
+        self.assertEqual(self.view.top_peek.offset, 0)
+        self.assertTrue(self.view.interaction.restore(place))
+        self.pump()
+        restored = self.view.interaction.capture()
+        self.assertEqual(restored.key, place.key)
+        self.assertAlmostEqual(restored.offset, place.offset, delta=3)
+
     def test_restore_correction_yields_to_new_keyboard_input(self):
         self.view.interaction.move("last")
         self.pump()

@@ -131,6 +131,13 @@ when global cancellation removes their slot, and sign-out clears snapshots and
 reaction state. PostPositions updates only mounted pills whose projected position
 actually changed, rather than setting GTK/accessibility properties for every row.
 
+Long top jumps bypass the item-position request and set the adjustment to zero
+directly, correcting it after layout. They skip the top peek; nearby jumps keep
+it. GTK virtualisation owns destination rows; no model items are removed or
+rebuilt merely to jump. The original stable key/pixel anchor remains available
+for Undo. A native 60-post fixture jumps from post 45 and asserts no intermediate
+adjustment values, destination completion and exact anchor/offset restoration.
+
 Alt+Up/Down select the loaded parent/first direct reply only in conversation list context; header buttons provide the same actions. Existing list/post commands are shared. Return to opened post appears when its row is outside the viewport and has Undo. Reactivation of the current anchor focuses its visible body without pushing a duplicate page. Merges preserve a URI/pixel viewport anchor and selection, and restore a replaced descendant control by semantic identity after allocation; busy loaders retain logical control focus and keep Enter from opening the previously selected post, without changing the reading position; errors restore their retry button, and disappearing loaders return to their parent or nearest visible message. Only actual presentation changes rebind retained rows: increased graph depth alone does not restart media work. Completion/error announcements use GTK’s polite accessible announcement API on mapped pages; actual Orca acceptance remains a human gate.
 
 Requests still retrieve two reply levels and up to 20 ancestors through the pinned SDK’s supported getPostThread route. Further replies are anchored at branch posts with parentHeight=0; earlier ancestors use depth=0. There is no invented API cursor. One request per page, generation/liveness guards, cancellation, failed-frontier state and fetched-anchor deduplication prevent concurrent or repeated automatic traversal. Eligible visible continuations autoload with manual fallback. The fallback Retry captures the exact failed request; success clears that retry and resumes normal branch paging, including after an offline cached start. Server-selected/omitted siblings can still limit wide threads; the browser route and opening another message remain available.

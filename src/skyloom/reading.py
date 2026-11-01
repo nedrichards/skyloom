@@ -21,9 +21,9 @@ class ReadingSession:
         self.closed = False
         adjustment = view.scroll.get_vadjustment()
         signal = adjustment.connect("value-changed", lambda *_: self.changed())
-        view.cleanups.append(lambda: adjustment.disconnect(signal))
+        view.cleanups.append(lambda signal=signal: adjustment.disconnect(signal))
         signal = view.store.connect("notify::selected", lambda *_: self.changed())
-        view.cleanups.append(lambda: view.store.disconnect(signal))
+        view.cleanups.append(lambda signal=signal: view.store.disconnect(signal))
         view.cleanups.append(self.close)
         view.connect("unmap", lambda *_: self.flush())
 

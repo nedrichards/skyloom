@@ -228,13 +228,19 @@ class ListInteraction:
         positions = self.positions()
         if positions:
             self.select(positions[0], focus=False)
-        self.view.list.scroll_to(0, Gtk.ListScrollFlags(0), None)
-        self.view.scroll.get_vadjustment().set_value(0)
+        adjustment = self.view.scroll.get_vadjustment()
+        distant = adjustment.get_value() > adjustment.get_page_size()
+        # For a distant jump, set the native viewport directly instead of issuing
+        # a second item-based positioning request across intermediate rows.
+        if not distant:
+            self.view.list.scroll_to(0, Gtk.ListScrollFlags(0), None)
+        adjustment.set_value(0)
 
         # Cancel an outstanding focus/restore correction before completing the jump.
         def landed():
             self.view.scroll.get_vadjustment().set_value(0)
-            self.view.top_peek.pulse()
+            if not distant:
+                self.view.top_peek.pulse()
 
         self.view.after_position(landed)
         return place

@@ -63,6 +63,10 @@ Automatic work respects activity, connection/cost and power restrictions; Home
 prefetch cancels on unmapping or loss of eligibility. Errors preserve content and
 explicit opening/retry remains available.
 
+Top jumps longer than one viewport set the native viewport directly to the top,
+without traversing intermediate pages or playing the top-edge bounce. Posts stay
+in the virtual list and Undo restores the original post and pixel offset.
+
 Card text remains selectable. A single click tolerates pointer jitter below the
 desktop's GTK drag threshold and opens after the double-click interval. Deliberate
 drags (even returning to their start), double-click word selection, Shift-click,

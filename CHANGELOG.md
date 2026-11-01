@@ -3,11 +3,12 @@
 ## Unreleased
 
 - Harden thread prefetch after adversarial review: preserve response anchors and original freshness, fetch ancestry-only cache misses, retain local reactions across older responses, and target visible deep replies. Cancel speculative requests for foreground work, recover canceled controllers, and clear snapshots on sign-out.
-- Avoid rewriting unchanged thread pills and restarting idle debounce on unrelated worker notifications; index cached subtree membership.
+- Avoid rewriting unchanged thread pills and restarting idle debounce on unrelated worker notifications; index cached subtree membership. Correct reading-position signal cleanup.
 
 - Dismiss new-post arrival notices and clear their unseen count when the list reaches the top through any scrolling method.
 
 - Remove the + suffix from position pills while retaining incomplete-context explanations. Add bounded visible-conversation prefetch on Home, share fresh snapshots with opened conversations, and load nearby conversation continuations ahead of reading.
+- Jump directly to the top when moving more than a viewport, skipping intermediate scrolling and the top bounce while preserving reading-position Undo.
 
 - Upgrade development Ruff to 0.17.3; enforce the reviewed shared-clock mock check and keep refresh-monitor test clocks local to their consumer.
 
