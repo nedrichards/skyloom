@@ -20,7 +20,7 @@ pydantic_core==2.50.1
 Pygments==2.21.0
 pytest==9.1.1
 regex==2026.9.29
-ruff==0.17.2
+ruff==0.17.3
 tlds==2026093003
 typing-inspection==0.4.4
 typing_extensions==4.16.0

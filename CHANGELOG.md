@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Upgrade development Ruff to 0.17.3; enforce the reviewed shared-clock mock check and keep refresh-monitor test clocks local to their consumer.
+
 - Shorten position Undo toasts to two seconds and dismiss them when leaving the window, keeping keyboard Undo available. Use “Moved to top” for an explicit top jump, avoiding stale “Back at the top” feedback on resume. Reaction Undo retains its five-second timeout.
 
 - Establish private GitHub source hosting, including the implemented preview and latest thread-context/input improvements; retain the separate public-release and human-acceptance gates.

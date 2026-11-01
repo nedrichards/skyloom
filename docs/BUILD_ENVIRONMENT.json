@@ -21,7 +21,7 @@
     "app_keyring_entries_removed": true
   },
   "high_contrast_large_text_smoke": "Historical PASS on pre-update-notice/sidebar build 6e19dc63842a3c3aa7c8f2482f154359fb163ae2893b9de9835d0cc642630d55: Preferences settings/authentication and Appearance chooser, light/dark at 800/480, high contrast and 16-point text. Not rerun for responsive-sidebar change.",
-  "ruff": "0.17.2",
+  "ruff": "0.17.3",
   "python_target": "3.14",
   "lint": "PASS: scripts/lint.sh; all first-party Python files; stable/targeted preview Ruff, formatter, SyntaxWarning-as-error compilation, shell syntax",
   "model_benchmark": {

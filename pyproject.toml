@@ -16,7 +16,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py314"
-required-version = "==0.17.2"
+required-version = "==0.17.3"
 
 [tool.ruff.lint]
 select = [

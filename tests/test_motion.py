@@ -1,10 +1,11 @@
 """Native feedback, modern reduced motion and deadline-based refresh contracts."""
 
 import gc
+import time
 import unittest
 import weakref
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from gtk_support import settle
 
@@ -147,7 +148,17 @@ class MotionTests(unittest.TestCase):
                 window.page_requests["invented"] = object()
 
         window.check_auto_refresh = check
-        with patch("skyloom.refresh_monitor.time.time", return_value=1100) as wall:
+        wall = Mock(return_value=1100)
+        with patch(
+            "skyloom.refresh_monitor.time",
+            SimpleNamespace(
+                time=wall,
+                monotonic=time.monotonic,
+                clock_gettime=time.clock_gettime,
+                CLOCK_BOOTTIME=time.CLOCK_BOOTTIME,
+            ),
+        ):
+            self.assertIsNot(time.time, wall)
             monitor = RefreshMonitor(window)
             self.addCleanup(monitor.close)
             monitor.test_connection = Connection()

@@ -4,7 +4,7 @@ Reviewed 27 October 2026. Run `./scripts/lint.sh` after installing `requirements
 
 ## Current Ruff configuration
 
-`pyproject.toml` targets Python 3.14 and requires exactly Ruff 0.17.2, matching the development lockfile. The stable rules apply to **all** Python under `src`, `tests`, `scripts` and `design`.
+`pyproject.toml` targets Python 3.14 and requires exactly Ruff 0.17.3, matching the development lockfile. The stable rules apply to **all** Python under `src`, `tests`, `scripts` and `design`.
 
 | Rules | Purpose |
 | --- | --- |
@@ -17,7 +17,7 @@ Reviewed 27 October 2026. Run `./scripts/lint.sh` after installing `requirements
 | `PGH`, `T10` | Precise suppressions, invalid ignores and accidental debugger statements |
 | `TRY201`, `TRY203`, `TRY400`, `TRY401` | Exception re-raising and logging mistakes |
 
-The second command in the script adds only preview rules `PLW1514` (explicit file encodings) and `RUF056` (redundant falsy dictionary defaults). `explicit-preview-rules = true` prevents selected families from silently enabling all their preview rules. Ruff's formatter runs in stable mode. See the upstream [rule catalogue](https://docs.astral.sh/ruff/rules/) and [preview configuration](https://docs.astral.sh/ruff/preview/).
+The second command in the script adds only preview rules `PLW1514` (explicit file encodings), `RUF056` (redundant falsy dictionary defaults) and `shared-clock-mock` (patch only the consumer’s clock reference, keeping other tasks and threads on the real clock). `explicit-preview-rules = true` prevents selected families from silently enabling all their preview rules. Ruff's formatter runs in stable mode. See the upstream [rule catalogue](https://docs.astral.sh/ruff/rules/) and [preview configuration](https://docs.astral.sh/ruff/preview/).
 
 ## Deliberate exceptions
 

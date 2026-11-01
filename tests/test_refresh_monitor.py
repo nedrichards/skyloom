@@ -2,7 +2,8 @@
 
 import time
 import unittest
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import test_startup
 from gtk_support import settle
@@ -29,7 +30,16 @@ class MonitorIntegrationTests(unittest.TestCase):
         self.assertIsNotNone(view)
         policy = window.interactions.policy(view.auto_key)
         policy.finished(now, True)
-        with patch("skyloom.refresh_monitor.time.time", return_value=now):
+        with patch(
+            "skyloom.refresh_monitor.time",
+            SimpleNamespace(
+                time=Mock(return_value=now),
+                monotonic=time.monotonic,
+                clock_gettime=time.clock_gettime,
+                CLOCK_BOOTTIME=time.CLOCK_BOOTTIME,
+            ),
+        ):
+            self.assertEqual(time.time.__module__, "time")
             window.settings.set_boolean("auto-refresh", True)
             monitor.changed()
             self.assertIsNotNone(monitor.source)

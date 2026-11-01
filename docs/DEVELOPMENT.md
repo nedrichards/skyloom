@@ -95,7 +95,7 @@ No public repository or homepage has been configured. AppStream therefore report
 
 ## Code quality and Python support
 
-Python 3.14 is the minimum supported interpreter, enforced by Meson and project metadata. Ruff 0.17.2 is enforced by configuration and pinned in requirements-dev.lock. Run `./scripts/lint.sh` for stable and selected preview lint, formatting, SyntaxWarning-as-error compilation and shell syntax. All application, test and helper Python is included. See [LINT_POLICY.md](LINT_POLICY.md) for exact rules and exceptions and [PYTHON_314_AUDIT.md](PYTHON_314_AUDIT.md) for reviewed language/library features and measured model allocations.
+Python 3.14 is the minimum supported interpreter, enforced by Meson and project metadata. Ruff 0.17.3 is enforced by configuration and pinned in requirements-dev.lock. Run `./scripts/lint.sh` for stable and selected preview lint, formatting, SyntaxWarning-as-error compilation and shell syntax. All application, test and helper Python is included. See [LINT_POLICY.md](LINT_POLICY.md) for exact rules and exceptions and [PYTHON_314_AUDIT.md](PYTHON_314_AUDIT.md) for reviewed language/library features and measured model allocations.
 
 Native metadata checks additionally include `glib-compile-schemas --strict --dry-run data`. Strict AppStream validation still exits 3 for the missing public homepage; this is an open metadata warning. No static type checker or remote CI is configured. `./scripts/check.sh` provides the reproducible local integration gate; [TESTING.md](TESTING.md) explains its scope.
 

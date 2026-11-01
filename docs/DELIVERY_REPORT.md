@@ -1,5 +1,27 @@
 # Delivery report
 
+## Ruff 0.17.3 review — 1 November 2026
+
+Development Ruff is pinned to 0.17.3. Stable lint, selected preview checks,
+formatting, SyntaxWarning-as-error compilation and shell syntax pass. The
+`shared-clock-mock` preview gate now prevents process-wide clock patches in
+refresh-monitor tests; test wall clocks are private while BOOTTIME constants
+and real monotonic clocks are preserved. Clock isolation assertions extend
+the existing deadline/resume cases. The regex compilation preview check had
+no findings.
+
+A source native suite using the available display and Cairo ran 221 tests:
+219 passed, with failures in `test_label_controls_sync_mounted_copies_and_keep_keyboard_focus`
+and `test_offscreen_pictures_release_textures_and_ignore_late_callbacks`. Both
+modified clock test modules passed within that run. A forced X11 launch
+crashed during GTK initialization. These runs do not replace earlier installed
+application evidence or claim a clean full native gate. Other source edits
+were occurring concurrently in this checkout. The two GUI failures passed
+when run in isolation against both committed HEAD and the modified source. A
+focused rerun of both changed clock cases plus those two GUI cases passed all
+four tests. A separate six-test motion/monitor run had an unrelated animation
+settling timeout. The full-suite timing instability remains unresolved.
+
 ## Position toast timing — 1 November 2026
 
 Explicit top jumps now say “Moved to top”. Position Undo feedback lasts two
