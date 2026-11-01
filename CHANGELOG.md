@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Shorten position Undo toasts to two seconds and dismiss them when leaving the window, keeping keyboard Undo available. Use “Moved to top” for an explicit top jump, avoiding stale “Back at the top” feedback on resume. Reaction Undo retains its five-second timeout.
+
 - Establish private GitHub source hosting, including the implemented preview and latest thread-context/input improvements; retain the separate public-release and human-acceptance gates.
 
 - Share thread position pills across feed, profile, search and quoted cards. Keep bounded relationship knowledge across views, update mounted pills in place and mark incomplete context with + without fetching threads in the background.

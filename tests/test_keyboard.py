@@ -292,6 +292,22 @@ class KeyboardTests(unittest.TestCase):
         self.assertEqual(calls, ["second"])
         self.assertFalse(self.window.interactions.undo())
 
+    def test_position_toast_is_brief_and_dismissed_when_leaving_window(self):
+        calls = []
+        interactions = self.window.interactions
+        toast = interactions.offer_undo("Moved to top", lambda: calls.append(True), self.view)
+        self.assertEqual(toast.get_timeout(), 2)
+        self.window.is_active = lambda: False
+        interactions.activity_changed()
+        self.assertIsNone(interactions.undo_toast)
+        self.assertIsNotNone(interactions.undo_action)
+        self.assertTrue(interactions.undo())
+        self.assertEqual(calls, [True])
+
+    def test_reaction_undo_keeps_its_longer_timeout(self):
+        toast = self.window.interactions.offer_undo("Liked", lambda: None)
+        self.assertEqual(toast.get_timeout(), 5)
+
     def test_header_restore_yields_to_input_without_a_reading_session(self):
         self.view.set_header(Gtk.Box(height_request=300))
         self.pump()

@@ -67,3 +67,7 @@ New post uses a normal native plus button in the header, with the existing toolt
 
 
 The appearance chooser retains native keyboard/selection behaviour with a consistent arrow/surface border across themes. Reading-position saves update a small bookmark record; archive cleanup and the 250-post rendered window remain separate. Decoded images additionally have a byte/count budget, and offscreen list pictures release/reload their paintables while preserving card geometry.
+
+Position Undo toasts last two seconds and dismiss when the window becomes inactive,
+so returning to a reading position does not replay a stale top-jump message.
+Keyboard/menu Undo remains available after dismissal; reaction toasts retain five seconds.

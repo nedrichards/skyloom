@@ -1,5 +1,21 @@
 # Delivery report
 
+## Position toast timing — 1 November 2026
+
+Explicit top jumps now say “Moved to top”. Position Undo feedback lasts two
+seconds rather than five and is dismissed on window deactivation, avoiding stale
+top feedback when resuming further down a feed. The saved Undo action remains
+available through the keyboard/menu; reaction feedback retains five seconds.
+Native regressions cover timeout separation, inactivity dismissal and retained
+Undo, alongside existing stable-position restoration.
+
+`./scripts/check.sh` passed lint, formatting, compilation and metadata checks;
+its nested Flatpak launch failed with “Unable to allocate instance id”. The
+host-launched X11/Cairo native suite passed all **220 tests with zero skips**.
+The installed invented-data refresh scenario passed (`GUI_SMOKE_SCENARIO_PASS: refresh`).
+The offline Flatpak build/export and local reinstall succeeded. No live account
+data was used; physical resume/touch and Orca acceptance remain unperformed.
+
 ## Initial private source repository — 1 November 2026
 
 The maintainer authorised creation of

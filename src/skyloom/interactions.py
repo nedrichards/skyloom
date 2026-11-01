@@ -27,6 +27,13 @@ class Interactions:
     def activity_changed(self, *_args):
         if not self.window.is_active():
             self.held.clear()
+            if (
+                self.undo_toast is not None
+                and self.undo_action is not None
+                and self.undo_action[1] is not None
+            ):
+                self.undo_toast.dismiss()
+                self.undo_toast = None
 
     def current_view(self, mapped=True):
         split = getattr(self.window, "split", None)
@@ -278,7 +285,7 @@ class Interactions:
             self.undo_toast.dismiss()
         self.undo_action = (self.window.generation, view, callback)
         token = self.undo_action
-        toast = Adw.Toast(title=title, button_label="Undo", timeout=5)
+        toast = Adw.Toast(title=title, button_label="Undo", timeout=2 if view is not None else 5)
         self.undo_toast = toast
         toast.connect(
             "button-clicked", lambda _toast: self.undo() if self.undo_action is token else None
@@ -319,7 +326,7 @@ class Interactions:
             view.top_peek.pulse()
             return True
         place = view.interaction.top()
-        self.offer_undo("Back at the top", lambda: view.interaction.restore(place), view)
+        self.offer_undo("Moved to top", lambda: view.interaction.restore(place), view)
         return True
 
     def focus_pane(self):
