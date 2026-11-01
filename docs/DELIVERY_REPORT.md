@@ -1,5 +1,26 @@
 # Delivery report
 
+## Arrival notices at the top — 1 November 2026
+
+Feed arrival notices now dismiss when the native vertical adjustment reaches the
+top, including manual scrolling. This also clears the pending Go to top action
+and feed unseen count, without invoking a jump or changing Undo. Arrivals already
+at the top do not create a redundant notice. Staged Show actions remain available.
+
+Stable/preview Ruff, formatting, compilation, desktop and schema checks passed.
+The new native regression passed in GNOME 51 with X11/Cairo, including rejection
+of the dismissed toast's stale action. The broader source runtime run reported
+241 tests with 5 failures and 8 errors in conversation/prefetch coverage; this is
+not a passing full-suite result. Three failing cases passed when run separately
+against a temporary source copy excluding this change, so their cause remains
+unresolved. The normal Flatpak manifest was subsequently rebuilt and installed
+for manual review from `skyloom-origin`, backed by `flatpak-repo/`. Installed
+commit `ae8df7b05c4ca7a37fcc0cf086956ecdb7552436d910d7750a79ca642e855813`
+passes the new native arrival-notice regression against `/app/share/skyloom`.
+Manual review of both installed apps was approved by the maintainer.
+The exact staged commit snapshot also passes the arrival-notice regression and
+existing toast/keyboard regression independently of the unrelated working tree.
+
 ## Ruff 0.17.3 review — 1 November 2026
 
 Development Ruff is pinned to 0.17.3. Stable lint, selected preview checks,

@@ -524,6 +524,28 @@ class KeyboardTests(unittest.TestCase):
         toast.emit("button-clicked")
         self.assertEqual(applied, ["latest"])
 
+    def test_reaching_top_clears_arrival_notice_without_running_jump(self):
+        from types import SimpleNamespace
+
+        adjustment = self.view.scroll.get_vadjustment()
+        adjustment.set_value(adjustment.get_upper() - adjustment.get_page_size())
+        self.assertGreater(adjustment.get_value(), 0)
+        applied = []
+        self.view.feed = SimpleNamespace(unseen={"invented-new-post"})
+        self.view.offer_update(
+            "1 new post", lambda: applied.append("jump"), button_label="Go to top"
+        )
+        self.pump()
+        toast = self.view.update_notice.toast
+        self.assertIsNotNone(toast)
+        adjustment.set_value(adjustment.get_lower())
+        self.assertIsNone(self.view.pending_update)
+        self.assertIsNone(self.view.update_notice.toast)
+        self.assertFalse(self.view.feed.unseen)
+        toast.emit("button-clicked")
+        self.assertFalse(applied)
+        self.view.feed = None
+
     def test_update_notice_replacement_page_scope_and_close_reject_stale_actions(self):
         applied = []
         self.view.offer_update("1 new post", lambda: applied.append("old"))

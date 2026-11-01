@@ -439,6 +439,8 @@ class FeedView(Gtk.Box):
         )
         adjustment = self.scroll.get_vadjustment()
         adjustment.connect("value-changed", lambda *_: self.queue_check())
+        notice_signal = adjustment.connect("value-changed", self.update_notice.reached_top)
+        self.cleanups.append(lambda: adjustment.disconnect(notice_signal))
         adjustment.connect("changed", lambda *_: self.queue_check())
         adjustment.connect("changed", self.fit_header)
         self.connect("map", lambda *_: self.queue_check())
@@ -872,6 +874,7 @@ class FeedView(Gtk.Box):
     def offer_update(self, title, callback, *, button_label="Show", revision=None):
         self.pending_update = callback
         self.update_notice.offer(title, button_label, revision=revision)
+        self.update_notice.reached_top(self.scroll.get_vadjustment())
         self.update_notice.schedule()
         getattr(self.window, "view_changed", lambda: None)()
 

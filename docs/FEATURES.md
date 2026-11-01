@@ -71,3 +71,5 @@ The appearance chooser retains native keyboard/selection behaviour with a consis
 Position Undo toasts last two seconds and dismiss when the window becomes inactive,
 so returning to a reading position does not replay a stale top-jump message.
 Keyboard/menu Undo remains available after dismissal; reaction toasts retain five seconds.
+
+Reaching the top of a feed clears its pending new-post arrival notice and unseen count, regardless of the scrolling input.

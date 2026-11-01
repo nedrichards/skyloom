@@ -127,6 +127,18 @@ class UpdateNotice:
         self.queued = None
         self.revision = None
 
+    def reached_top(self, adjustment):
+        view = self.view()
+        if (
+            view is not None
+            and view.pending_update is not None
+            and self.button_label == "Go to top"
+            and adjustment.get_value() <= adjustment.get_lower() + 0.5
+        ):
+            if view.feed is not None:
+                view.feed.unseen.clear()
+            view.clear_update()
+
     def schedule(self):
         view = self.view()
         if self.queued is not None or self.announced or view is None or not view.pending_update:
