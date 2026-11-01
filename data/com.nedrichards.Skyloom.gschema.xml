@@ -1,0 +1,7 @@
+<schemalist><schema id="com.nedrichards.Skyloom" path="/com/nedrichards/Skyloom/">
+<key name="appearance" type="s"><default>'system'</default><summary>Colour scheme</summary></key>
+<key name="load-images" type="b"><default>true</default><summary>Download images</summary></key>
+<key name="warn-labelled-content" type="b"><default>false</default><summary>Warn before showing labelled content</summary></key>
+<key name="auto-refresh" type="b"><default>true</default><summary>Refresh stale feeds while active</summary></key>
+<key name="use-metered" type="b"><default>false</default><summary>Allow automatic downloads on metered connections</summary></key>
+</schema></schemalist>

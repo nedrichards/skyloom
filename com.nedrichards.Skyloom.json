@@ -1,0 +1,48 @@
+{
+  "app-id": "com.nedrichards.Skyloom",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "51",
+  "sdk": "org.gnome.Sdk",
+  "command": "skyloom",
+  "finish-args": [
+    "--share=network",
+    "--share=ipc",
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--device=dri",
+    "--talk-name=org.freedesktop.secrets"
+  ],
+  "modules": [
+    "python-dependencies.json",
+    {
+      "name": "skyloom",
+      "buildsystem": "meson",
+      "sources": [
+        {
+          "type": "dir",
+          "path": ".",
+          "skip": [
+            ".venv",
+            "wheels",
+            "build",
+            "build-flatpak",
+            ".flatpak-builder",
+            "flatpak-repo",
+            "dist",
+            "screenshots",
+            ".git",
+            ".agents",
+            ".aws",
+            ".codex",
+            ".pytest_cache",
+            ".ruff_cache",
+            ".venv-sdk",
+            "build-native",
+            "local-install",
+            "build-runtime"
+          ]
+        }
+      ]
+    }
+  ]
+}

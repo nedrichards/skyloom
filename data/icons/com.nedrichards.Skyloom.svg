@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <title>Skyloom</title>
+  <desc>A wooden loom weaving pale threads into sky-blue cloth.</desc>
+  <defs>
+    <linearGradient id="maple" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f2d4af"/>
+      <stop offset="0.5" stop-color="#dec09a"/>
+      <stop offset="1" stop-color="#c89b6e"/>
+    </linearGradient>
+  </defs>
+  <!-- Uprights sit behind the rounded beams. -->
+  <g id="frame-uprights">
+    <rect x="18" y="22" width="12" height="80" rx="4" fill="#986a44"/>
+    <rect x="98" y="22" width="12" height="80" rx="4" fill="#986a44"/>
+    <rect x="18" y="18" width="12" height="80" rx="4" fill="#cdab8f"/>
+    <rect x="98" y="18" width="12" height="80" rx="4" fill="#cdab8f"/>
+  </g>
+  <g id="woven-cloth">
+    <rect x="32" y="24" width="64" height="76" rx="3" fill="#62a0ea"/>
+    <!-- Broad warp threads and weft bands retain their rhythm at 32 pixels. -->
+    <path d="M44 20V106M64 20V106M84 20V106" fill="none" stroke="#f6f5f4" stroke-width="8"/>
+    <!-- A restrained lower edge gives the blue bands a material profile. -->
+    <path d="M32 45H96M32 65H96M32 85H96" fill="none" stroke="#1a5fb4" stroke-width="2"/>
+    <path d="M32 40H96M32 60H96M32 80H96" fill="none" stroke="#1c71d8" stroke-width="8"/>
+    <path d="M44 34V46M84 34V46M64 54V66M44 74V86M84 74V86" fill="none" stroke="#f6f5f4" stroke-width="8"/>
+  </g>
+  <!-- The beams use the same four-pixel front profile and overhead lighting. -->
+  <g id="frame-beams">
+    <rect x="12" y="16" width="104" height="16" rx="8" fill="#986a44"/>
+    <rect x="12" y="12" width="104" height="16" rx="8" fill="url(#maple)"/>
+    <path d="M22 14H106" fill="none" stroke="#fff2dc" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+    <rect x="12" y="100" width="104" height="16" rx="8" fill="#986a44"/>
+    <rect x="12" y="96" width="104" height="16" rx="8" fill="url(#maple)"/>
+    <path d="M22 98H106" fill="none" stroke="#fff2dc" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  </g>
+</svg>

@@ -1,0 +1,5 @@
+#!@PYTHON@
+import sys
+sys.path.insert(0, '@PKGDIR@')
+from skyloom.__main__ import main
+raise SystemExit(main())

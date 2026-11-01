@@ -1,0 +1,7 @@
+<gresources>
+  <gresource prefix="/com/nedrichards/Skyloom">
+    <file>style.css</file>
+    <file>icons/scalable/actions/skyloom-like-symbolic.svg</file>
+    <file>icons/scalable/actions/skyloom-liked-symbolic.svg</file>
+  </gresource>
+</gresources>

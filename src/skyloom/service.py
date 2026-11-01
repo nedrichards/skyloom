@@ -1,0 +1,474 @@
+"""SDK adapter. One instance and all its calls belong to the async worker loop."""
+
+import asyncio
+import logging
+import time
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, replace
+from pathlib import Path
+
+from atproto import models
+from atproto_client.exceptions import AtProtocolError
+
+from .conversation import thread_from
+from .credentials import KeyringError, SecretStore
+from .domain import Notice, Page, author_from, feed_from, post_from
+from .errors import POST_UNAVAILABLE, UserError
+from .network import new_client
+from .richtext import facets_for, validate
+from .storage import Storage
+
+# Never let third-party diagnostics print HTTP headers, response bodies or session material.
+for _name in ("atproto", "atproto_client", "httpx", "httpcore"):
+    logger = logging.getLogger(_name)
+    logger.handlers = [logging.NullHandler()]
+    logger.propagate = False
+    logger.disabled = True
+
+
+def data(model):
+    return (
+        model.model_dump(by_alias=True, exclude_none=True)
+        if hasattr(model, "model_dump")
+        else model
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Attachment:
+    path: str
+    alt: str
+
+
+_CURRENT_ACCOUNT = object()
+
+
+class Service:
+    def __init__(self, client=None, secrets=None, storage=None, client_factory=new_client):
+        self.client_factory = client_factory
+        self.client = client or self.client_factory()
+        self.secrets = secrets
+        self.storage = storage or Storage()
+        self.account = None
+        self.lock = asyncio.Lock()
+        self.draft_lock = asyncio.Lock()
+        self.persist_error = None
+        self._storage_lease = None
+        self.client.on_session_change(self._session_changed)
+
+    def _io(self, operation, *args, account=None):
+        did = account or self.account.did
+        lease = getattr(self, "_storage_lease", None)
+        token = lease[1] if lease and lease[0] == did else self.storage.token(did)
+        return asyncio.to_thread(self.storage.run, did, token, operation, *args)
+
+    def _local(self, operation, *args, account=_CURRENT_ACCOUNT, serial=False):
+        # Capture the owner when the awaitable is requested, not when a queued
+        # coroutine eventually starts after a different account has signed in.
+        owner = self.account if account is _CURRENT_ACCOUNT else account
+        if owner is not None:
+            did = owner.did
+            lease = getattr(self, "_storage_lease", None)
+            token = lease[1] if lease and lease[0] == did else self.storage.token(did)
+
+        async def execute():
+            if owner is None or self.account is not owner:
+                return None
+            return await asyncio.to_thread(self.storage.run, did, token, operation, *args)
+
+        async def serialized():
+            async with self.draft_lock:
+                return await execute()
+
+        return serialized() if serial else execute()
+
+    async def _secure_io(self, operation, *args):
+        # Keep the surrounding SDK lock until the blocking keyring call stops.
+        # Cancellation of its awaiter cannot cancel a running filesystem thread.
+        task = asyncio.create_task(asyncio.to_thread(operation, *args))
+        cancelled = False
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                cancelled = True
+        if cancelled:
+            # A failed rotated-session save must still reach _session_changed's
+            # persistence recovery state even when its original request was cancelled.
+            error = None if task.cancelled() else task.exception()
+            if error is not None:
+                raise error
+            raise asyncio.CancelledError
+        return task.result()
+
+    async def close(self):
+        if self.secrets is not None and hasattr(self.secrets, "cancel_all"):
+            self.secrets.cancel_all()
+        await self.client.request.close()
+
+    def keyring(self):
+        if self.secrets is None:
+            self.secrets = SecretStore()
+        return self.secrets
+
+    async def _session_changed(self, event, session):
+        # Runs on every import/create/refresh; exceptions abort rather than falsely claiming persistence.
+        try:
+            await self._secure_io(self.keyring().save, session.export())
+            self.persist_error = None
+        except KeyringError as exc:
+            self.persist_error = exc
+            raise
+
+    async def sign_in(self, handle, app_password, pds="https://bsky.social"):
+        from urllib.parse import urlparse
+
+        u = urlparse(pds)
+        if (
+            u.scheme != "https"
+            or not u.hostname
+            or u.username
+            or u.password
+            or u.query
+            or u.fragment
+        ):
+            raise UserError("Enter an HTTPS PDS address without credentials or query parameters.")
+        async with self.lock:
+            if getattr(self.client.request, "retry_at", 0) > time.monotonic():
+                raise UserError(
+                    "Bluesky is limiting sign-in attempts. Wait a few minutes, then try again."
+                )
+            await self.client.request.close()
+            self.client = self.client_factory(base_url=pds.rstrip("/"))
+            self.client.on_session_change(self._session_changed)
+            # Discovery is performed by the configured PDS (bsky.social for Bluesky accounts).
+            try:
+                profile = await self.client.login(handle.strip().lstrip("@"), app_password)
+            finally:
+                app_password = ""
+            if profile is None:
+                raise UserError("This server does not provide a Bluesky profile.")
+            self.account = author_from(data(profile))
+            self.reading_feed = "following"
+            self.reading_choices = [("following", "Following")]
+            self._storage_lease = (
+                self.account.did,
+                await asyncio.to_thread(self.storage.activate, self.account.did),
+            )
+            await self._io("put", "identity", data(profile))
+            return self.account
+
+    async def restore(self):
+        async with self.lock:
+            value = await self._secure_io(self.keyring().load)
+            if not value:
+                return None
+            await self.client.login(session_string=value, fetch_bsky_profile=False)
+            session = self.client._session
+            self._storage_lease = (
+                session.did,
+                await asyncio.to_thread(self.storage.activate, session.did),
+            )
+            try:
+                profile = await self.client.get_profile(session.did)
+                self.client.me = profile
+                identity = data(profile)
+                await self._io("put", "identity", identity, account=session.did)
+            except AtProtocolError as exc:
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+                if status in (400, 401, 403):
+                    raise
+                identity = await self._io(
+                    "get",
+                    "identity",
+                    {"did": session.did, "handle": session.handle},
+                    account=session.did,
+                )
+                self.client.me = models.AppBskyActorDefs.ProfileViewDetailed(**identity)
+            self.account = author_from(identity)
+            self.reading_choices = [
+                tuple(option)
+                for option in await self._io(
+                    "get", "feed-options", [("following", "Following")], account=session.did
+                )
+            ]
+            selected = await self._io("get", "reading:feed", "following", account=session.did)
+            self.reading_feed = (
+                selected
+                if any(option[0] == selected for option in self.reading_choices)
+                else "following"
+            )
+            return self.account
+
+    async def sign_out(self):
+        async with self.lock:
+            account = self.account
+            # Clear keyring first; if it fails keep account context so the user can retry.
+            await self._secure_io(self.keyring().clear)
+            try:
+                # deleteSession expects refresh JWT, whereas the default SDK request uses access JWT.
+                session = self.client._session
+                await self.client.com.atproto.server.delete_session(
+                    headers={"Authorization": f"Bearer {session.refresh_jwt}"},
+                    ignore_session_check=True,
+                )
+            except Exception:  # noqa: BLE001, S110 — offline sign-out succeeds; errors may contain tokens.
+                pass  # Local sign-out still succeeds offline. No sensitive details logged.
+            if account:
+                lease = getattr(self, "_storage_lease", None)
+                token = (
+                    lease[1]
+                    if lease and lease[0] == account.did
+                    else self.storage.token(account.did)
+                )
+                await asyncio.to_thread(self.storage.clear, account.did, token)
+            self.account = None
+            await self.client.request.close()
+            self.client = self.client_factory()
+            self.client.on_session_change(self._session_changed)
+
+    @asynccontextmanager
+    async def authenticated(self):
+        async with self.lock:
+            if self.persist_error:
+                # A failed refresh write must be retried before using the rotated token again.
+                await self._session_changed(None, self.client._session)
+            if not self.account:
+                raise UserError("Sign in to continue.")
+            yield
+
+    async def feed(self, feed="following", cursor=None):
+        async with self.authenticated():
+            if feed == "following":
+                result = await self.client.get_timeline(cursor=cursor, limit=30)
+            else:
+                result = await self.client.app.bsky.feed.get_feed(
+                    {"feed": feed, "cursor": cursor, "limit": 30}
+                )
+            page = feed_from(data(result))
+            if self.account:
+                await self._io("cache", feed, page, cursor)
+            return page
+
+    def cached(self, feed):
+        return self._local("cached", feed)
+
+    def cached_state(self, feed):
+        return self._local("cached_state", feed)
+
+    def cached_page(self, feed, cursor):
+        return self._local("cached_page", feed, cursor)
+
+    def save_feed_state(self, feed, pager, bookmark, account):
+        return self._local("checkpoint", feed, pager, bookmark, account=account)
+
+    def save_active_feed(self, feed, account):
+        return self._local("put", "reading:feed", feed, account=account)
+
+    def cached_post(self, uri):
+        return self._local("cached_post", uri)
+
+    async def feeds(self):
+        async with self.authenticated():
+            prefs = data(await self.client.app.bsky.actor.get_preferences()).get("preferences", [])
+            uris = []
+            for pref in prefs:
+                if pref.get("$type", "").endswith("#savedFeedsPrefV2"):
+                    uris.extend(
+                        x["value"]
+                        for x in pref.get("items", [])
+                        if x.get("pinned") and x.get("type") == "feed"
+                    )
+                elif pref.get("$type", "").endswith("#savedFeedsPref"):
+                    uris.extend(pref.get("pinned", []))
+            uris = list(dict.fromkeys(uris))[:24]
+            if not uris:
+                await self._io("put", "feed-options", [("following", "Following")])
+                return [("following", "Following")]
+            response = data(await self.client.app.bsky.feed.get_feed_generators({"feeds": uris}))
+            options = [("following", "Following")] + [
+                (x["uri"], x.get("displayName", "Custom feed")) for x in response.get("feeds", [])
+            ]
+            await self._io("put", "feed-options", options)
+            return options
+
+    def cached_feeds(self):
+        return self._local("get", "feed-options", [("following", "Following")])
+
+    async def thread(self, uri, *, earlier=False, replies_only=False):
+        async with self.authenticated():
+            node = data(
+                await self.client.get_post_thread(
+                    uri, depth=0 if earlier else 2, parent_height=0 if replies_only else 20
+                )
+            )["thread"]
+        if "post" not in node:
+            raise UserError(POST_UNAVAILABLE)
+        return thread_from(node, include_replies=not earlier)
+
+    async def profile(self, actor):
+        async with self.authenticated():
+            return author_from(data(await self.client.get_profile(actor)))
+
+    async def author_feed(self, actor, cursor=None, feed_filter="posts_no_replies"):
+        async with self.authenticated():
+            return feed_from(
+                data(
+                    await self.client.get_author_feed(
+                        actor, cursor=cursor, filter=feed_filter, limit=30
+                    )
+                )
+            )
+
+    async def mutate(self, post, kind):
+        async with self.authenticated():
+            if kind == "like":
+                if post.like_uri:
+                    await self.client.delete_like(post.like_uri)
+                    return replace(post, like_uri="", likes=max(0, post.likes - 1))
+                result = await self.client.like(post.uri, post.cid)
+                return replace(post, like_uri=result.uri, likes=post.likes + 1)
+            if post.repost_uri:
+                await self.client.delete_repost(post.repost_uri)
+                return replace(post, repost_uri="", reposts=max(0, post.reposts - 1))
+            result = await self.client.repost(post.uri, post.cid)
+            return replace(post, repost_uri=result.uri, reposts=post.reposts + 1)
+
+    async def follow(self, author):
+        async with self.authenticated():
+            if author.following:
+                await self.client.delete_follow(author.following)
+                return replace(author, following="")
+            result = await self.client.follow(author.did)
+            return replace(author, following=result.uri)
+
+    async def moderate(self, author, kind):
+        async with self.authenticated():
+            if kind == "mute":
+                method = (
+                    self.client.app.bsky.graph.unmute_actor
+                    if author.muted
+                    else self.client.app.bsky.graph.mute_actor
+                )
+                await method({"actor": author.did})
+            elif kind == "block":
+                if author.blocking:
+                    from atproto import AtUri
+
+                    uri = AtUri.from_str(author.blocking)
+                    await self.client.com.atproto.repo.delete_record(
+                        {"repo": self.account.did, "collection": uri.collection, "rkey": uri.rkey}
+                    )
+                else:
+                    await self.client.app.bsky.graph.block.create(
+                        self.account.did,
+                        models.AppBskyGraphBlock.Record(
+                            subject=author.did, created_at=self.client.get_current_time_iso()
+                        ),
+                    )
+        return await self.profile(author.did)
+
+    async def search(self, query, people=False, cursor=None):
+        async with self.authenticated():
+            if people:
+                result = data(
+                    await self.client.app.bsky.actor.search_actors(
+                        {"q": query, "limit": 30, "cursor": cursor}
+                    )
+                )
+                return tuple(author_from(x) for x in result.get("actors", [])), result.get("cursor")
+            result = data(
+                await self.client.app.bsky.feed.search_posts(
+                    {"q": query, "limit": 30, "cursor": cursor}
+                )
+            )
+            return Page(tuple(post_from(x) for x in result.get("posts", [])), result.get("cursor"))
+
+    async def notifications(self, cursor=None):
+        async with self.authenticated():
+            d = data(
+                await self.client.app.bsky.notification.list_notifications(
+                    {"limit": 40, "cursor": cursor}
+                )
+            )
+            items = tuple(
+                Notice(
+                    author_from(x["author"]),
+                    x["reason"],
+                    x["uri"],
+                    x.get("reasonSubject", ""),
+                    x.get("isRead", False),
+                    x["indexedAt"],
+                )
+                for x in d.get("notifications", [])
+            )
+            return items, d.get("cursor"), self.client.get_current_time_iso()
+
+    async def mark_seen(self, timestamp):
+        async with self.authenticated():
+            await self.client.app.bsky.notification.update_seen({"seenAt": timestamp})
+
+    async def unread(self):
+        async with self.authenticated():
+            return (await self.client.app.bsky.notification.get_unread_count()).count
+
+    def drafts(self):
+        return self._local("drafts")
+
+    def draft_get(self, key):
+        return self._local("get", "draft:" + key, {})
+
+    def draft_save(self, key, value):
+        return self._local("put", "draft:" + key, value, serial=True)
+
+    async def send(self, text, attachments=(), reply=None, quote=None):
+        error = validate(text, attachments)
+        if error:
+            raise UserError(error)
+        async with self.authenticated():
+
+            async def resolve(handle):
+                return (
+                    await self.client.com.atproto.identity.resolve_handle({"handle": handle})
+                ).did
+
+            facets = [
+                models.AppBskyRichtextFacet.Main(**x) for x in await facets_for(text, resolve)
+            ]
+            reply_ref = None
+            if reply:
+                root_uri, root_cid = reply.root or (reply.uri, reply.cid)
+                reply_ref = models.AppBskyFeedPost.ReplyRef(
+                    root={"uri": root_uri, "cid": root_cid},
+                    parent={"uri": reply.uri, "cid": reply.cid},
+                )
+            embed = None
+            if attachments:
+                images = []
+                for a in attachments:
+                    try:
+                        payload = await asyncio.to_thread(Path(a.path).read_bytes)
+                    except OSError:
+                        raise UserError(
+                            "An image is no longer available. Remove it and attach it again."
+                        ) from None
+                    if len(payload) > 1_000_000 or not payload.startswith(
+                        (b"\x89PNG", b"\xff\xd8\xff")
+                    ):
+                        raise UserError(
+                            "An image is invalid or larger than 1 MB. Remove it and attach it again."
+                        )
+                    blob = (await self.client.upload_blob(payload)).blob
+                    images.append(models.AppBskyEmbedImages.Image(alt=a.alt, image=blob))
+                embed = models.AppBskyEmbedImages.Main(images=images)
+            if quote:
+                record = models.AppBskyEmbedRecord.Main(record={"uri": quote.uri, "cid": quote.cid})
+                embed = (
+                    models.AppBskyEmbedRecordWithMedia.Main(record=record, media=embed)
+                    if embed
+                    else record
+                )
+            # No automatic retry: a timeout can occur after the server creates the post.
+            return await self.client.send_post(
+                text, reply_to=reply_ref, embed=embed, facets=facets, langs=["en"]
+            )

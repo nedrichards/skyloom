@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Skyloom
+Comment=A native client for Bluesky
+Exec=skyloom
+Icon=com.nedrichards.Skyloom
+Terminal=false
+Type=Application
+Categories=Network;GTK;
+Keywords=Bluesky;Social;
+StartupNotify=true
+DBusActivatable=false

@@ -1,0 +1,183 @@
+{
+  "date": "2026-11-01",
+  "architecture": "x86_64",
+  "python": "3.14.9",
+  "gtk": "4.24.1",
+  "libadwaita": "1.10.0",
+  "meson": "1.12.0",
+  "atproto": "0.0.73",
+  "tests": 218,
+  "gui": "PASS: installed named conversation scenario at 800/480, normal renderer, invented records; narrow light feed/quote pills visually inspected. All 42 installed modules and compiled resources match source/build. Earlier navigation/full GUI journeys retain historical scope; pointer signal regressions do not establish physical mouse/touch or Orca acceptance.",
+  "app_commit": "540267572ac03c2877ca2ec83a4b99b3cf3d3f026d7b1aed827d370c08f60c07",
+  "runtime_commit": "3fdff711ebbaec7aeb565d33e21a37ea77d848efe0c342f7750bb41634b6b856",
+  "sdk_commit": "70f7db725cc410468d49b88af80e93aa805c24aeb72b90d0939793460c32fa8f",
+  "bundle": "67de7efb6b4c3164289003d7f5624cec7f82377f09a879ecfc81b9c9e23c3a61  dist/com.nedrichards.Skyloom-0.1.0-x86_64.flatpak",
+  "bundle_bytes": 10648464,
+  "app_id": "com.nedrichards.Skyloom",
+  "legacy_cleanup": {
+    "installation_removed": true,
+    "sandbox_data_removed": true,
+    "settings_reset": true,
+    "app_keyring_entries_removed": true
+  },
+  "high_contrast_large_text_smoke": "Historical PASS on pre-update-notice/sidebar build 6e19dc63842a3c3aa7c8f2482f154359fb163ae2893b9de9835d0cc642630d55: Preferences settings/authentication and Appearance chooser, light/dark at 800/480, high contrast and 16-point text. Not rerun for responsive-sidebar change.",
+  "ruff": "0.17.2",
+  "python_target": "3.14",
+  "lint": "PASS: scripts/lint.sh; all first-party Python files; stable/targeted preview Ruff, formatter, SyntaxWarning-as-error compilation, shell syntax",
+  "model_benchmark": {
+    "posts": 1000,
+    "images_per_post": 2,
+    "before_retained_bytes": 698704,
+    "after_retained_bytes": 514704,
+    "reduction_percent": 26.3,
+    "scope": "Measured in the earlier Python/lint review, before conversation parent references were added"
+  },
+  "runtime_tests": "PASS: source and installed code, 218 tests each, zero skips, explicit X11/Cairo, including shared pills and pointer jitter/selection regressions. Direct check.sh static checks pass but nested Flatpak launch cannot allocate instance; host-launched suites pass. Existing GI cleanup/GDK timing warnings remain.",
+  "source_parity": "PASS: all 41 installed Python modules and compiled resources match the final workspace/build.",
+  "conversation_loading": "Supported getPostThread depth 2 / parentHeight 20, one outstanding request per page; graph edges/gaps and local continuation controls; deterministic causal oldest-sibling projection, 250-post/250-gap bound, fetched/no-progress guards, no synthetic API cursor; shallow refresh retains deeper loaded messages",
+  "physical_input": "CURRENT XWAYLAND LIMITATION: dedicated fixture driver completed but no Down/J events reached the window capture handler; selection was already zero before injection and focus remained in the header. The initial selection check did not prove delivery. Native controller/focus contracts pass. Physical keyboard/touch/Orca acceptance is not claimed.",
+  "icon": "Refined Open Loom full-colour and symbolic; rejected directions, comparison sheets, superseded previews and obsolete icon screenshots removed",
+  "automatic_refresh": "5-minute active-window freshness, one-shot BOOTTIME deadline and existing cost/power/backoff gates. Feed arrivals merge immediately in stable live order; first eligible restart head and manual refresh accept server head order. Input before startup reconciliation preserves live order.",
+  "content_scrolling": "Native first-section headers compose profile/search details and virtualised rows in one scroller; complete biographies, stable-height compact profile identity, header recycling/focus/top/Undo regressions; image and long description share one dialog scroller",
+  "creator": "Nick Richards: About developer name and developers credits, AppStream developer metadata",
+  "sidebar_actions": "Preferences and About in shared header overflow menu; Sign out/Leave demo moved into the final Authentication group of Preferences, with native confirmation and cancellation focus return",
+  "navigation": "Native OverlaySplitView, bidirectional accessible toggles, adaptive overlay/Back/F6/menu behaviour retained. Responsive collapse uses native spring visibility after a bounded three-frame remap/reflow handoff; latest target retained, unmap cancellation and local reduced-motion policy; no custom animation loop.",
+  "image_cache": "Account-private encoded CDN files, 128 MiB / 2048 entries, LRU eviction, offline/restart decoding, corrupt entry recovery and late-download invalidation on sign-out; decoded LRU additionally bounded to 48 MiB/32 entries, weak native consumer accounting and viewport/unmap paintable release with stable geometry",
+  "offline": "Saved post/quote detail, new/reply/quote draft editing/save/reopen; publishing disabled; cached feed switching precedes network; server errors do not imply global offline",
+  "initial_plan": "Bootstrap prompt/runner and duplicate specs retired; conversation redesign proposal implemented and retired into FEATURES/ARCHITECTURE/TESTING, with remaining human/live-service acceptance in ROADMAP",
+  "local_automation": "Lint, desktop and schema pass. Final source full check.sh has intermittent standalone conversation-focus failures; final installed full gate passes 210 tests under explicit X11/Cairo. GUI runs sequentially.",
+  "preferences": "Reading, Updates, Storage, Authentication; concise labels and subtitles, live connection state, GSettings bindings, bottom account action, in-dialog sign-out failure toast and retry; no duplicated shortcuts/power-saver information rows; theme chooser has matching arrow/content borders and an outer shadow, scoped to Appearance only",
+  "overflow_menu": "Visibility bound to show-sidebar, with inverse binding on every content header; hidden menu popovers close; F10 follows actual sidebar visibility in wide/overlay layouts",
+  "search": "Full-height initial/loading/empty/error/retry states in one native scroller with fields/results; viewport measured after allocation; nonempty results release header minimum; clear cancels stale requests; actual search screenshots",
+  "startup": "Neutral pending until session lookup resolves; spinner after 200 ms, native 150 ms crossfade; no artificial minimum duration; missing session -> sign in, saved account -> shell, lookup failure -> recovery; cancel timers/requests and suppress late callbacks on close",
+  "content_labels": "Three wrapping inline icon chips plus all-labels count; standard readable meanings, exact selectable/copyable values, post/author/profile scope, lazy native popovers and preferences; default visible; local Show/Hide with lazy first build, shared same-key choices and keyboard focus return; theme-aware borders including high contrast",
+  "conversation_navigation": "Exact post URI anchors including cross-author feed comments; distinct anchors retain Back steps; same anchor focuses its visible body without a new page; Alt+Up/Down and header controls select loaded parent/first reply; Return has Undo; descendant and logical loader focus restore after allocation without taking focus from another view; fallback retries the exact failed request and resumes branch paging after success; busy loader keyboard scope prevents Enter opening the old selected post",
+  "refresh_cascade": "Connectivity updates reaction controls in place, without whole-list replacement; identical network/loading-policy state skips list rechecks; metadata preserves selected feed, recycled avatar work is cancelled, queued media rechecks cache; local 32-job saturation has its own busy message; actual server 429 cooldown unchanged.",
+  "profile_layout": "Profile browser action and filter share one natural Adw.WrapBox with follow/moderation controls; wraps only when constrained. Native clickable account card in the fixed sidebar bottom bar replaces the separate Profile row; same Ctrl+4, F6, repeat navigation and active-destination top/Undo handling; full accessible identity with ellipsised name/handle.",
+  "refresh_presentation": "URI/offset anchoring without focus transfer for background arrivals; retained disjoint history with bounded real-cursor gap autoload/manual fallback. Manual refresh goes to top; Go to top and Undo change position only, retaining arrivals/reactions/cursors. Exact pixels restored when reachable; native adjustment clamps unavoidable reflow at bounds. Manual visible arrivals retain motion-aware opacity feedback.",
+  "performance": {
+    "report": "docs/PERFORMANCE.md",
+    "results": "docs/performance-results.json",
+    "backend": "Wayland",
+    "renderer": "GskVulkanRenderer",
+    "monitor_hz": 59.998,
+    "scope": "Installed fixture runs: 30 and 250 posts; 480/1100 widths; reduced motion; plain-list control; OpenGL comparison; three process-startup samples. Separate Python hotspot profile and native-animation diagnostic runs. Supplemental reaction, draft/autosave, four previews, 100 notifications/Mark seen, menus, Preferences, image viewer and connection changes; native caption/layout tail remains. Continuation captures GTK layout marks, direct main-thread completion duration, context switches and idle CPU; no hardware energy measurement.",
+    "counter_update_250_ms": {
+      "before": 90.91,
+      "after": 13.974
+    },
+    "stress_peak_rss_mib": {
+      "before": 434.3,
+      "after": 384.2
+    },
+    "sixty_fps_everywhere": false,
+    "limitation": "Normal 30-post scrolling near 59-60 fps; dense 250-post animation-enabled scrolling around 34-37 fps; cold view spans around 0.6 s. Native animation/layout cost remains; no specific upstream bug or hardware-independent guarantee asserted.",
+    "notification_read_100": {
+      "before_row_rebinds": 100,
+      "after_row_rebinds": 0,
+      "before_max_presentation_gap_ms": 266.678,
+      "after_max_presentation_gap_ms": 99.998,
+      "interpretation": "Presentation gaps during static async waits do not establish blocked rendering; final direct completion 17.284 ms, worst paint span 10.589 ms.",
+      "continuation_completion_ms": 17.284,
+      "continuation_max_paint_ms": 10.589,
+      "remaining_over_budget": true
+    },
+    "reading_matrix_app_commit": "47c44a6fcea617111a903516f14f3221abd3a05538db98bf661f6b5e572f4c67",
+    "interactions_app_commit": "9bce2be09ec0413ff95b03d84fb02becaf4d59c2079e2f46606722eef94bd909",
+    "continuation_results": "docs/performance-continuation.json",
+    "continuation_app_commit": "11ef6fb309879183a3b04a2e731fbf007e69d6d15c75b4982414787764867a87",
+    "quiet_idle_8s": {
+      "cpu_ms": 0.177,
+      "voluntary_context_switches": 1,
+      "paint_frames": 0,
+      "scope": "Fixture idle sample, not a hardware energy claim"
+    },
+    "card_results": "docs/performance-cards.json",
+    "card_app_commit": "90325456ea9226f73590a3f0c1f60841232271b802e9d928eeb1d65875935452",
+    "card_normal_fps": [
+      59.75,
+      59.75
+    ],
+    "card_dense_fps": [
+      51.68,
+      42.93
+    ],
+    "card_cold_frame_ms": 632.012,
+    "upper_edge_results": "docs/performance-peek.json",
+    "upper_edge_scroll_30_fps": [
+      59.23,
+      59.73
+    ],
+    "upper_edge_app_commit": "2c97c0d658fbc5476279520db9e8b39872fd121b3d208db6bbc0a518078d4b0f"
+  },
+  "motion": "160 ms opacity-only selected-reaction/read-marker feedback, fixed unread envelope and accessible read state; both GTK motion settings, visible clipping, inactive/power/unmap completion, no retained finished animation",
+  "native_suite_app_commit": "6e19dc63842a3c3aa7c8f2482f154359fb163ae2893b9de9835d0cc642630d55",
+  "native_suite_scope": "204 source/default-renderer and installed/Cairo tests, no skips. Full GUI journey ran before a fixture-only popover activation correction; final named preferences scenarios and module/resource parity run on final installation.",
+  "card_interaction": "Natural-width combined avatar/profile target, unused header space opens conversation; wrapping Adw.WrapBox label buttons without grid cells; native pointer selection remains logical without a full-row wash, direct keyboard focus outlines only clamped content, child controls keep local focus rings; caption metadata, consistent symbolic icon/count actions and original outline/filled hearts; profile focus survives content rebind.",
+  "full_gui_app_commit": "6e19dc63842a3c3aa7c8f2482f154359fb163ae2893b9de9835d0cc642630d55",
+  "test_renderer_limitation": "Source/default-renderer and installed/Cairo functional suites pass. Current standalone X11 30-post timing run has adequate samples; old baseline is rejected for insufficient feedback/different scroll workloads. Physical-input/live-account acceptance and universal 60 fps are not claimed.",
+  "upper_edge_feedback": "360 ms damped clipped snapshot translation around the shared scroller; zero-offset direct child path; wheel and no-op/top keyboard/destination feedback; smooth/touch native overscroll; no model/adjustment/layout changes, no active-animation restart; motion/power/activity/unmap/close gates.",
+  "overlay_updates": "Shared five-second Go to top feed toast; posts already in list. Dismissal retains menu/keyboard navigation; page/dialog/activity scoping and stale-action guards. Notifications retain their Show transaction.",
+  "header_new_post": "Normal native list-add-symbolic header button; tooltip/Ctrl+N and click-to-compose preserved; composer Post retains suggested-action styling. Installed fixture asserted styles/icon/tooltip and activation, rendered header/composer, and did not publish.",
+  "header_gui_app_commit": "26af00e7d4e4e745106a2326a1a9b389560e20c8d58008a5452fe055a9d39c26",
+  "header_source_check": "PASS: check.sh, 157 tests plus lint/metadata/schema checks on the header styling change.",
+  "reading_cache": {
+    "posts_per_feed": 10000,
+    "posts_per_account": 50000,
+    "unprotected_max_age_days": 30,
+    "saved_windows": 12,
+    "posts_per_window": 250,
+    "page_metadata_per_feed": 1000,
+    "cleanup": "On first use, 512 archived records or one hour of active cache work; no periodic cleanup wake-up. Protected windows and bounded sweep slack can exceed count targets; SQLite freed pages are reused.",
+    "checkpoint": "One-second coalescing and worker IO; one outstanding save per view. Position-only saves serialize only the bookmark/change one row; immutable window comparisons archive changed posts and protection membership only. Capture before navigation/feed switch/close and final cleanup. Account epochs checked under per-account IO lock shared with clear reject stale threads after cancellation/sign-out.",
+    "storage": "DID-hashed account-private SQLite under XDG_DATA_HOME/skyloom inside the Flatpak; credentials remain in libsecret.",
+    "compatibility": "Legacy bare-list/head snapshots readable; independent head/window/bookmark records; offline cursor pages require all referenced posts. Missing URI can fall back to saved neighbours; selected feed validated against cached choices."
+  },
+  "adversarial_review": {
+    "report": "docs/CODE_QUALITY_REVIEW.md",
+    "date": "2026-10-28",
+    "production_code_changed": true,
+    "installed_app_or_bundle_changed": true,
+    "status": "All R1-R12 findings plus R13 Appearance chooser seam implemented with invariant regressions. Physical/live-service/performance acceptance limits remain in ROADMAP.",
+    "tests": 204,
+    "source_default_renderer": "PASS, X11, no skips",
+    "installed_cairo": "PASS, X11, no skips",
+    "full_gui": "PASS; see gui and native_suite_scope",
+    "persistence_work_probe": {
+      "posts": 250,
+      "before_serializations": 251,
+      "after_serializations": 1,
+      "after_post_serializations": 0,
+      "before_sql_changed_rows": 501,
+      "after_sql_changed_rows": 1,
+      "uri_lookup_plan": "SEARCH feed_posts USING INDEX feed_posts_uri_age (uri=?)"
+    },
+    "performance_results": "docs/performance-refactor.json",
+    "timing_comparison": "REJECTED: insufficient old warm-scroll samples, mismatched scroll distance and CPU budgets. Different delivered workload means no relative speed/CPU conclusion. Current standalone candidate 58.24/57.49 fps.",
+    "media_scope": "64 distinct generated 1024x768 PNGs; prior retention simulated using current decoder, separate processes. Native paintables 64 -> 12; estimated resident decoded pixels 192 -> 48 MiB. Whole-process peak RSS 112.88 -> 113.67 MiB; no RSS/energy saving claim."
+  },
+  "repeated_update_notices": {
+    "app_commit": "658c5c200f973a3430c3e5cd68df69405aa21eb861cd66e231081cc35a2d544b",
+    "source_check": "PASS: host scripts/check.sh, 206 tests, zero skips",
+    "installed_tests": "PASS: 206 tests, zero skips, installed code/default renderer",
+    "gui": "PASS: installed named refresh smoke",
+    "build": "PASS: offline Flatpak Builder, local export/reinstall and bundle export",
+    "behaviour": "Announce a pending batch once across visibility/activity/menu interruptions; stable item identities deduplicate repeated offers, retain latest actions and admit equal-count new batches. Feed refresh without arrivals stays quiet.",
+    "limits": "Earlier source keyboard-restore frame timeout passed in subsequent complete runs; no personal feed/session inspected, no account process restarted; earlier full GUI/high-contrast evidence is historical."
+  },
+  "sidebar_resize": {
+    "app_commit": "dcbc613a3308aa42f7a9570d07c1654ab2e775348e15482fe723f786c636ec91",
+    "source_focused": "PASS: 12 navigation/dense-window tests, X11/Cairo",
+    "source_full": "Final check.sh: lint/desktop/schema pass; 210 tests, two standalone ConversationView focus/selection failures. Earlier full source pass; no assertions changed.",
+    "installed_full": "PASS: 210 tests, zero skips, X11/Cairo, installed code",
+    "gui": "PASS: final installed named navigation smoke, normal renderer, invented records, 1280/480",
+    "build": "PASS: offline Builder/export/reinstall and local bundle export",
+    "probe": {
+      "posts": 250,
+      "baseline_intermediate_frames": 0,
+      "final_source_intermediate_frames": 10,
+      "scope": "Separate demo processes. Visible transition evidence, not a frame-rate/performance comparison; initial width reflow still costs hundreds of milliseconds."
+    },
+    "limits": "Intermittent standalone conversation-focus failures, normal-session feed frame-wait timeouts and native rapid-reversal AdwGizmo allocation warning remain documented. No physical input/live-account acceptance or account-process restart."
+  }
+}

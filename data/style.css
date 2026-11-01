@@ -1,0 +1,78 @@
+/* Deliberately retain Adwaita colour, typography and focus defaults. */
+.post-body { line-height: 1.3; }
+/* Native section headers contain whole pages here, not just heading text. */
+.page-intro { font-weight: normal; }
+
+/* Label chips use theme foreground and a quiet surface in light/dark/high contrast. */
+
+.content-label-chip > button {
+  border-radius: 99px;
+  font-size: 0.9em;
+  font-weight: normal;
+  padding: 4px 10px;
+  min-height: 26px;
+  background: alpha(currentColor, 0.06);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+}
+.content-label-chip > button:hover { background: alpha(currentColor, 0.12); }
+.content-label-notice {
+  padding: 16px;
+  border-radius: 12px;
+  background: alpha(currentColor, 0.04);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+}
+
+/* Conversation relationships remain readable without relying on colour or indentation. */
+.conversation-message { border-left: 2px solid var(--border-color); margin-left: 14px; }
+.conversation-reply { border-left-width: 3px; }
+.conversation-branch { margin-top: 12px; }
+.conversation-position {
+  border-radius: 99px;
+  padding: 2px 7px;
+  background: alpha(currentColor, 0.06);
+  color: var(--window-fg-color);
+}
+.opened-message { background: alpha(currentColor, 0.04); border-left-color: var(--accent-color); }
+.feed-thread-member { border-left: 2px solid var(--border-color); margin-left: 14px; }
+.conversation-loader:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+@keyframes post-arrival { from { opacity: 0; } to { opacity: 1; } }
+.arriving-post { animation: post-arrival 160ms ease-out; }
+
+/* State remains clear through filled glyphs/read semantics, also without motion. */
+.reaction-selected, .unread-indicator { color: var(--accent-color); }
+
+/* Keep the reading surface quiet; selection is the command cursor, not a pointer fill.
+ * GTK propagates focus-visible to ancestors, so :focus must also match the row itself.
+ * Focusing a child button or selecting text must never outline the entire card. */
+.content-list > row, .content-list > row:selected,
+.content-list > row:hover, .content-list > row:selected:hover, .content-list > row:active {
+  background: transparent;
+  color: inherit;
+  outline: none;
+}
+.content-list > row:focus:focus-visible > clamp > * {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -3px;
+  background: alpha(var(--accent-color), 0.05);
+}
+.quoted-post:focus:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
+}
+.post-author { padding: 4px; border-radius: 9px; }
+.post-actions button { min-height: 30px; padding: 3px 9px; font-weight: normal; }
+.post-actions { margin-top: 2px; }
+
+/* The chooser arrow and surface share one border, without an inset shadow seam. */
+.appearance-selector popover.menu > contents {
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+}
+.appearance-selector popover.menu > arrow {
+  border: 1px solid var(--border-color);
+}

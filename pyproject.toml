@@ -1,0 +1,35 @@
+[project]
+name = "skyloom"
+version = "0.1.0"
+description = "A native GNOME client for Bluesky"
+readme = "README.md"
+authors = [{name = "Nick Richards"}]
+license = "GPL-3.0-or-later"
+license-files = ["COPYING", "LICENSE.md"]
+requires-python = ">=3.14"
+dependencies = ["atproto==0.0.73", "regex==2026.9.29"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+required-version = "==0.17.2"
+
+[tool.ruff.lint]
+select = [
+    "A", "ASYNC", "B", "BLE", "C4", "DTZ", "E", "EXE", "F", "FLY", "FURB", "I",
+    "ICN", "ISC", "LOG", "PERF", "PGH", "PIE", "RET", "RSE", "RUF", "S",
+    "SIM", "SLOT", "T10", "UP", "W", "YTT",
+    "TRY201", "TRY203", "TRY400", "TRY401",
+]
+ignore = ["E501"]
+allowed-confusables = ["’"]
+explicit-preview-rules = true
+
+[tool.ruff.lint.per-file-ignores]
+# Assertions are the smoke-test oracle and must remain enabled when running it.
+"src/skyloom/smoke.py" = ["S101"]
+"tests/**" = ["S101"]

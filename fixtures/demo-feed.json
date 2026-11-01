@@ -1,0 +1,72 @@
+{
+  "_purpose": "Invented offline-only design and integration fixtures; no live social media data. Adapt parser/models to implementation.",
+  "demo_account": {
+    "did": "did:example:skyloom-demo-account",
+    "handle": "demo.invalid",
+    "display_name": "Skyloom Demo",
+    "bio": "An offline account created for testing GNOME UI layouts."
+  },
+  "feeds": [
+    {"id": "following", "name": "Following", "description": "Posts from people you follow"},
+    {"id": "design", "name": "Design & Technology", "description": "A sample custom feed"},
+    {"id": "nature", "name": "The Outside World", "description": "Another sample custom feed"}
+  ],
+  "posts": [
+    {
+      "id": "p1", "uri": "at://did:example:demo1/app.bsky.feed.post/p1", "cid": "demo-cid-p1",
+      "author": {"did": "did:example:demo1", "handle": "ada.demo.invalid", "display_name": "Ada Rivers", "avatar_fallback": "AR"},
+      "created_at": "2026-10-26T15:34:00Z", "text": "Some software feels like home. A responsive layout, thoughtful spacing and tiny details can make everyday tools a joy to use.",
+      "reply_count": 8, "repost_count": 17, "like_count": 96,
+      "viewer": {"liked": false, "reposted": false}, "embeds": []
+    },
+    {
+      "id": "p2", "uri": "at://did:example:demo2/app.bsky.feed.post/p2", "cid": "demo-cid-p2",
+      "author": {"did": "did:example:demo2", "handle": "leo.demo.invalid", "display_name": "Leo M", "avatar_fallback": "LM"},
+      "created_at": "2026-10-26T14:15:00Z", "text": "A little reminder to add alt text. A good description tells someone what matters about a picture, not only what objects are in it.",
+      "reply_count": 2, "repost_count": 4, "like_count": 29,
+      "viewer": {"liked": true, "reposted": false},
+      "embeds": [{"kind": "images", "images": [{"local_fixture": "demo-landscape", "alt": "Illustrated rolling hills under a pale blue sky with a winding path."}]}]
+    },
+    {
+      "id": "p3", "uri": "at://did:example:demo3/app.bsky.feed.post/p3", "cid": "demo-cid-p3",
+      "author": {"did": "did:example:demo3", "handle": "nora.demo.invalid", "display_name": "Nora Shah", "avatar_fallback": "NS"},
+      "created_at": "2026-10-26T13:01:00Z", "text": "Open source is better when we build with each other. Here’s a project worth exploring: https://example.invalid/project #OpenSource",
+      "reply_count": 19, "repost_count": 51, "like_count": 202,
+      "viewer": {"liked": false, "reposted": true},
+      "embeds": [{"kind": "external", "title": "An imaginative example project", "description": "A completely fictional link card for a demo feed.", "url": "https://example.invalid/project"}]
+    },
+    {
+      "id": "p4", "uri": "at://did:example:demo4/app.bsky.feed.post/p4", "cid": "demo-cid-p4",
+      "author": {"did": "did:example:demo4", "handle": "milo.demo.invalid", "display_name": "Milo Hart", "avatar_fallback": "MH"},
+      "created_at": "2026-10-26T11:22:00Z", "text": "I love the moment when a complicated conversation becomes easy to follow. A thread should make its context obvious even as it gets longer.",
+      "reply_count": 5, "repost_count": 2, "like_count": 44,
+      "viewer": {"liked": false, "reposted": false},
+      "embeds": [{"kind": "quote", "quoted_post_id": "p1"}]
+    },
+    {
+      "id": "p5", "uri": "at://did:example:demo5/app.bsky.feed.post/p5", "cid": "demo-cid-p5",
+      "author": {"did": "did:example:demo5", "handle": "river.demo.invalid", "display_name": "River Chen", "avatar_fallback": "RC"},
+      "created_at": "2026-10-25T19:45:00Z", "text": "A weekend of crisp air and long walks 🌤️🧣. What did everyone discover?",
+      "reply_count": 23, "repost_count": 8, "like_count": 123,
+      "viewer": {"liked": false, "reposted": false},
+      "embeds": [{"kind": "images", "images": [
+        {"local_fixture": "demo-landscape", "alt": "A winding trail across green hills, with fluffy clouds overhead."},
+        {"local_fixture": "demo-architecture", "alt": "Simple angular buildings, warm terracotta walls and cobalt windows."}
+      ]}]
+    },
+    {
+      "id": "p6", "uri": "at://did:example:demo6/app.bsky.feed.post/p6", "cid": "demo-cid-p6",
+      "author": {"did": "did:example:demo6", "handle": "sam.demo.invalid", "display_name": "Sam Patel", "avatar_fallback": "SP"},
+      "created_at": "2026-10-25T08:15:00Z", "text": "A shorter post, for visual rhythm.",
+      "reply_count": 0, "repost_count": 0, "like_count": 3,
+      "viewer": {"liked": false, "reposted": false}, "embeds": []
+    }
+  ],
+  "notifications": [
+    {"id": "n1", "type": "like", "from": "ada.demo.invalid", "post_id": "p1", "unread": true},
+    {"id": "n2", "type": "reply", "from": "nora.demo.invalid", "post_id": "p4", "unread": true},
+    {"id": "n3", "type": "follow", "from": "sam.demo.invalid", "unread": false}
+  ],
+  "demo_states": ["default", "loading", "no-results", "offline-cached", "offline-empty", "error-429", "no-session", "empty-notifications"],
+  "_warning": "Use only when --demo is explicitly set. This is fabricated, non-live data; it should never be presented as an actual Bluesky feed."
+}
