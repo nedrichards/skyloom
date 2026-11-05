@@ -89,3 +89,5 @@ so returning to a reading position does not replay a stale top-jump message.
 Keyboard/menu Undo remains available after dismissal; reaction toasts retain five seconds.
 
 Reaching the top of a feed clears its pending new-post arrival notice and unseen count, regardless of the scrolling input.
+
+Loading posts in a saved-feed gap preserves the visible reading position while loading, on failure and when inserting the fetched posts.

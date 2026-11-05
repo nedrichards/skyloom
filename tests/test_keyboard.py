@@ -282,6 +282,53 @@ class KeyboardTests(unittest.TestCase):
         row = next(row for row in self.view.rows if isinstance(row._value, FeedGap))
         self.assertFalse(row.get_last_child().get_sensitive())
 
+    def test_gap_loading_preserves_reading_position_through_retry_and_insertion(self):
+        from unittest.mock import patch
+
+        from skyloom.domain import Page, Pager
+        from skyloom.feed_coordination import FeedCoordination
+        from skyloom.reading import ReadingSession
+        from skyloom.window import Window
+
+        before = self.posts[10].uri
+        pager = Pager(list(self.posts), "tail", gaps={before: "between"})
+        self.window.pagers = {"following": pager}
+        self.window.feed_page = lambda *_: None
+        self.view.feed = FeedCoordination(self.window, self.view, "following")
+        self.view.reading = ReadingSession(self.window, self.view, "following")
+        self.view.set_posts(pager.projected())
+        self.view.list.scroll_to(10, Gtk.ListScrollFlags(0), None)
+        self.pump()
+        gap_row = next(
+            row for row in self.view.rows if getattr(row._value, "uri", None) == "gap:" + before
+        )
+        gap_row.get_last_child().grab_focus()
+        self.pump()
+        adjustment = self.view.scroll.get_vadjustment()
+        adjustment.set_value(adjustment.get_value() + 45)
+        self.pump()
+        place = self.view.reading.capture()
+        self.assertIsNotNone(place)
+        self.assertGreater(adjustment.get_value(), adjustment.get_page_size())
+
+        def unchanged():
+            self.pump()
+            current = self.view.reading.capture()
+            self.assertEqual(current.uri, place.uri)
+            self.assertAlmostEqual(current.offset, place.offset, delta=3)
+
+        with patch("skyloom.window.submit_request") as request:
+            Window.load_feed_gap(self.window, self.view, before)
+            unchanged()
+            request.call_args.args[4]("Invented connection failure")
+            unchanged()
+            Window.load_feed_gap(self.window, self.view, before)
+            unchanged()
+            inserted = replace(self.posts[0], uri=self.posts[0].uri + "-between")
+            request.call_args.args[3](Page((inserted, self.posts[10]), None))
+            unchanged()
+            self.assertIn(inserted, self.window.pagers["following"].posts)
+
     def test_stale_undo_toast_cannot_execute_a_newer_action(self):
         calls = []
         first = self.window.interactions.offer_undo("First", lambda: calls.append("first"))

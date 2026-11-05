@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve the visible post and its pixel offset when Load posts in between enters its loading state, as well as on completion or retry.
+
 - Harden thread prefetch after adversarial review: preserve response anchors and original freshness, fetch ancestry-only cache misses, retain local reactions across older responses, and target visible deep replies. Cancel speculative requests for foreground work, recover canceled controllers, and clear snapshots on sign-out.
 - Avoid rewriting unchanged thread pills and restarting idle debounce on unrelated worker notifications; index cached subtree membership. Correct reading-position signal cleanup.
 

@@ -1,5 +1,26 @@
 # Delivery report
 
+## Feed gap loading position — 5 November 2026
+
+Load posts in between now captures the visible post and pixel offset before
+replacing the focused gap button with its loading state, then restores through
+the existing bounded, input-cancellable positioning path. Completion and failure
+continue to capture the current position independently, so later scrolling wins.
+
+The invented-data native regression reproduces the original jump from post 7 to
+post 0 with the focused gap button; it fails without the fix and passes with it.
+It verifies the post and offset through loading, failure, retry and insertion.
+The focused test also passed against installed `/app/share/skyloom` code in the
+GNOME 51 Flatpak under X11/Cairo. The offline pinned Builder build/export and
+local reinstall succeeded. Lint, desktop validation and schema checks passed.
+
+`./scripts/check.sh` could not launch its nested Flatpak runtime (`Unable to
+allocate instance id`). The host-launched source keyboard suite ran 37 tests;
+35 passed, including the new regression, while paging activation and native
+pointer/keyboard focus tests failed. The complete suite and GUI smoke were not
+rerun for this change. These results do not establish physical pointer/touch or
+live-account acceptance.
+
 ## Renderer follow-up — 1 November 2026
 
 Normal installed launch was checked with a fresh empty native window: Wayland,

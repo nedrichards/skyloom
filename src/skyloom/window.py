@@ -777,9 +777,11 @@ class Window(Adw.ApplicationWindow):
         key = "feed:" + feed
         if not cursor or key in self.page_requests:
             return
+        bookmark = reading.capture()
         coordination.gap_attempted.add((before, cursor))
         coordination.gap_states[before] = FeedGap(before, cursor, busy=True)
         view.set_posts(pager.projected(coordination.gap_states))
+        reading.restore(bookmark)
 
         def failed(message):
             bookmark = reading.capture()
