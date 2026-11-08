@@ -1,5 +1,44 @@
 # Delivery report
 
+## Header feed selection — 8 November 2026
+
+Home now hosts its adaptive feed selector entirely in the existing header. Its
+allocated title width and full-name requests select expanded, horizontally
+scrollable or compact dropdown presentation. Manual collapse/expand and scroll
+arrows remain native controls. Selection uses the existing dropdown model/signal,
+retaining immutable feed IDs, metadata fallback, loading and reading checkpoints.
+Crossfades use 280 ms and arrow scrolling 160 ms, with motion policy respected.
+No second header row, feed overview or new service endpoint was added.
+
+The development prototype and all its captures were removed at the maintainer's
+request. Validation uses disposable checks; no new permanent tests were added.
+The installed runtime check uses the real Home with six invented feeds, measures
+constant header height through resize/return, switches every feed, checks actual
+horizontal overflow/scrolling and metadata reorder/removal recovery. The title
+control stayed 34 px high at 1280, 800 and 480 px window widths; those states
+were expanded, scrollable and compact respectively. Focus moved into the
+dropdown on collapse and back to the selected feed on expansion. Captures of
+the actual Home were inspected, then restored/removed after review.
+
+Offline Flatpak build/export and local installation succeeded; both changed
+production modules match the installed files byte for byte. The installed
+full demo smoke passed, including feed/cache switching, sidebar resizing,
+conversation/back, profile/search, composer, offline/error recovery and sign-out.
+The final installed GNOME 51 X11/Cairo suite passed **279 tests, zero skips**.
+The initial source run had two failures in standalone small-fragment restoration
+and TopPeek timing assertions; the fragment case passed in isolation, while
+TopPeek failed a different assertion. Both cases passed against the unchanged
+committed baseline, and the final installed full-suite rerun passed without
+modifying assertions. These results retain the shared-compositor timing limit.
+Native GDK skipped-frame/frame-throttling warnings were emitted.
+
+Lint, formatting, compilation, desktop metadata and schema checks passed.
+`./scripts/check.sh` reached its native step but the nested sandbox could not
+allocate a Flatpak instance, so native validation used the host Flatpak route.
+Physical touch/keyboard, Orca and live-account acceptance remain the separate
+release gates in the roadmap. No new tests or development captures remain in
+the checkout; existing regression tests are unchanged.
+
 ## Sidebar transition refinement — 8 November 2026
 
 Narrow-window collapse now moves the content and visible sidebar together on a

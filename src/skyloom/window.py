@@ -16,6 +16,7 @@ from .domain import Author, Pager, Post, find_post, safe_url
 from .errors import POST_UNAVAILABLE, UserError
 from .feed_coordination import FeedCoordination
 from .feed_state import FeedGap
+from .feed_switcher import FeedSwitcher
 from .interactions import Interactions
 from .motion import Feedback
 from .navigation import Navigation
@@ -411,7 +412,8 @@ class Window(Adw.ApplicationWindow):
         self.feed_picker.set_tooltip_text("Choose a feed")
         self.feed_picker.update_property([Gtk.AccessibleProperty.LABEL], ["Choose a feed"])
         self.feed_picker.connect("notify::selected", self.feed_changed)
-        home_header.set_title_widget(self.feed_picker)
+        self.feed_switcher = FeedSwitcher(self.feed_picker, self)
+        home_header.set_title_widget(self.feed_switcher)
         home_toggle = self.navigation.create_toggle()
         home_header.pack_start(home_toggle)
         home_header.pack_end(button("view-refresh-symbolic", "Refresh feed (Ctrl+R)", self.refresh))

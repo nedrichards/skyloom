@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep Home feed selection inside the existing header: show a visible strip when space permits, scroll it horizontally as space tightens, and crossfade back to the dropdown at narrow widths. Preserve feed selection and reading state, with explicit collapse/expand and scroll controls. Remove the development prototype and captures.
+
 - Animate narrow-window collapse on one 340 ms timeline: slide live content beneath a temporary in-memory render of the departing sidebar, avoiding the native sidebar spring finishing too quickly. Preserve reduced motion, resize reversals and native overlay controls.
 
 - Enforce HTTPS on every SDK request, including redirects and session-discovered servers. Validate undo/unfollow/unblock record ownership, collection and subject before deletion, and use the verified CID to reject concurrent replacements. Preserve already-removed recovery and add adversarial SDK regressions.
