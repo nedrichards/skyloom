@@ -525,9 +525,9 @@ class Window(Adw.ApplicationWindow):
         side.add_bottom_bar(footer)
         side.set_content(column)
         self.split.set_sidebar(side)
-        self.split.set_content(self.nav)
+        self.navigation.set_content(self.nav)
         self.split.set_show_sidebar(not self.split.get_collapsed())
-        self.stack.add_named(self.split, "shell")
+        self.stack.add_named(self.navigation.root, "shell")
 
     def set_feeds(self, options):
         if options == self.feed_options:
@@ -1881,7 +1881,7 @@ class Window(Adw.ApplicationWindow):
         if shell:
             self.stack.remove(shell)
         self.split.set_sidebar(None)
-        self.split.set_content(None)
+        self.navigation.set_content(None)
         self.views, self.pagers, self.feed_views = [], {}, {}
 
     def close_requested(self, *_args):

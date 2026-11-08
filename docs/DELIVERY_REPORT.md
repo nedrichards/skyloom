@@ -1,5 +1,35 @@
 # Delivery report
 
+## Sidebar transition refinement — 8 November 2026
+
+Narrow-window collapse now moves the content and visible sidebar together on a
+340 ms cubic ease-out timeline. The sidebar's native spring cannot be retimed
+through public API, so a decorative in-memory render of its themed pane covers
+the faster native departure. It never takes focus/input and is released on
+completion or cancellation. No sidebar image is saved to disk in production.
+The live content uses a clipped allocation transform at its final width; it
+does not rewrap the feed on each animation frame. Unmapping, reversal and
+explicit visibility changes cancel the content slide. Reduced motion and disabled
+animations keep immediate endpoints.
+
+Validation: the 11 focused native navigation tests passed, including sampled
+content and sidebar movement on the same frames, sidebar departure, focus return,
+resize reversal and reduced-motion endpoints. The full source GNOME 51
+X11/Cairo suite passed **279 tests with zero skips**. Lint, formatting, desktop
+metadata and schema checks passed. `./scripts/check.sh` reached the runtime
+step but the nested sandbox could not allocate a Flatpak instance; the full
+native suite was therefore run through the host Flatpak route. One native
+GDK skipped-frame warning was emitted. The shared-timeline revision was
+built/exported offline and installed locally. All 11 navigation tests passed
+again against the installed code, including render cleanup on reversal and
+reduced-motion endpoints.
+The full source suite includes the updated overlapping-motion frame assertion.
+An invented-data midpoint capture was inspected: the themed sidebar remains
+visible over the moving content. Its installed demo navigation smoke passed at
+1280/light and 480/dark, with the existing GDK frame-throttling warning.
+Generated smoke captures were restored to avoid unrelated screenshot changes.
+These checks do not establish physical resize polish or default-renderer frame-rate acceptance.
+
 ## Adversarial security review — 8 November 2026
 
 Reviewed session persistence/refresh/sign-out, authenticated mutations, external

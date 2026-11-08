@@ -44,8 +44,10 @@ class NavigationTests(unittest.TestCase):
         self.content.add_top_bar(header)
         self.content.set_content(Gtk.Label(label="Invented content stays mounted"))
         self.split.set_sidebar(self.sidebar)
-        self.split.set_content(self.content)
-        self.window = Adw.Window(default_width=800, default_height=500, content=self.split)
+        self.navigation.set_content(self.content)
+        self.window = Adw.Window(
+            default_width=800, default_height=500, content=self.navigation.root
+        )
         self.addCleanup(self.window.destroy)
         self.window.present()
         self.pump()
@@ -60,7 +62,7 @@ class NavigationTests(unittest.TestCase):
         self.assertFalse(self.sidebar.get_mapped())
         self.assertGreater(self.content.get_width(), before + 150)
         self.assertEqual(self.toggle.get_tooltip_text(), "Show navigation")
-        self.assertIs(self.split.get_content(), self.content)
+        self.assertIs(self.split.get_content().child, self.content)
         self.toggle.emit("clicked")
         self.pump()
         self.assertTrue(self.sidebar.get_mapped())
@@ -100,26 +102,51 @@ class NavigationTests(unittest.TestCase):
         self.window.add_breakpoint(narrow)
         self.sidebar.get_first_child().grab_focus()
         samples = []
+        content_samples = []
 
         def frame(*_args):
             valid, bounds = self.sidebar.compute_bounds(self.split)
+            slide = self.navigation.sidebar_slide
+            if slide.image is not None:
+                valid_content, content_bounds = self.content.compute_bounds(self.split)
+                if valid_content:
+                    content_samples.append((slide.offset, content_bounds.origin.x))
             if valid and self.sidebar.get_mapped():
+                valid_content, content_bounds = self.content.compute_bounds(self.split)
                 samples.append((bounds.origin.x, bounds.size.width))
+
             return True
 
         tick = self.window.add_tick_callback(frame)
         try:
             self.window.set_default_size(480, 500)
-            self.assertTrue(settle(self.window, 650, lambda: not self.sidebar.get_mapped()))
+            self.assertTrue(
+                settle(
+                    self.window,
+                    900,
+                    lambda: (
+                        not self.sidebar.get_mapped()
+                        and self.navigation.sidebar_slide.image is None
+                    ),
+                )
+            )
         finally:
             self.window.remove_tick_callback(tick)
         self.assertTrue(self.split.get_collapsed())
         self.assertFalse(self.split.get_show_sidebar())
         self.assertTrue(
+            any(sidebar_x < -2 and 2 < content_x < 200 for sidebar_x, content_x in content_samples),
+            "Content and sidebar must move together during collapse",
+        )
+        self.assertTrue(
+            any(-160 < x < -60 and content_x > 2 for x, content_x in content_samples),
+            "The rendered sidebar must remain visible through the shared transition",
+        )
+        self.assertTrue(
             any(-width + 2 < x < -2 for x, width in samples),
             "Resizing must render an intermediate sidebar position before unmapping it",
         )
-        self.assertIs(self.split.get_content(), self.content)
+        self.assertIs(self.split.get_content().child, self.content)
         self.assertAlmostEqual(self.content.get_width(), self.split.get_width(), delta=2)
         self.assertEqual(self.toggle.get_tooltip_text(), "Show navigation")
         focus = self.window.get_focus()
@@ -141,9 +168,10 @@ class NavigationTests(unittest.TestCase):
         self.assertFalse(self.split.get_collapsed())
         self.assertTrue(self.split.get_show_sidebar())
         self.assertTrue(self.sidebar.get_mapped())
-        self.assertIs(self.split.get_content(), self.content)
+        self.assertIs(self.split.get_content().child, self.content)
         self.assertTrue(self.toggle.get_active())
         self.assertIsNone(self.navigation.visibility_tick)
+        self.assertIsNone(self.navigation.sidebar_slide.image)
 
     def test_collapse_skips_animation_when_motion_is_disabled(self):
         for enabled, reduced in (
@@ -154,6 +182,7 @@ class NavigationTests(unittest.TestCase):
                 self.animation_settings(enabled, reduced)
                 self.split.set_collapsed(True)
                 self.assertFalse(self.sidebar.get_mapped())
+                self.assertIsNone(self.navigation.sidebar_slide.image)
                 self.assertFalse(self.toggle.get_active())
                 self.split.set_collapsed(False)
                 self.assertTrue(self.sidebar.get_mapped())

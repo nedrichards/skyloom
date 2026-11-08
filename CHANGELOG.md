@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Animate narrow-window collapse on one 340 ms timeline: slide live content beneath a temporary in-memory render of the departing sidebar, avoiding the native sidebar spring finishing too quickly. Preserve reduced motion, resize reversals and native overlay controls.
+
 - Enforce HTTPS on every SDK request, including redirects and session-discovered servers. Validate undo/unfollow/unblock record ownership, collection and subject before deletion, and use the verified CID to reject concurrent replacements. Preserve already-removed recovery and add adversarial SDK regressions.
 - Serialize prepared attachment copies with account cleanup so late image work cannot recreate private files after sign-out. Ignore picker/preparation callbacks for a closed composer or retired account.
 

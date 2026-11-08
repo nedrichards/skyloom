@@ -179,7 +179,18 @@ setters, so a visibility change requested there waits for the split view's next
 map; only the latest requested target is retained. A bounded three-frame handoff
 allows the initial narrow allocation to finish before starting the spring, so
 dense feed reflow does not consume the animation's elapsed time. Unmapping
-cancels that callback; there is no timer or idle animation loop. This follows the inspected libadwaita 1.10.0
+cancels that callback. On collapse, content and the visible sidebar share a
+340 ms cubic ease-out timeline. The native sidebar spring has no public timing
+control. A temporary immutable `Gtk.WidgetPaintable` render of the themed sidebar
+pane is therefore drawn above the native split view during resize, moving with
+the same progress as the live content. The native sidebar still handles actual
+visibility, focus, dismissal and gestures. The render is decorative, cannot take
+input or focus, stays only in memory and is discarded at completion or cancellation.
+The content's final width is allocated once; GTK allocation transforms keep its
+hit testing aligned without rewrapping text on each frame. Reversal, unmapping,
+content replacement and explicit visibility changes clear both the render and
+the content transform. Reduced motion and disabled animations skip this path.
+There is no idle animation loop. This follows the inspected libadwaita 1.10.0
 [split-view implementation](https://github.com/GNOME/libadwaita/blob/1.10.0/src/adw-overlay-split-view.c)
 and [breakpoint implementation](https://github.com/GNOME/libadwaita/blob/1.10.0/src/adw-breakpoint-bin.c).
 GTK's disabled-animation setting is handled by the native animation. A local
