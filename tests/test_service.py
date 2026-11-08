@@ -75,7 +75,7 @@ class Contract(unittest.IsolatedAsyncioTestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.secrets = Secrets()
         self.requests = []
-        self.fail = None
+        self.fail_response = None
         self.refreshes = 0
         self.profile = {
             "did": DID,
@@ -139,9 +139,9 @@ class Contract(unittest.IsolatedAsyncioTestCase):
             else None
         )
         self.requests.append((method, body, dict(req.url.params), req.headers.get("Authorization")))
-        if self.fail and method == self.fail[0]:
+        if self.fail_response and method == self.fail_response[0]:
             return httpx.Response(
-                self.fail[1],
+                self.fail_response[1],
                 json={
                     "error": "TestFailure",
                     "message": "Sensitive exception body must not reach UI",
@@ -166,6 +166,23 @@ class Contract(unittest.IsolatedAsyncioTestCase):
             }
         elif method.endswith("createRecord"):
             value = {"uri": f"at://{DID}/{body['collection']}/own-record", "cid": CID}
+        elif method.endswith("getRecord"):
+            params = dict(req.url.params)
+            collection = params["collection"]
+            subject = (
+                {"uri": URI, "cid": CID}
+                if collection in ("app.bsky.feed.like", "app.bsky.feed.repost")
+                else "did:example:other"
+            )
+            value = {
+                "uri": f"at://{DID}/{collection}/{params['rkey']}",
+                "cid": CID,
+                "value": {
+                    "$type": collection,
+                    "subject": getattr(self, "deletion_subject", subject),
+                    "createdAt": "2026-10-26T10:00:00Z",
+                },
+            }
         elif method.endswith("getPreferences"):
             value = {
                 "preferences": [
@@ -259,7 +276,7 @@ class Contract(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(self.service.account)
         self.secrets.locked = False
         self.service.client._session.access_jwt = jwt(exp=int(time.time()) - 10)
-        self.fail = ("com.atproto.server.refreshSession", 401)
+        self.fail_response = ("com.atproto.server.refreshSession", 401)
         with self.assertRaises(AtProtocolError) as caught:
             await self.service.feed()
         self.assertIn("session", message(caught.exception))
@@ -339,7 +356,7 @@ class Contract(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(deletion[1]["collection"], "app.bsky.feed.like")
         reposted = await self.service.mutate(p, "repost")
         self.assertFalse((await self.service.mutate(reposted, "repost")).repost_uri)
-        self.fail = ("com.atproto.repo.createRecord", 500)
+        self.fail_response = ("com.atproto.repo.createRecord", 500)
         with self.assertRaises(AtProtocolError):
             await self.service.mutate(p, "like")
         self.assertFalse(p.like_uri)  # Immutable snapshot is rollback source.
@@ -372,6 +389,119 @@ class Contract(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(UserError, "no longer available"):
             await self.service.send("Kept image post", [Attachment(str(path), "Description kept")])
 
+    async def test_untrusted_viewer_uris_cannot_choose_deletion_target(self):
+        from dataclasses import replace
+
+        await self.login()
+        post = (await self.service.feed()).posts[0]
+        author = Author("did:example:other", "other.invalid", "Other")
+        for field, collection in (
+            ("like_uri", "app.bsky.feed.like"),
+            ("repost_uri", "app.bsky.feed.repost"),
+            ("following", "app.bsky.graph.follow"),
+            ("blocking", "app.bsky.graph.block"),
+        ):
+
+            async def act(uri, field=field):
+                if field in ("like_uri", "repost_uri"):
+                    return await self.service.mutate(
+                        replace(post, **{field: uri}), "like" if field == "like_uri" else "repost"
+                    )
+                target = replace(author, **{field: uri})
+                return (
+                    await self.service.follow(target)
+                    if field == "following"
+                    else await self.service.moderate(target, "block")
+                )
+
+            prefix = f"at://{DID}/{collection}/"
+            for uri in (
+                f"at://{DID}/app.bsky.feed.post/valuable-post",
+                f"at://did:example:other/{collection}/record",
+                f"https://{DID}/{collection}/record",
+                prefix,
+                *(prefix + key for key in (".", "..", "a/b", "a?x", "a#x", "%61", "a" * 513)),
+            ):
+                with self.subTest(field=field, uri=uri):
+                    count = len(self.requests)
+                    with self.assertRaises(UserError):
+                        await act(uri)
+                    self.assertEqual(len(self.requests), count)
+            await act(prefix + "valid_key:~.1-2")
+            deletion = next(r for r in reversed(self.requests) if r[0].endswith("deleteRecord"))
+            self.assertEqual(
+                deletion[1],
+                {
+                    "repo": DID,
+                    "collection": collection,
+                    "rkey": "valid_key:~.1-2",
+                    "swapRecord": CID,
+                },
+            )
+            self.deletion_subject = (
+                {"uri": URI + "-other", "cid": CID}
+                if field in ("like_uri", "repost_uri")
+                else "did:example:unrelated"
+            )
+            count = len(self.requests)
+            with self.assertRaises(UserError):
+                await act(prefix + "unrelated-record")
+            self.assertEqual(len(self.requests), count + 1)
+            self.assertTrue(self.requests[-1][0].endswith("getRecord"))
+            del self.deletion_subject
+
+    async def test_unknown_mutation_cannot_fall_through_to_repost(self):
+        await self.login()
+        post = (await self.service.feed()).posts[0]
+        count = len(self.requests)
+        with self.assertRaises(UserError):
+            await self.service.mutate(post, "unexpected")
+        self.assertEqual(len(self.requests), count)
+
+    async def test_unblock_uri_cannot_delete_a_post(self):
+        await self.login()
+        author = Author("did:example:other", "other.invalid", "Other", blocking=URI)
+        count = len(self.requests)
+        with self.assertRaises(UserError):
+            await self.service.moderate(author, "block")
+        self.assertEqual(len(self.requests), count)
+
+    async def test_deletion_verification_failure_and_concurrent_change_are_not_retried(self):
+        from dataclasses import replace
+
+        await self.login()
+        post = replace(
+            (await self.service.feed()).posts[0],
+            like_uri=f"at://{DID}/app.bsky.feed.like/own-record",
+        )
+        for method, status in (("getRecord", 500), ("deleteRecord", 409)):
+            self.fail_response = ("com.atproto.repo." + method, status)
+            count = len(self.requests)
+            with self.subTest(method=method), self.assertRaises(AtProtocolError):
+                await self.service.mutate(post, "like")
+            methods = [r[0].rsplit(".", 1)[-1] for r in self.requests[count:]]
+            self.assertEqual(
+                methods, ["getRecord"] if method == "getRecord" else ["getRecord", "deleteRecord"]
+            )
+            self.assertTrue(post.like_uri)
+        self.fail_response = ("com.atproto.repo.getRecord", 404)
+        count = len(self.requests)
+        self.assertFalse((await self.service.mutate(post, "like")).like_uri)
+        self.assertEqual(len(self.requests), count + 1)
+
+    async def test_session_discovered_http_endpoint_never_receives_tokens(self):
+        session = self.session()
+        session["didDoc"]["service"][0]["serviceEndpoint"] = "http://pds.invalid"
+        self.session = lambda: session
+        self.service.client_factory = lambda base_url: AsyncClient(
+            base_url=base_url, request=Request(transport=httpx.MockTransport(self.handle))
+        )
+        # The SDK adopts the discovered endpoint before fetching the profile.
+        with self.assertRaises(UserError):
+            await self.login()
+        self.assertEqual(len(self.requests), 1)
+        self.assertTrue(self.requests[0][0].endswith("createSession"))
+
     async def test_search_notifications_follow_moderation(self):
         await self.login()
         self.assertTrue((await self.service.search("hi")).posts)
@@ -395,10 +525,10 @@ class Contract(unittest.IsolatedAsyncioTestCase):
     async def test_offline_restore_and_refresh_persistence_retry(self):
         await self.login()
         await self.service.feed()
-        self.fail = ("app.bsky.actor.getProfile", 500)
+        self.fail_response = ("app.bsky.actor.getProfile", 500)
         self.assertEqual((await self.service.restore()).did, DID)
         self.assertTrue((await self.service.cached("following")).posts)
-        self.fail = None
+        self.fail_response = None
         self.secrets.locked = True
         self.service.client._session.access_jwt = jwt(exp=int(time.time()) - 10)
         with self.assertRaises(KeyringError):
@@ -463,7 +593,7 @@ class Contract(unittest.IsolatedAsyncioTestCase):
             (429, "limiting"),
             (500, "connection"),
         ]:
-            self.fail = ("app.bsky.feed.getTimeline", status)
+            self.fail_response = ("app.bsky.feed.getTimeline", status)
             with self.assertRaises(AtProtocolError) as caught:
                 await self.service.feed()
             text = message(caught.exception)
@@ -475,6 +605,48 @@ class Contract(unittest.IsolatedAsyncioTestCase):
 
 
 class CooldownTests(unittest.IsolatedAsyncioTestCase):
+    async def test_redirects_cannot_send_signin_body_over_http(self):
+        for status in (301, 302, 303, 307, 308):
+            calls = []
+
+            def handler(request, status=status, calls=calls):
+                calls.append(request)
+                if request.url.scheme == "https":
+                    return httpx.Response(status, headers={"Location": "http://pds.invalid/next"})
+                return httpx.Response(200, json={"ok": True})
+
+            request = Request(transport=httpx.MockTransport(handler))
+            try:
+                with self.subTest(status=status), self.assertRaises(UserError):
+                    await request.post(
+                        "https://pds.invalid/session", data={"password": "test-only-never-valid"}
+                    )
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(calls[0].url.scheme, "https")
+            finally:
+                await request.close()
+
+    async def test_https_redirects_still_work_and_direct_http_is_blocked(self):
+        calls = []
+
+        def handler(request):
+            calls.append(request)
+            if request.url.path == "/start":
+                return httpx.Response(307, headers={"Location": "https://pds.invalid/end"})
+            return httpx.Response(200, json={"ok": True})
+
+        request = Request(transport=httpx.MockTransport(handler))
+        try:
+            await request.post("https://pds.invalid/start", data={"fixture": "body"})
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls[0].content, calls[1].content)
+            for url in ("http://pds.invalid/start", "https://user:pass@pds.invalid/start"):
+                with self.subTest(url=url), self.assertRaises(UserError):
+                    await request.get(url)
+            self.assertEqual(len(calls), 2)
+        finally:
+            await request.close()
+
     async def test_login_replacement_preserves_cooldown(self):
         calls = []
 

@@ -1,5 +1,53 @@
 # Delivery report
 
+## Adversarial security review — 8 November 2026
+
+Reviewed session persistence/refresh/sign-out, authenticated mutations, external
+links/rich text, attachment preparation, media/cache boundaries and Flatpak
+permissions/pinned sources. Three concrete issues were fixed:
+
+- The SDK follows redirects and can adopt a PDS endpoint from session/DID data.
+  Checking HTTPS only at sign-in allowed later plain-HTTP requests. A production
+  HTTPX request hook now rejects HTTP and URL credentials before dispatch,
+  including redirect hops; valid HTTPS servers and redirects still work.
+- Unblock copied the collection from an untrusted viewer URI into an
+  authenticated delete, allowing a forged post URI to delete a post instead.
+  All removal actions now require the account DID, intended collection and
+  valid record key. A PDS lookup verifies the record's subject/type/URI, and
+  `swapRecord` binds deletion to its verified CID. This adds one lookup per
+  removal. Already-removed records remain successful no-ops; failures keep
+  existing rollback/retry behaviour and never automatically retry mutations.
+- Attachment preparation bypassed account storage invalidation, allowing a late
+  worker to recreate private upload copies after sign-out. It now uses the
+  account IO lock and captured generation. Cleanup removes completed work and
+  rejects queued stale work; closed/retired composer callbacks are ignored.
+
+Original-source HTTP contract reproductions fail for the forged unblock URI,
+session-discovered HTTP endpoint and redirect downgrade. The fixed SDK contract
+suite passes 21 tests, including malformed/wrong-owner/wrong-collection URIs,
+wrong subjects, concurrent-delete failure, missing-record recovery and all five
+redirect statuses. Native image tests exercise running/queued cleanup races and
+late picker/preparation callbacks with invented data. The fixture's HTTP failure
+selector was renamed so it no longer shadows unittest's assertion failure method.
+
+The final installed GNOME 51 X11/Cairo suite passed **279 tests with zero skips**.
+Offline pinned Flatpak build/export and local reinstall succeeded; all four
+changed production modules match the installation byte for byte. Permissions
+remain network/display/GPU/IPC and Secret Service only. `./scripts/check.sh`
+passed lint, desktop metadata and schema checks before the known nested Flatpak
+instance-allocation failure; the native suite above ran through the host route.
+The installed full GUI smoke passed sequentially in normal styling and with
+high contrast/16-point text, covering 480/800/1280-pixel layouts, composer/images,
+draft recovery, reactions/rollback, navigation, sign-out recovery, conversations,
+refresh and offline behaviour. Both composer captures were visually inspected.
+GDK frame-timing warnings remain visible; these functional runs are not frame
+pacing measurements. Captures and logs are in ignored `build-security-review/`.
+
+No real credentials, account mutations or personal feed data were used. Human
+live-service, physical input, Orca and default-Wayland acceptance remain open.
+This is a source/contract/native review, not a claim that upstream dependencies
+or all possible deployments have been independently security-certified.
+
 ## Maintenance checkpoint — 8 November 2026
 
 The maintainer reports that the conversation scrolling changes work well and

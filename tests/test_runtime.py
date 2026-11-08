@@ -125,6 +125,107 @@ class WorkerTests(unittest.TestCase):
 
 @unittest.skipUnless(RUNTIME, "GNOME 51 GI runtime required")
 class ImageTests(unittest.TestCase):
+    def test_late_image_picker_and_preparation_cannot_follow_signout(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from skyloom.composer import Composer
+        from skyloom.domain import Author
+        from skyloom.storage import Storage
+
+        with tempfile.TemporaryDirectory() as directory:
+            storage = Storage(directory)
+            account = Author("did:example:picker", "picker.invalid", "Invented picker")
+            storage.activate(account.did)
+            service = SimpleNamespace(account=account, storage=storage)
+            callbacks, requests = [], []
+            dialog = SimpleNamespace(
+                set_filters=lambda _: None,
+                open=lambda _window, _cancel, callback: callbacks.append(callback),
+                open_finish=lambda _: SimpleNamespace(get_path=lambda: "unused-fixture.png"),
+            )
+            owner = SimpleNamespace(
+                window=SimpleNamespace(
+                    service=service,
+                    worker=SimpleNamespace(submit=lambda *args: requests.append(args)),
+                ),
+                closed=False,
+                add=SimpleNamespace(set_sensitive=lambda _: None),
+                attachments=[],
+                render_attachments=lambda: self.fail("Stale preparation changed the composer"),
+                changed=lambda: self.fail("Stale preparation changed the draft"),
+            )
+            with patch("skyloom.composer.Gtk.FileDialog", return_value=dialog):
+                Composer.choose_image(owner)
+                owner.closed = True
+                callbacks.pop()(dialog, None)
+                self.assertFalse(requests)
+                owner.closed = False
+                Composer.choose_image(owner)
+                callbacks.pop()(dialog, None)
+            self.assertEqual(len(requests), 1)
+            work, ready, _failed = requests[0]
+            storage.clear(account.did)
+            service.account = None
+            result = asyncio.run(work)
+            self.assertIsNone(result)
+            ready(result)
+            ready("old-account-result.png")
+            self.assertFalse(owner.attachments)
+            self.assertFalse(list(storage.base.glob("*-images")))
+
+    def test_signout_waits_for_running_preparation_and_rejects_queued_copies(self):
+        from unittest.mock import patch
+
+        from skyloom.media import prepare
+        from skyloom.storage import Storage
+
+        with tempfile.TemporaryDirectory() as directory:
+            storage = Storage(Path(directory) / "private")
+            account = "did:example:preparation"
+            token = storage.activate(account)
+            source = Path(directory) / "source.png"
+            pix = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, 8, 8)
+            pix.fill(0x3584E4FF)
+            pix.savev(str(source), "png", [], [])
+            entered, release, clearing, cleared = (threading.Event() for _ in range(4))
+            results = []
+
+            def delayed(path, target):
+                entered.set()
+                if not release.wait(5):
+                    raise TimeoutError("Invented preparation gate was not released")
+                return prepare(path, target)
+
+            def make():
+                results.append(storage.run(account, token, "prepare_image", source))
+
+            def clear():
+                clearing.set()
+                storage.clear(account)
+                cleared.set()
+
+            with patch("skyloom.media.prepare", delayed):
+                worker = threading.Thread(target=make)
+                worker.start()
+                try:
+                    self.assertTrue(entered.wait(3))
+                    cleanup = threading.Thread(target=clear)
+                    cleanup.start()
+                    self.assertTrue(clearing.wait(3))
+                    self.assertFalse(cleared.wait(0.05))
+                finally:
+                    release.set()
+                    worker.join(5)
+                    if clearing.is_set():
+                        cleanup.join(5)
+            self.assertTrue(cleared.is_set())
+            self.assertEqual(len(results), 1)
+            self.assertFalse(Path(results[0]).exists())
+            self.assertIsNone(storage.run(account, token, "prepare_image", source))
+            self.assertFalse(list(storage.base.glob("*-images")))
+            self.assertTrue(source.exists())
+
     def test_images_survive_restart_offline_and_corruption_recovers_online(self):
         from unittest.mock import patch
 

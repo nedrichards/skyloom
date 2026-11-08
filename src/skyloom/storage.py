@@ -386,6 +386,14 @@ class Storage:
             ).fetchall()
             return [(key[6:], value) for key, raw in rows if (value := json.loads(raw))]
 
+    def prepare_image(self, account, path):
+        # Called through run(): preparation and sign-out share the account IO
+        # lock, and a queued operation cannot recreate files after invalidation.
+        from .media import prepare
+
+        directory = self.base / (hashlib.sha256(account.encode()).hexdigest() + "-images")
+        return prepare(path, directory)
+
     def clear(self, account, token=None):
         with self._io_lock(account):
             if token is not None and token != self.token(account):

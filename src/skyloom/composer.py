@@ -1,13 +1,11 @@
 """A responsive composer with durable drafts and guarded close/send operations."""
 
 import asyncio
-import hashlib
 from dataclasses import asdict
 
 from gi.repository import Adw, Gio, GLib, Gtk
 
 from .keyboard import match
-from .media import prepare
 from .richtext import counts, validate
 from .service import Attachment
 from .storage import post_restore
@@ -177,6 +175,12 @@ class Composer(Adw.Dialog):
         return False
 
     def choose_image(self):
+        service = self.window.service
+        account = service.account
+        if self.closed or account is None:
+            return
+        storage = service.storage
+        token = storage.token(account.did)
         chooser = Gtk.FileDialog(title="Choose an image")
         filters = Gio.ListStore.new(Gtk.FileFilter)
         f = Gtk.FileFilter(name="JPEG and PNG images")
@@ -190,24 +194,25 @@ class Composer(Adw.Dialog):
                 file = dialog.open_finish(result)
             except GLib.Error:
                 return
-            if not file or not file.get_path():
+            if self.closed or service.account is not account or not file or not file.get_path():
                 return
             self.add.set_sensitive(False)
-            account_hash = hashlib.sha256(self.window.service.account.did.encode()).hexdigest()
-            directory = self.window.service.storage.base / (account_hash + "-images")
 
             async def make():
-                return await asyncio.to_thread(prepare, file.get_path(), directory)
+                return await asyncio.to_thread(
+                    storage.run, account.did, token, "prepare_image", file.get_path()
+                )
 
             def ready(path):
-                if not self.closed:
+                if path is not None and not self.closed and service.account is account:
                     self.attachments.append(Attachment(path, ""))
                     self.render_attachments()
                     self.changed()
 
             def failed(msg):
-                self.add.set_sensitive(True)
-                self.feedback.set_label(msg)
+                if not self.closed and service.account is account:
+                    self.add.set_sensitive(True)
+                    self.feedback.set_label(msg)
 
             self.window.worker.submit(make(), ready, failed)
 

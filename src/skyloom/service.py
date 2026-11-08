@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
@@ -322,22 +323,58 @@ class Service:
 
     async def mutate(self, post, kind):
         async with self.authenticated():
+            if kind not in ("like", "repost"):
+                raise UserError("This post action is not supported.")
             if kind == "like":
                 if post.like_uri:
-                    await self.client.delete_like(post.like_uri)
+                    await self._delete_record(post.like_uri, "app.bsky.feed.like", post.uri)
                     return replace(post, like_uri="", likes=max(0, post.likes - 1))
                 result = await self.client.like(post.uri, post.cid)
                 return replace(post, like_uri=result.uri, likes=post.likes + 1)
             if post.repost_uri:
-                await self.client.delete_repost(post.repost_uri)
+                await self._delete_record(post.repost_uri, "app.bsky.feed.repost", post.uri)
                 return replace(post, repost_uri="", reposts=max(0, post.reposts - 1))
             result = await self.client.repost(post.uri, post.cid)
             return replace(post, repost_uri=result.uri, reposts=post.reposts + 1)
 
+    async def _delete_record(self, value, collection, subject):
+        # Viewer fields are untrusted AppView data. Never let them select a
+        # repository or collection for an authenticated destructive request.
+        prefix = f"at://{self.account.did}/{collection}/"
+        rkey = value.removeprefix(prefix) if isinstance(value, str) else ""
+        if (
+            not isinstance(value, str)
+            or not value.startswith(prefix)
+            or not re.fullmatch(r"[A-Za-z0-9._:~-]{1,512}", rkey)
+            or rkey in (".", "..")
+        ):
+            raise UserError("This saved action is invalid. Refresh the content and try again.")
+        params = {"repo": self.account.did, "collection": collection, "rkey": rkey}
+        try:
+            record = data(await self.client.com.atproto.repo.get_record(params))
+        except AtProtocolError as exc:
+            if getattr(getattr(exc, "response", None), "status_code", None) == 404:
+                return  # Already removed: keep undo actions idempotent.
+            raise
+        content = record.get("value")
+        actual = content.get("subject") if isinstance(content, dict) else None
+        if collection in ("app.bsky.feed.like", "app.bsky.feed.repost"):
+            actual = actual.get("uri") if isinstance(actual, dict) else None
+        if (
+            record.get("uri") != value
+            or not record.get("cid")
+            or not isinstance(content, dict)
+            or content.get("$type") != collection
+            or actual != subject
+        ):
+            raise UserError("This saved action has changed. Refresh the content and try again.")
+        # Reject a concurrent replacement between verification and deletion.
+        await self.client.com.atproto.repo.delete_record({**params, "swapRecord": record["cid"]})
+
     async def follow(self, author):
         async with self.authenticated():
             if author.following:
-                await self.client.delete_follow(author.following)
+                await self._delete_record(author.following, "app.bsky.graph.follow", author.did)
                 return replace(author, following="")
             result = await self.client.follow(author.did)
             return replace(author, following=result.uri)
@@ -353,12 +390,7 @@ class Service:
                 await method({"actor": author.did})
             elif kind == "block":
                 if author.blocking:
-                    from atproto import AtUri
-
-                    uri = AtUri.from_str(author.blocking)
-                    await self.client.com.atproto.repo.delete_record(
-                        {"repo": self.account.did, "collection": uri.collection, "rkey": uri.rkey}
-                    )
+                    await self._delete_record(author.blocking, "app.bsky.graph.block", author.did)
                 else:
                     await self.client.app.bsky.graph.block.create(
                         self.account.did,

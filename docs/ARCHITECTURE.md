@@ -190,6 +190,28 @@ sidebar position during a real breakpoint resize, correct focus return, safe
 reversal and immediate reduced-motion endpoints. A full-window regression also
 requires visible sidebar motion while resizing a 250-post invented feed.
 
+## Authenticated request and deletion boundaries
+
+The production SDK request installs an asynchronous HTTPX request hook that
+requires HTTPS and rejects URL credentials before network dispatch, including
+each redirect hop. This also covers endpoints adopted by the SDK from session
+or DID data; checking only the custom-server form is insufficient. Valid HTTPS
+custom servers and redirects remain supported. The hook follows the documented
+[HTTPX event contract](https://www.python-httpx.org/advanced/event-hooks/).
+
+Viewer like/repost/follow/block URIs are untrusted. Undo, unfollow and unblock
+require the signed-in DID, the action's fixed collection and a strictly valid
+[record key](https://atproto.com/specs/record-key). A read from the PDS verifies
+the record's URI, type and subject before deletion; `swapRecord` binds the delete
+to that verified CID. This adds one read to removal actions. Missing records
+remain successful no-ops; lookup failures or concurrent replacement preserve the
+UI's existing rollback/retry behaviour. Mutations are never automatically retried.
+
+Attachment preparation uses the same storage generation and account IO lock as
+drafts and sign-out cleanup. Cleanup waits for a running copy and removes it;
+queued work with a retired generation does nothing. File-picker and preparation
+callbacks also check composer/account liveness before updating the draft.
+
 ## Storage locations and retention
 
 Inside the Flatpak, `$XDG_DATA_HOME/skyloom` holds DID-hashed SQLite databases and account image-upload copies. On the host these normally appear under `~/.var/app/com.nedrichards.Skyloom/data/skyloom/`. SQLite tables archive every fetched feed page and quoted record, indexed by feed/URI and age. The archive targets 10,000 posts per feed and 50,000 per account, plus protected saved windows; 12 windows hold up to 250 posts with bookmark/cursor/page-boundary/gap metadata. Cleanup runs on first use, after 512 archived records or an hour of active cache work: unprotected records older than 30 days and excess oldest records are removed. There is bounded slack between sweeps; protected windows may exceed the archive budget. Page metadata is capped at 1,000 pages per feed/30 days. Deleted SQLite pages are reused rather than vacuuming on each save. Quotes are directly indexed; legacy head JSON remains compatible. No background timer wakes the app just to prune. Search, notifications, profile data and newly loaded thread branches are not separately persisted.

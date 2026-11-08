@@ -132,6 +132,7 @@ class StorageOwnershipTests(unittest.IsolatedAsyncioTestCase):
             ("put", "draft:invented", {"text": "Invented draft"}),
             ("cache", "following", Page((POST,)), None),
             ("checkpoint", "following", Pager([POST]), Bookmark(POST.uri)),
+            ("prepare_image", "unused-invented-image.png"),
         )
         for operation in operations:
             with self.subTest(operation=operation[0]), tempfile.TemporaryDirectory() as directory:

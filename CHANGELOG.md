@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Enforce HTTPS on every SDK request, including redirects and session-discovered servers. Validate undo/unfollow/unblock record ownership, collection and subject before deletion, and use the verified CID to reject concurrent replacements. Preserve already-removed recovery and add adversarial SDK regressions.
+- Serialize prepared attachment copies with account cleanup so late image work cannot recreate private files after sign-out. Ignore picker/preparation callbacks for a closed composer or retired account.
+
 - Record the maintainer's improved scrolling retest and the remaining visual disturbance during new-item insertion in long conversations. Retain reviewed performance evidence and remove disposable local investigation outputs.
 
 - Keep conversation loading from restoring an obsolete request-start position or issuing competing scroll commands during recent wheel/momentum input. Patch loader status in place, avoid reprojecting unchanged thread content, and use branch-aware automatic loading with a reading-progress-renewed, directional lookahead budget.
