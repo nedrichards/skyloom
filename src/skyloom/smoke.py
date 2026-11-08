@@ -1696,6 +1696,10 @@ class Smoke:
     def refresh_setup(self) -> bool:
         if self.w.page_requests:
             return False
+        # Establish the capture geometry before taking any reading anchor.
+        # capture() otherwise resizes the window after refresh_staged first
+        # checks the anchor, invalidating pixel offsets through text reflow.
+        self.w.set_default_size(800, 820)
         self.w.refresh_monitor.close()
         self.refresh_original = self.w.service.posts
         base = self.refresh_original[0]
@@ -1716,7 +1720,7 @@ class Smoke:
         return True
 
     def refresh_position(self) -> bool:
-        if self.w.page_requests:
+        if self.w.page_requests or self.w.get_width() != 800 or self.w.get_height() != 820:
             return False
         self.refresh_view.interaction.move("last")
         return True
@@ -1776,6 +1780,8 @@ class Smoke:
             abs(delta) < 3
             or (delta >= 0 and abs(value - maximum) < 1)
             or (delta <= 0 and abs(value - minimum) < 1)
+        ), (
+            f"Reading offset changed by {delta:.2f}px (value={value:.2f}, range={minimum:.2f}..{maximum:.2f})"
         )
 
     def refresh_staged(self) -> bool:

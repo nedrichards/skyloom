@@ -15,7 +15,7 @@ Skyloom is a local development preview maintained by Nick Richards. It uses nati
 | Safety | Content visible by default with wrapping label chips, explanation/scope popovers, exact-value copying, preferences and local Show/Hide controls; optional warning cards, separate viewer mute/block handling and external reporting route. This is not the full Bluesky moderation-preference/labeler engine. |
 | Offline | Thousands of archived feed posts, persisted reading windows/positions, offline cached-page replay and bounded image cache; cached post/quote reopening; cached/local images. Network operations remain explicit, and errors retain readable content. |
 | Refresh | Five-minute active-window freshness, immediate stable-order arrivals, Go to top/position Undo, network-cost/connectivity/power-saver gates, suspend-aware clock, bounded retry backoff. |
-| Native interface | Adaptive closable sidebar, single visible overflow menu, concise preferences with Authentication/Sign out at the bottom, consistent tile padding, one content scroller, system/light/dark/high-contrast support, large text, native image viewer and contextual shortcut help. |
+| Native interface | Reusable native post/quote core cells, avatars and media tiles with binding-safe selection, controls and media cleanup; adaptive closable sidebar, single visible overflow menu, concise preferences with Authentication/Sign out at the bottom, consistent tile padding, one content scroller, system/light/dark/high-contrast support, large text, native image viewer and contextual shortcut help. |
 | Input | Keyboard list movement/activation, pane switching, destination shortcuts, reversible top jumps/reactions, double-tap/click active destination to top and deliberate touch pull-to-refresh. |
 | Packaging | Meson, original Open Loom full-colour/symbolic icons, desktop entry, GSettings, AppStream, hashed dependency sources, local x86_64 Flatpak repository and bundle. |
 | Development | Isolated invented-data demo, HTTP contract tests, actual-runtime native widget tests, installed GUI smoke and reproducible local checks. |
@@ -58,7 +58,12 @@ opened. Local reactions survive older responses, and foreground work cancels
 speculative reads. Prefetch does not insert replies into the feed or
 change its order. Opening a conversation loads ancestors and replies normally;
 continuations within one viewport ahead can consume up to three additional
-lookahead requests per page. Visible continuation/manual retry behaviour remains.
+lookahead requests between changes of the first visible post. Reply lookahead
+follows the reading direction; conversations use branch geometry rather than the
+generic feed-end pager. Loading status retains its controls and leaves the reading
+position alone. Late responses preserve the current stationary reading anchor,
+while recent wheel/momentum input suppresses competing viewport corrections.
+Visible continuation/manual retry behaviour remains.
 Automatic work respects activity, connection/cost and power restrictions; Home
 prefetch cancels on unmapping or loss of eligibility. Errors preserve content and
 explicit opening/retry remains available.

@@ -49,6 +49,6 @@ class AutoPager:
         return True
 
     def near_end(self, value, upper, page_size):
-        if page_size > 0 and upper - value - page_size <= max(240, page_size * 0.6):
+        if page_size > 0 and upper - value - page_size <= max(480, page_size * 2):
             return self.request(automatic=True)
         return False

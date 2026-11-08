@@ -1007,6 +1007,8 @@ class Window(Adw.ApplicationWindow):
         active = None
         retry = None
         lookahead_requests = 0
+        lookahead_anchor = None
+        lookahead_forward = True
         view = ConversationView(self, state, lambda **kwargs: load(**kwargs))
         page.content_view = view
         header.pack_end(view.return_button)
@@ -1016,12 +1018,13 @@ class Window(Adw.ApplicationWindow):
         view.refresh = lambda: load(refresh=True)
         toolbar.set_content(view)
 
-        def sync():
+        def sync(*, content_changed=True):
             view.sync(
                 earlier_busy=active == "earlier",
                 earlier_error=older_error,
                 active=active,
                 errors=errors,
+                content_changed=content_changed,
             )
 
         def load(earlier=False, refresh=False, branch=None):
@@ -1039,12 +1042,11 @@ class Window(Adw.ApplicationWindow):
                 if initial or refresh
                 else branch or state.next_branch
             )
-            place = view.interaction.capture() if received else None
             if not target:
                 return False
             active = "earlier" if earlier else target
             view.paging.begin("Loading earlier messages…" if earlier else "Loading conversation…")
-            sync()
+            sync(content_changed=not received)
 
             request_revision = self.thread_cache.revision
 
@@ -1068,8 +1070,6 @@ class Window(Adw.ApplicationWindow):
                     older_error = ""
                 view.paging.complete(state.next_branch, added, state.message)
                 sync()
-                if not initial and place is not None:
-                    view.interaction.restore(place)
                 if initial:
                     if any(post.uri == uri for post in state.posts):
                         view.focus_post(uri)
@@ -1094,8 +1094,9 @@ class Window(Adw.ApplicationWindow):
                     view.state = state
                     view.post_updated = state.update_post
                 view.paging.fail(msg)
-                sync()
-                view.after_position()
+                sync(content_changed=initial or msg == POST_UNAVAILABLE)
+                if initial:
+                    view.after_position()
 
             cached_thread = self.thread_cache.get_snapshot(uri) if initial and not refresh else None
             if cached_thread is not None:
@@ -1116,9 +1117,17 @@ class Window(Adw.ApplicationWindow):
             return True
 
         def check_earlier():
-            nonlocal lookahead_requests
+            nonlocal lookahead_requests, lookahead_anchor, lookahead_forward
             if self.automatic_pause_reason():
                 return False
+            rows = view.interaction.visible_rows()
+            anchor = next((row._value.uri for _, row in rows if isinstance(row._value, Post)), None)
+            if anchor is not None and anchor != lookahead_anchor:
+                previous = view.entries.get(lookahead_anchor)
+                current = view.entries.get(anchor)
+                if previous is not None and current is not None:
+                    lookahead_forward = current[0] > previous[0]
+                lookahead_anchor, lookahead_requests = anchor, 0
             adjustment = view.scroll.get_vadjustment()
             if (
                 state.earlier
@@ -1130,18 +1139,21 @@ class Window(Adw.ApplicationWindow):
                 if adjustment.get_value() <= 160:
                     return load(earlier=True)
                 if lookahead_requests < 3 and len(state.posts) < 250:
-                    lookahead_requests += 1
-                    return load(earlier=True)
+                    loaded = load(earlier=True)
+                    lookahead_requests += bool(loaded)
+                    return loaded
             if not view.paging.busy:
-                visible = {row._value.uri for _y, row in view.interaction.visible_rows()}
+                visible = {row._value.uri for _y, row in rows}
                 for _y, row in view.interaction.visible_rows(margin=1):
                     item = row._value
                     if isinstance(item, Continuation) and item.parent not in errors:
                         if item.uri in visible:
                             return load(branch=item.parent)
-                        if lookahead_requests < 3 and len(state.posts) < 250:
-                            lookahead_requests += 1
-                            return load(branch=item.parent)
+                        ahead = _y >= 0 if lookahead_forward else _y < view.scroll.get_height()
+                        if ahead and lookahead_requests < 3 and len(state.posts) < 250:
+                            loaded = load(branch=item.parent)
+                            lookahead_requests += bool(loaded)
+                            return loaded
             return False
 
         view.check_start = check_earlier

@@ -1,5 +1,184 @@
 # Delivery report
 
+## Maintenance checkpoint — 8 November 2026
+
+The maintainer reports that the conversation scrolling changes work well and
+substantially improve the experience. Some visual disturbance remains when new
+items arrive during momentum scrolling in a long thread; this is recorded in
+[the roadmap](ROADMAP.md), and seamless insertion is not claimed. This closes the
+current optimisation pass; further investigation remains roadmap work.
+
+Disposable build/export outputs, temporary source baselines, fixture captures and
+interpreter/test caches were cleaned up for publication. Reviewed benchmark
+scripts, aggregate results and regression tests remain versioned. Original
+maintainer-supplied Sysprof captures remain local and ignored; reusable development
+dependencies are retained. Earlier sections record evidence and limitations at
+their delivery date, including outputs that have since been removed.
+
+## Conversation loading and momentum — 8 November 2026
+
+Conversation request completion previously restored the position saved before
+the network request, after the view had already restored its newer position.
+An invented delayed-response regression reproduces this duplicate restoration
+with the old controller and passes with the new one. Completion now uses only
+the current anchor. Appends below it and busy-only updates issue no positioning
+request; stationary insertions before it correct the pixel offset without an
+initial `scroll_to` reveal. Recent input-led kinetic scrolling suppresses
+background viewport/focus corrections, while explicit navigation keeps its
+normal behaviour and cancels pending corrections.
+
+Loading/error controls update in place. Status-only changes reuse decorated
+posts without projecting the conversation or rebuilding its post metadata.
+Conversations use their branch geometry exclusively, disabling the competing
+generic feed-end pager. Speculative reply loading follows reading direction;
+the three-request budget renews when the first visible post changes. The single
+in-flight request, 250-post cap, connection/activity/power restrictions, account
+guards and explicit error recovery remain in force.
+
+Native regressions exercise delayed network completion after scrolling, busy
+control identity/focus, absence of scroll requests for appends and active scroll,
+generic-pager exclusion, directional lookahead and budget renewal. The delayed
+fixture uses an invented author without follow state. There is no follow-state
+branch in the service loading path; colder caches exposing asynchronous changes
+more often is an inference, not a reproduced live-account finding.
+
+The final installed GNOME 51 X11/Cairo suite passed **270 tests with zero skips**.
+An earlier installed run failed the new delayed-response test; that fixture lacked
+an explicit check that native scrolling had passed the insertion branch. It now
+waits for that visible precondition and retains its single-restoration, URI and
+pixel-offset assertions. Source suites passed 270 tests before the final explicit
+input reset, which the installed suite covers. Lint, desktop metadata and schema
+checks passed. `./scripts/check.sh` reaches the known nested Flatpak instance
+allocation failure; the native gate was instead launched through the host.
+Offline pinned build/export and local reinstall succeeded.
+
+The installed full X11/Cairo GUI smoke passed, including earlier/deeper/retry
+conversation loading, Back, refresh/Undo and automatic paging. The normal
+800-pixel invented conversation capture was visually inspected. Captures remain
+in ignored build paths. GDK frame-timing warnings remain visible; functional
+smokes are not frame-pacing measurements.
+
+The installed high-contrast/16-point conversation scenario also passed at 800/480
+pixels; the narrow dark ordered-conversation capture was visually inspected.
+
+The maintainer's physical-scroll retest above is positive but retains a specific
+insertion defect. Broader live-service, normal Wayland and Orca acceptance remain
+open. These corrections do not establish a frame rate guarantee or eliminate the
+remaining first-view construction costs.
+
+## Four measured optimisation targets — 8 November 2026
+
+The list-width/Pango, buffer/widget construction, CSS invalidation and Python
+allocation targets now have focused implementations and regressions:
+
+- Body labels request eight characters rather than one, avoiding the pathological
+  narrow-layout measurement while preserving WORD_CHAR wrapping and selection.
+- Avatars, media tiles and ordinary content/action parent chains are retained;
+  initial avatars receive their identity during construction. Binding cancellation
+  retires handlers, futures, metadata, selection and textures. Warning controls
+  are lazy until content is hidden, and reconciliation snapshots native entries.
+- Local action/menu-item CSS classes replace ancestor-based action matching.
+- Unchanged context/Post DTOs are reused, and plain markup bypasses facet
+  byte-copy/container work. GC and history-retention policies are unchanged.
+
+**Final source and installed native suites each passed all 264 tests with zero
+skips** under GNOME 51 X11/Cairo. Regressions cover actual cell recycling,
+old/new CSS geometry, retained avatar/media parents and handler bounds, late
+image rejection, disclosure, native selection, exact reading anchors and
+Latin/CJK/Arabic/URL geometry at 11/16/24-point fonts and 320–800-pixel requests.
+Lint, desktop metadata and schema checks passed. `./scripts/check.sh` still
+fails to allocate a nested Flatpak instance; equivalent host-launched native
+gates passed. Offline pinned build/export and local reinstall succeeded.
+
+The final installed **full GUI smoke passed**, including normal/narrow profiles,
+conversations, refresh Show/Undo, automatic paging, offline/draft recovery and
+label controls. Installed high-contrast/16-point labels, conversations, refresh
+and paging scenarios passed sequentially as well. An invented large-text label
+capture was visually inspected. Captures remain in ignored build paths; tracked
+screenshots were preserved.
+
+The smoke investigation found an orchestration defect in both saved baseline and
+candidate: refresh_staged checked an anchor, then capture resized the window and
+invalidated that offset through text reflow. Refresh now establishes the final
+800×820 geometry before capturing its anchor and waits for actual dimensions.
+The position assertion remains intact, with useful numeric failure diagnostics.
+This resolved the staged-refresh full-journey gap observed earlier in this report.
+GDK timing/skipped-frame warnings remain visible and are not frame-rate proof.
+
+[Performance evidence](PERFORMANCE.md) and [aggregates](performance-four-targets.json)
+retain request probes (553.668 → 97.356 ms for 250 labels), final native rebinding
+(717.272 → 536.702 ms per 1,000 bindings), and metadata allocation counts
+(20,000 → 0 unchanged records). Compositor comparisons were rejected for missing
+frames, changed work and tail regressions. Cold model-install latency remains
+substantial; there is **no general FPS, whole-workload speed, physical-momentum,
+Orca, ghosting, GPU-energy or live-service acceptance claim**. First-view buffering,
+viewport scans and remaining dynamic structures are still documented future work.
+No commit, upload, tag or release was performed.
+
+## Reusable list cells — 8 November 2026
+
+Feed/profile/search/conversation post rows now retain native core widgets across
+GTK factory bindings, including header, selectable body label, action controls,
+menu and controllers. One compact quote core is retained as well. Recycling
+retires media and label gates, clears selection/popovers/delayed input/old model
+references, resets conversation styling and binds callbacks to current data.
+Avatars, media tiles, label/external-card structures and branch controls remain
+item-specific; first-view native buffering is unchanged.
+
+Source and final installed GNOME 51 X11/Cairo suites passed all **255 tests with
+zero skips**. New regressions exercise actual native recycling over 250 posts,
+100 successive action/data bindings, moderation/disclosure transitions, quoted
+cell reuse and stale image completions. Pinned lint, desktop and schema checks
+passed; `./scripts/check.sh` still cannot allocate a nested Flatpak instance, so
+the native gate was launched through the host. Offline pinned build/export and
+local reinstall succeeded.
+
+The full installed X11/Cairo GUI journey completed conversation/label/profile
+captures but timed out at `refresh_staged`, waiting for the staged-refresh notice.
+The unchanged isolated installed refresh scenario then passed, including Show,
+Undo and exact reading anchors. This is a full-journey validation limitation, not
+a full GUI pass or an established attribution to the refactor. GDK frame-timing
+warnings also occurred. The invented conversation capture was visually inspected;
+tracked demo screenshots were restored and further captures use ignored build
+outputs. Isolated installed conversation and refresh smokes passed under
+X11/Cairo; the installed paging smoke also passed in the normal desktop renderer.
+These functional passes do not replace the failed full-journey result.
+
+The unmapped 1,000-binding benchmark built one body/action tree with reuse versus
+1,000 with reconstruction (705.320 versus 1,681.110 ms total in one sample). This
+simulates lifecycle work with current code; it is not an old-binary comparison.
+[PERFORMANCE.md](PERFORMANCE.md) retains aggregate evidence and the actual
+250-post scroll probes: the comparison was **rejected** for different travelled
+distances/work and cold-tail regression. Cold p95 rose 33.858 → 43.049 ms; warm
+maximum fell 112.447 → 80.489 ms. These mixed single-run results establish no
+overall scrolling speed gain or frame-budget acceptance.
+
+Physical momentum scrolling, normal Wayland visual quality, Orca and live-service
+acceptance remain unverified. No renderer or host motion preference was changed;
+no commit, upload or release was made.
+
+## Scrolling review and targeted corrections — 8 November 2026
+
+[SCROLLING_REVIEW.md](SCROLLING_REVIEW.md) records the current main-thread
+architecture findings and remaining work. Automatic paging now starts two
+viewports ahead and hides healthy Load more controls; errors, cursor stalls and
+policy overrides remain actionable. Image failures and disabled automatic image
+loading retain the reserved media height instead of collapsing the row.
+
+Validation: pinned lint, desktop metadata and schema stages passed through
+`./scripts/check.sh`; its nested Flatpak stage failed with `Unable to allocate
+instance id`. The equivalent host-launched GNOME 51 source suite passed all
+250 tests with zero skips under explicit X11/Cairo, including new early-paging,
+healthy-footer and image-failure regressions. The offline pinned Builder
+build/export and local reinstall succeeded. The installed invented-data paging
+smoke passed sequentially after tests. It emitted a GDK frame-timing throttling
+warning, so this is functional evidence only.
+
+No new matched timing benchmark, physical momentum-scroll acceptance, Wayland
+visual proof, live-service check or universal smoothness claim is made. Full
+post-tree construction on bind, buffer-sized geometry scans and periodic
+main-thread reading snapshots remain open. No commit or publication was made.
+
 ## Feed gap loading position — 5 November 2026
 
 Load posts in between now captures the visible post and pixel offset before

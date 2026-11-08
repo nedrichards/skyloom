@@ -292,7 +292,9 @@ class ContentTests(unittest.TestCase):
         from skyloom.widgets import PostRow
 
         flashes = []
-        self.window.motion = SimpleNamespace(fade=lambda widget, **kwargs: flashes.append(widget))
+        self.window.motion = SimpleNamespace(
+            fade=lambda widget, **kwargs: flashes.append(widget), finish=lambda widget: None
+        )
         post = replace(self.post, labels=(), images=(), like_uri="", repost_uri="")
         row = PostRow(post, self.window)
         self.addCleanup(row.cancel)
@@ -903,6 +905,188 @@ class ContentTests(unittest.TestCase):
         finally:
             view.close()
 
+    def test_native_list_recycles_post_cells_across_distant_scrolls(self):
+        from unittest.mock import patch
+
+        from skyloom.widgets import FeedView, PostRow
+
+        bindings = {}
+        original = PostRow.bind_post
+
+        def bound(row, post):
+            bindings.setdefault(row, set()).add(post.uri)
+            original(row, post)
+
+        view = FeedView(self.window)
+        window = Gtk.Window(child=view, default_width=800, default_height=600)
+        posts = [
+            replace(
+                self.post,
+                uri=f"at://did:example:scroll/app.bsky.feed.post/{n}",
+                text=f"Invented scroll post {n} " * 10,
+                labels=(),
+                images=(),
+            )
+            for n in range(250)
+        ]
+        try:
+            with patch.object(PostRow, "bind_post", bound):
+                view.set_posts(posts)
+                window.present()
+                self.assertTrue(settle(window, ready=lambda: not view.check_pending))
+                for direction in ("last", "first", "last", "first"):
+                    view.interaction.move(direction)
+                    self.assertTrue(settle(window, ready=lambda: not view.check_pending))
+                self.assertTrue(
+                    any(len(uris) > 1 for uris in bindings.values()), "No cell was recycled"
+                )
+                for row in view.rows:
+                    if isinstance(row, PostRow):
+                        self.assertEqual(row.post.uri, row._value.uri)
+                        self.assertEqual(row.text.get_text(), row.post.text)
+        finally:
+            view.close()
+            window.destroy()
+
+    def test_recycled_post_retains_controls_and_routes_only_to_current_data(self):
+        from skyloom.widgets import PostRow
+
+        first = replace(self.post, labels=(), images=(), like_uri="at://invented/like")
+        row = PostRow(first, self.window)
+        self.addCleanup(row.cancel)
+        widgets = row.heading, row.text, row.actions, row.menu, row.author_button
+        row.text.select_region(0, 10)
+        row.create_post_menu(row.menu)
+        row.text_press = (row.text, 0, 0, False, False)
+        opened, profiles, mutations, replies = [], [], [], []
+        self.window.thread = opened.append
+        self.window.profile = profiles.append
+        self.window.mutate = lambda post, kind: mutations.append((post, kind))
+        self.window.compose = lambda **kwargs: replies.append(kwargs)
+        for index in range(100):
+            post = replace(
+                first,
+                uri=f"at://did:example:recycled/app.bsky.feed.post/{index}",
+                text=f"Invented post {index}",
+                author=replace(first.author, did=f"did:example:{index}", name=f"Author {index}"),
+                like_uri="",
+                repost_uri="",
+                likes=index,
+            )
+            row.bind_post(post)
+            self.assertEqual(
+                widgets, (row.heading, row.text, row.actions, row.menu, row.author_button)
+            )
+            self.assertEqual(row.text.get_text(), post.text)
+            self.assertFalse(row.text.get_selection_bounds()[0])
+            self.assertIsNone(row.menu.get_popover())
+            self.assertIsNone(row.text_press)
+            self.assertFalse(row.action_buttons[2].has_css_class("reaction-selected"))
+            self.assertEqual(row.action_buttons[2].glyph.get_icon_name(), "skyloom-like-symbolic")
+        row.activate()
+        row.author_button.emit("clicked")
+        row.action_buttons[2].emit("clicked")
+        row.action_buttons[0].emit("clicked")
+        self.assertEqual(opened, [post.uri])
+        self.assertEqual(profiles, [post.author.did])
+        self.assertEqual(mutations, [(post, "like")])
+        self.assertEqual(replies, [{"reply": post}])
+        row.cancel()
+        self.assertIsNone(row.post)
+        self.assertIsNone(row._value)
+        self.assertEqual(row.text.get_text(), "")
+        self.assertNotIn(row, row.position_owner.rows)
+
+    def test_recycled_post_respects_mute_and_lazy_label_disclosure(self):
+        from skyloom.widgets import PostRow
+
+        plain = replace(self.post, labels=(), images=())
+        row = PostRow(plain, self.window)
+        self.addCleanup(row.cancel)
+        text = row.text
+        row.bind_post(replace(plain, author=replace(plain.author, muted=True)))
+        self.assertIn("This account is muted.", self.labels(row))
+        self.assertNotIn(plain.text, self.labels(row))
+        self.window.settings.set_boolean("warn-labelled-content", True)
+        row.bind_post(self.post)
+        gate = row.gate
+        self.assertIsNone(gate.revealer.get_child())
+        self.assertNotIn(plain.text, self.labels(row))
+        gate.set_revealed(True)
+        self.assertIs(row.text, text)
+        self.assertIn(plain.text, self.labels(row))
+        row.bind_post(plain)
+        self.assertNotIn(gate, self.window.content_gates)
+        self.assertIsNone(gate.revealer.get_child())
+        self.assertIs(row.text, text)
+        self.assertIn(plain.text, self.labels(row))
+
+    def test_recycled_quote_reuses_text_and_clears_previous_binding(self):
+        from skyloom.widgets import PostRow
+
+        quote = replace(
+            self.post, uri="at://did:example:quote/app.bsky.feed.post/1", labels=(), images=()
+        )
+        row = PostRow(replace(self.post, labels=(), images=(), quote=quote), self.window)
+        self.addCleanup(row.cancel)
+        child, text = row.quoted_rows[0], row.quoted_rows[0].text
+        row.bind_post(replace(self.post, labels=(), images=(), quote=None))
+        self.assertIsNone(child.post)
+        self.assertIsNone(child.get_parent())
+        newer = replace(quote, uri="at://did:example:quote/app.bsky.feed.post/2", text="New quote")
+        row.bind_post(replace(self.post, labels=(), images=(), quote=newer))
+        self.assertIs(row.quoted_rows[0], child)
+        self.assertIs(child.text, text)
+        self.assertEqual(child.text.get_text(), "New quote")
+
+    def test_recycled_post_rejects_late_media_completion(self):
+        from skyloom.widgets import PostRow
+
+        callbacks = []
+
+        def submit(coro, loaded, failed):
+            coro.close()
+            callbacks.append((loaded, failed))
+
+        self.window.worker.submit = submit
+        row = PostRow(self.post, self.window)
+        self.addCleanup(row.cancel)
+        picture = next(w for w in self.walk(row) if isinstance(w, Gtk.Picture))
+        loaded, failed = callbacks[-1]
+        binds = []
+        self.window.images.bind = lambda *args: binds.append(args)
+        row.bind_post(replace(self.post, labels=(), images=(), text="New binding"))
+        loaded(object())
+        failed("Late failure")
+        self.assertFalse(binds)
+        self.assertIsNone(picture.get_paintable())
+        self.assertIn("New binding", self.labels(row))
+
+    def test_failed_image_keeps_reserved_geometry_and_view_action(self):
+        from skyloom.widgets import PostRow
+
+        failures = []
+
+        def submit(coro, loaded, failed):
+            coro.close()
+            failures.append(failed)
+
+        self.window.worker.submit = submit
+        row = PostRow(self.post, self.window)
+        picture = next(widget for widget in self.walk(row) if isinstance(widget, Gtk.Picture))
+        viewer = picture.get_parent()
+        self.assertEqual(picture.get_size_request().height, 220)
+        failures[-1]("Invented download failure")
+        self.assertIs(viewer.get_child(), picture)
+        self.assertTrue(viewer.get_visible())
+        self.assertEqual(picture.get_size_request().height, 220)
+        self.assertIn("unavailable", viewer.get_tooltip_text())
+        opened = []
+        self.window.view_media = opened.append
+        viewer.emit("clicked")
+        self.assertEqual(opened, list(self.post.images))
+        row.cancel()
+
     def test_images_off_has_a_named_explicit_view_action(self):
         from skyloom.widgets import PostRow
 
@@ -951,6 +1135,7 @@ class PagingWidgetTests(unittest.TestCase):
             window.present()
             self.flush()
             self.assertFalse(calls)
+            self.assertTrue(all(not footer.more.get_visible() for footer in view.footers))
             self.assertIs(view.scroll.get_child(), view.list)
             self.assertEqual(view.flat.get_n_items(), 41)
             adjustment = view.scroll.get_vadjustment()
@@ -958,9 +1143,9 @@ class PagingWidgetTests(unittest.TestCase):
             self.flush()
             self.assertEqual(len(calls), 1)
             self.assertTrue(view.paging.busy)
-            view.set_items(list(range(60)), lambda n: n)
+            view.set_items(list(range(100)), lambda n: n)
             self.assertIs(view.model.get_item(0), first)
-            view.paging.complete("last", 20)
+            view.paging.complete("last", 60)
             self.flush()
             self.assertEqual(len(calls), 1)
             adjustment.set_value(adjustment.get_upper() - adjustment.get_page_size())

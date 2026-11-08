@@ -156,3 +156,31 @@ Reading-cache regressions use invented accounts and temporary SQLite databases. 
 The required native gate rejects unexpected skips. Run `./scripts/test-in-flatpak.sh --installed` after installation. Isolate GUI scenarios with `flatpak run com.nedrichards.Skyloom --demo --smoke-test OUTPUT --smoke-scenario preferences` (or navigation/profile/search/labels/conversation/paging/refresh/offline). Preserve the full journey as a separate gate.
 
 Run the distinct-image residency experiment in separate processes inside the installed decoder sandbox: `python3 scripts/benchmark-media-residency.py --mode retain-all --output BEFORE.json` and `--mode viewport --output AFTER.json`, exposing the source/output paths as in PERFORMANCE.md. It generates invented PNGs and measures native Picture references, conservative pixel estimates and process peak RSS; retain-all simulates prior ownership and is not an old installed-binary comparison. Use the versioned performance runner/comparator for matched work/frame checks; missing or compositor-throttled samples must not be reported as a pass.
+
+
+## Post-cell binding benchmark
+
+`scripts/benchmark-post-cells.py --mode construct --output BEFORE.json` and
+`--mode reuse --output AFTER.json` run in separate GNOME runtime processes with
+source PYTHONPATH, as in the performance runner. Both use invented text-only
+records and memory preferences. Construct simulates discarding each cell with the
+current implementation, not an old binary. Counts measure body/action tree
+construction; times include binding and cleanup on unmapped cells. This is not a
+scrolling, compositor, media-residency or live-service benchmark. Native tests
+separately exercise actual GTK recycling over a 250-post list.
+
+
+## Layout-request probes and matched scrolling
+
+`benchmark-label-measure.py` compares native label requests with `--width-chars 1`
+and `--width-chars 8` (use `--mode inherit`, separate output files and the GNOME
+runtime). `benchmark-row-measure.py` checks row minima and height requests across
+fonts/widths. Neither is a compositor FPS benchmark. Native tests also cover CJK,
+Arabic, URLs, selection and quote layout with the new hint.
+
+Performance workload version 4 applies relative 1,800 px/s input. The old absolute
+pixel targets fought GTK's variable-height anchor corrections and could deliver
+different travelled distances. Version 4 cannot be compared with version 3.
+Keep comparator failures, actual movement/bind counts, startup work and cold
+construction in reports. Missing/occluded/throttled frame samples are failures,
+not permission to compare different workloads or suppress tail regressions.

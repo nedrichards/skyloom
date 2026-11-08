@@ -6,7 +6,16 @@ from gi.repository import Gtk, Pango
 
 from .conversation import Continuation, EarlierMessages, ThreadGap
 from .domain import Post
-from .widgets import FeedView, PostRow, box, button, label, list_children, post_positions
+from .widgets import (
+    FeedView,
+    PostRow,
+    box,
+    button,
+    counters_only,
+    label,
+    list_children,
+    post_positions,
+)
 
 
 class ConversationView(FeedView):
@@ -17,7 +26,13 @@ class ConversationView(FeedView):
         self.pending_focus = None
         self.pending_loader_focus = None
         self.request_active = None
-        super().__init__(window, render=self.render_message)
+        super().__init__(
+            window,
+            render=self.render_message,
+            recycle=self.render_message,
+            update=self.update_loader,
+            automatic_end=False,
+        )
         self.add_css_class("conversation-view")
         self.return_button = button(
             "go-jump-symbolic", "Return to opened post", self.return_to_opened
@@ -158,7 +173,15 @@ class ConversationView(FeedView):
         self.interaction.select(index, focus=False)
         self.list.grab_focus()
 
-    def sync(self, *, earlier_busy=False, earlier_error="", active=None, errors=None):
+    def sync(
+        self,
+        *,
+        earlier_busy=False,
+        earlier_error="",
+        active=None,
+        errors=None,
+        content_changed=True,
+    ):
         errors = errors or {}
         self.request_active = active
         place = self.interaction.capture()
@@ -167,8 +190,15 @@ class ConversationView(FeedView):
             focus = None
         loader_parent = getattr(focus, "continuation_parent", None)
         loader_uri = getattr(focus, "continuation_uri", None)
-        focus_identity = self.remember_focus(focus)
-        rows = self.state.project()
+        scrolling = self.scrolling()
+        focus_identity = self.remember_focus(focus) if not scrolling else None
+        if scrolling:
+            loader_uri = None
+        rows = (
+            self.state.project()
+            if content_changed
+            else [self.model.get_item(i).post for i in range(self.model.get_n_items())]
+        )
         partial = bool(
             self.state.earlier
             or self.state.branches
@@ -176,17 +206,20 @@ class ConversationView(FeedView):
             or self.state.unavailable
             or self.state.limited
         )
-        post_positions(self.window).remember(
-            self.state.posts, incomplete=partial, parents=self.state.parents
-        )
-        presentation = {
-            key: (position.parent, position.opened, position.branch_start)
-            for key, position in self.state.positions.items()
-        }
-        posts = {post.uri: post for post in self.state.posts}
+        if content_changed:
+            post_positions(self.window).remember(
+                self.state.posts, incomplete=partial, parents=self.state.parents
+            )
+            presentation = {
+                key: (position.parent, position.opened, position.branch_start)
+                for key, position in self.state.positions.items()
+            }
+        else:
+            presentation = self.presentation
+        posts = {post.uri: post for post in self.state.posts} if content_changed else {}
         decorated = []
         for item in rows:
-            if isinstance(item, Post):
+            if isinstance(item, Post) and content_changed:
                 position = self.state.positions[item.uri]
                 parent = posts.get(position.parent)
                 context = (
@@ -201,23 +234,31 @@ class ConversationView(FeedView):
                 item = replace(item, context=context)
             elif isinstance(item, Continuation):
                 item = replace(item, busy=active == item.parent, error=errors.get(item.parent, ""))
+            elif isinstance(item, EarlierMessages):
+                item = replace(item, busy=earlier_busy, error=earlier_error)
             decorated.append(item)
-        if self.state.earlier:
+        if content_changed and self.state.earlier:
             decorated.insert(0, EarlierMessages(earlier_busy, earlier_error))
         rebind = {
             uri
             for uri, value in presentation.items()
             if uri in self.presentation and self.presentation[uri] != value
         }
+        restore_place = not scrolling and self.anchor_changed(place, decorated, rebind)
         self.set_posts(decorated, rebind=rebind)
         self.presentation = presentation
         for row in tuple(self.rows):
             control = getattr(row, "control", None)
             if control is not None and hasattr(self.window, "online_control"):
                 self.window.online_control(control, busy=active is not None)
-        if focus_identity is not None and (focus is None or focus.get_root() is None):
+        if focus_identity is not None and (focus.get_root() is None or not focus.is_focus()):
             self.pending_focus = focus_identity
-        if loader_uri:
+        if loader_uri and (
+            focus.get_root() is None
+            or not focus.is_sensitive()
+            or not focus.is_focus()
+            or (getattr(focus, "control", None) is not None and focus.control.get_sensitive())
+        ):
             self.pending_loader_focus = (loader_uri, loader_parent)
         elif focus is not None and focus.get_root() is not None:
             # GTK retains live descendant focus; viewport restoration must not grab the list.
@@ -227,18 +268,84 @@ class ConversationView(FeedView):
                 else None,
                 focus=False,
             )
-        if place is not None:
-            self.interaction.restore(place)
+        if restore_place:
+            self.interaction.restore(place, reveal=False)
+        elif self.pending_focus is not None or self.pending_loader_focus is not None:
+            # Focus recovery still needs allocated replacement rows, but must not
+            # turn a status-only sync into a viewport positioning request.
+            self.after_position()
         self.queue_controls()
 
-    def render_message(self, item):
+    def anchor_changed(self, place, items, rebind):
+        """Only reposition when content at/before the current anchor changes."""
+        if place is None:
+            return False
+
+        def prefix(values):
+            result = []
+            for item in values:
+                if isinstance(item, Continuation | EarlierMessages):
+                    item = replace(item, busy=False)
+                result.append(item)
+                if item.uri == place.key:
+                    return result
+            return None
+
+        before = prefix(self.model.get_item(i).post for i in range(self.model.get_n_items()))
+        after = prefix(items)
+        if before is None or after is None or len(before) != len(after):
+            return True
+        if any(
+            a is not b and a != b and not counters_only(a, b)
+            for a, b in zip(before, after, strict=True)
+        ):
+            return True
+        return any(item.uri in rebind for item in before)
+
+    def can_update_item(self, previous, current):
+        return (
+            isinstance(previous, Continuation | EarlierMessages)
+            and type(previous) is type(current)
+            and previous.uri == current.uri
+        ) or super().can_update_item(previous, current)
+
+    def update_loader(self, row, item):
+        earlier = isinstance(item, EarlierMessages)
+        row.message.set_label(
+            item.error
+            or (
+                "Earlier messages are available." if earlier else "More replies are available here."
+            )
+        )
+        row.control.set_label(
+            "Loading…"
+            if item.busy
+            else "Try again"
+            if item.error
+            else "Load earlier messages"
+            if earlier
+            else "Load more replies"
+        )
+        row.control.set_sensitive(
+            self.request_active is None and not item.busy and not self.window.read_only
+        )
+        row.update_property(
+            [Gtk.AccessibleProperty.LABEL], ["Loading messages" if item.busy else "More messages"]
+        )
+
+    def render_message(self, item, row=None):
         if isinstance(item, Post):
             position = self.state.positions.get(item.uri)
             known_parent = position and any(p.uri == position.parent for p in self.state.posts)
-            row = PostRow(
-                replace(item, context="" if known_parent and not position.opened else item.context),
-                self.window,
+            post = replace(
+                item, context="" if known_parent and not position.opened else item.context
             )
+            if row is None:
+                row = PostRow(post, self.window)
+            else:
+                row.bind_post(post)
+            for css in ("opened-message", "conversation-branch", "conversation-reply"):
+                row.remove_css_class(css)
             row.add_css_class("conversation-message")
             if position and position.opened:
                 row.add_css_class("opened-message")
@@ -277,17 +384,8 @@ class ConversationView(FeedView):
             return row
         earlier = isinstance(item, EarlierMessages)
         parent = None if earlier else item.parent
-        row.append(
-            label(
-                item.error
-                or (
-                    "Earlier messages are available."
-                    if earlier
-                    else "More replies are available here."
-                ),
-                "dim-label",
-            )
-        )
+        row.message = label("", "dim-label")
+        row.append(row.message)
         control = button(
             "",
             "Load earlier messages" if earlier else "Load more replies",
@@ -315,4 +413,5 @@ class ConversationView(FeedView):
         control.continuation_parent = parent or self.state.anchor
         control.set_halign(Gtk.Align.START)
         row.append(control)
+        self.update_loader(row, item)
         return row

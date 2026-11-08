@@ -23,6 +23,12 @@ class AutoPagerTests(unittest.TestCase):
         self.assertTrue(self.pager.near_end(5200, 6000, 600))
         self.assertEqual(self.calls, 2)
 
+    def test_prefetch_starts_two_viewports_before_the_end(self):
+        self.pager.complete("next", 30)
+        self.assertFalse(self.pager.near_end(1199, 3000, 600))
+        self.assertTrue(self.pager.near_end(1200, 3000, 600))
+        self.assertEqual(self.calls, 1)
+
     def test_error_pauses_auto_retry_but_manual_retry_works(self):
         self.pager.begin(reset=True)
         self.pager.fail("Offline")

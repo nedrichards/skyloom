@@ -106,6 +106,147 @@ class StartupTests(unittest.TestCase):
         self.app.service.account = self.account
         return self.account
 
+    def test_branch_completion_preserves_reading_after_scroll_during_request(self):
+        from dataclasses import replace
+        from threading import Event
+        from unittest.mock import patch
+
+        from test_conversation import node
+
+        from skyloom.conversation import ThreadPage
+        from skyloom.domain import post_from
+
+        self.app.settings.set_boolean("load-images", False)
+        self.open(self.restored_account)
+        self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
+        self.wait(lambda: not self.window.page_requests)
+        window = self.window
+        window.is_active = lambda: False  # Only explicit fixture requests are allowed.
+        root = post_from(node("cold-root")["post"])
+        posts = [root] + [
+            replace(
+                root,
+                uri=root.uri + f"-{n:03}",
+                text=f"Invented message {n}. " * 8,
+                parent=(root.uri, "cid"),
+                created=f"2026-11-08T12:{n // 60:02}:{n % 60:02}Z",
+            )
+            for n in range(80)
+        ]
+        branch = posts[40]
+        reply = replace(posts[-1], uri=root.uri + "-new-reply", parent=(branch.uri, "cid"))
+        started, release = Event(), Event()
+        self.addCleanup(release.set)
+
+        async def thread(uri, **kwargs):
+            if uri == root.uri:
+                return ThreadPage(tuple(posts), branches=(branch.uri,))
+            started.set()
+            await asyncio.to_thread(release.wait)
+            return ThreadPage((branch, reply))
+
+        self.app.service.thread = thread
+        window.thread(root.uri)
+        self.wait(lambda: not window.page_requests)
+        view = window.nav.get_visible_page().content_view
+        self.assertTrue(settle(window, ready=lambda: view.position_tick is None))
+        self.assertFalse(branch.author.following)
+        with patch.object(view.interaction, "restore", wraps=view.interaction.restore) as restore:
+            view.load(branch=branch.uri)
+            self.wait(started.is_set)
+            view.interaction.move("last")
+
+            def past_branch():
+                place = view.interaction.capture()
+                return (
+                    view.position_tick is None
+                    and place is not None
+                    and view.entries[place.key][0] > view.entries[branch.uri][0]
+                )
+
+            self.assertTrue(settle(window, ready=past_branch))
+            reading = view.interaction.capture()
+            restore.reset_mock()
+            release.set()
+            self.wait(lambda: not window.page_requests)
+            self.assertTrue(settle(window, ready=lambda: view.position_tick is None))
+            self.assertEqual(restore.call_count, 1)
+            self.assertEqual(restore.call_args.args[0].key, reading.key)
+            actual = view.interaction.capture()
+            self.assertEqual(actual.key, reading.key)
+            self.assertAlmostEqual(actual.offset, reading.offset, delta=3)
+
+    def test_thread_lookahead_renews_only_after_reading_progress(self):
+        from dataclasses import replace
+        from types import SimpleNamespace
+
+        from test_conversation import node
+
+        from skyloom.conversation import Continuation, ThreadPage
+        from skyloom.domain import Post, post_from
+
+        self.app.settings.set_boolean("load-images", False)
+        self.open(self.restored_account)
+        self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
+        self.wait(lambda: not self.window.page_requests)
+        window = self.window
+        window.is_active = lambda: False
+        root = post_from(node("lookahead-root")["post"])
+        posts = [root] + [
+            replace(root, uri=root.uri + f"-{n}", parent=(root.uri, "cid")) for n in range(8)
+        ]
+        calls = []
+
+        async def thread(uri, **kwargs):
+            calls.append(uri)
+            if uri == root.uri:
+                return ThreadPage(tuple(posts), branches=tuple(post.uri for post in posts[1:]))
+            return ThreadPage((next(post for post in posts if post.uri == uri),))
+
+        self.app.service.thread = thread
+        window.thread(root.uri)
+        self.wait(lambda: not window.page_requests)
+        view = window.nav.get_visible_page().content_view
+        self.assertTrue(settle(window, ready=lambda: view.position_tick is None))
+        marker = [root]
+        lookahead_y = [1200]
+
+        def visible(margin=0):
+            rows = [(0, SimpleNamespace(_value=marker[0]))]
+            if margin and view.state.next_branch:
+                rows.append(
+                    (lookahead_y[0], SimpleNamespace(_value=Continuation(view.state.next_branch)))
+                )
+            return rows
+
+        original = view.interaction.visible_rows
+        view.interaction.visible_rows = visible
+        self.addCleanup(setattr, view.interaction, "visible_rows", original)
+        original_restore = view.interaction.restore
+        view.interaction.restore = lambda _place, **_kwargs: (
+            True
+        )  # Synthetic viewport tests request policy only.
+        self.addCleanup(setattr, view.interaction, "restore", original_restore)
+        for _ in range(3):
+            self.assertTrue(view.check_start())
+            self.wait(lambda: not window.page_requests)
+        self.assertFalse(view.check_start())
+        self.assertEqual(len(calls), 4)
+        marker[0] = posts[-1]  # A different first visible post replenishes the budget.
+        self.assertIsInstance(marker[0], Post)
+        lookahead_y[0] = -200  # Behind a downward-moving reader: do not insert there.
+        self.assertFalse(view.check_start())
+        self.assertEqual(len(calls), 4)
+        lookahead_y[0] = 1200
+        self.assertTrue(view.check_start())
+        self.wait(lambda: not window.page_requests)
+        self.assertEqual(len(calls), 5)
+        marker[0] = posts[3]
+        lookahead_y[0] = -200  # Reading upwards: the same upper margin is now ahead.
+        self.assertTrue(view.check_start())
+        self.wait(lambda: not window.page_requests)
+        self.assertEqual(len(calls), 6)
+
     def test_home_prefetch_enriches_visible_posts_and_opening_reuses_snapshot(self):
         from test_conversation import node
 

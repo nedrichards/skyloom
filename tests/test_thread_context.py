@@ -59,6 +59,35 @@ class ThreadContextTests(unittest.TestCase):
         self.context.remember([plain])
         self.assertNotIn(plain.uri, self.context.positions)
 
+    def test_reaction_only_remember_retains_metadata_and_projection(self):
+        self.context.remember(self.posts)
+        original = dict(self.context.messages)
+        projection = self.context.positions
+        for post in self.posts:
+            self.assertFalse(self.context.remember([replace(post, likes=post.likes + 1)]))
+            self.assertIs(self.context.messages[post.uri], original[post.uri])
+        self.assertIs(self.context.positions, projection)
+        changed = replace(self.posts[0], replies=self.posts[0].replies + 1)
+        self.assertTrue(self.context.remember([changed]))
+        self.assertIsNot(self.context.messages[changed.uri], original[changed.uri])
+        self.assertTrue(self.context.positions[changed.uri][2])
+
+    def test_unchanged_metadata_still_promotes_lru_and_preserves_context(self):
+        root, first, second, _ = self.posts
+        context = ThreadContext(limit=2)
+        context.remember([root, first], incomplete=True)
+        original = context.messages[root.uri]
+        self.assertFalse(context.remember([replace(root, likes=1)]))
+        self.assertIs(context.messages[root.uri], original)
+        self.assertTrue(original.incomplete)
+        self.assertTrue(original.conversation)
+        context.remember([second])
+        self.assertIn(root.uri, context.messages)
+        self.assertNotIn(first.uri, context.messages)
+        context.remember([root], incomplete=False, parents={root.uri: second.uri})
+        self.assertFalse(context.messages[root.uri].incomplete)
+        self.assertEqual(context.messages[root.uri].parent, second.uri)
+
     def test_bounded_metadata_eviction_keeps_counts_honest_and_handles_cycles(self):
         context = ThreadContext(limit=2)
         root, first, second, child = self.posts

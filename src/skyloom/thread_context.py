@@ -30,19 +30,27 @@ class ThreadContext:
             if not isinstance(post, Post):
                 continue
             previous = self.messages.get(post.uri)
-            message = KnownMessage(
-                post.uri,
-                post.created,
-                (parents or {}).get(
-                    post.uri, post.parent[0] if post.parent else previous.parent if previous else ""
-                ),
-                post.root[0] if post.root else previous.root if previous else "",
-                post.replies,
-                previous.incomplete if incomplete is None and previous else bool(incomplete),
-                incomplete is not None or bool(previous and previous.conversation),
-            )
-            changed |= previous != message
-            self.messages[post.uri] = message
+            parent = post.parent[0] if post.parent else previous.parent if previous else ""
+            if parents is not None:
+                parent = parents.get(post.uri, parent)
+            root = post.root[0] if post.root else previous.root if previous else ""
+            partial = previous.incomplete if incomplete is None and previous else bool(incomplete)
+            conversation = incomplete is not None or bool(previous and previous.conversation)
+            # Counter acknowledgements and recycled bindings do not change relationship
+            # knowledge. Retain the immutable record instead of allocating a comparison DTO.
+            if not (
+                previous is not None
+                and previous.created == post.created
+                and previous.parent == parent
+                and previous.root == root
+                and previous.replies == post.replies
+                and previous.incomplete == partial
+                and previous.conversation == conversation
+            ):
+                self.messages[post.uri] = KnownMessage(
+                    post.uri, post.created, parent, root, post.replies, partial, conversation
+                )
+                changed = True
             self.messages.move_to_end(post.uri)
         while len(self.messages) > self.limit:
             self.messages.popitem(last=False)

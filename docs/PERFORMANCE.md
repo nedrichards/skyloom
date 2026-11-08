@@ -1,6 +1,122 @@
 # Performance
 
+The maintainer's latest retest reports substantially improved scrolling, with
+remaining visual disturbance when new items arrive during momentum in long
+conversations. See [the roadmap](ROADMAP.md) and [current delivery evidence](DELIVERY_REPORT.md).
+The measured results below retain their original workloads and limitations.
+
+## Four measured hot paths · 8 November 2026
+
+[Four-target aggregates](performance-four-targets.json) preserve the request,
+allocation, binding and compositor results, including rejected comparisons.
+These changes address work observed in the user-provided host/container traces:
+
+| Target | Implemented change | Evidence |
+| --- | --- | --- |
+| Width/Pango layout | Body width hint 1 → 8 characters; actual WORD_CHAR wrapping stays native | 250-label unconstrained horizontal request: 553.668 → 97.356 ms; row min/natural sizes and height requests equal in all 27 probe cases |
+| Buffer/widget construction | Retained avatars, media slots and core parent chains; lazy warning controls; one model-entry snapshot | Native lifecycle tests retain widgets/parents, clear stale data and reject late images; initially visible label gates omit six warning-only widgets each |
+| CSS invalidation | Explicit action/menu-item classes replace ancestor matching; ordinary binds preserve content/action parents | Native old/new action geometry comparison and retained-parent regressions pass |
+| Python allocation/GC | Reuse unchanged context/Post records; plain markup avoids facet temporaries; reuse native media/avatar callbacks | 20,000 unchanged KnownMessage allocations → 0; plain-markup microbenchmark 127.601 → 71.581 ms for 50,000 calls |
+
+Separate-process native text-only rebinding measured **717.272 → 536.702 ms** for
+1,000 bindings including cleanup (p95 **1.079 → 0.799 ms**). Both modes use one
+retained core cell; this compares the pre-goal implementation with the final
+installed build. It is not a compositor FPS, process-RSS or live-photo claim.
+These single-run timings support the deterministic construction reductions;
+maximum samples and all scopes remain in the aggregate.
+
+The body request hint is below the existing row-control minimum in tested
+layouts. Native tests compare Latin/CJK/Arabic/unbroken-URL text, quoted rows,
+320/360/480/800-pixel height requests and 11/16/24-point fonts. Actual selectable
+text, facets and all retained records are preserved. No history limit or GC
+policy was changed.
+
+### Macro measurements and limits
+
+Intermediate integrated runs reduced sampled cold frame-work maxima (Wayland:
+712.175 → 324.412 ms; X11/Vulkan: 567.798 → 210.362 ms), **but neither pair passed
+the comparator**. The Wayland candidate lacked scrolling frames. X11/Vulkan
+reported changed startup/callback work and a worse cold-scroll p95 (16.072 →
+23.379 ms), with inconsistent presentation feedback. Cold model-install action
+time was also worse in those single samples (Wayland 558.452 → 742.901 ms;
+X11 545.187 → 636.576 ms), despite lower X11 feed-creation CPU. Do not report
+those isolated frame maxima as an overall latency or FPS improvement.
+
+Separate cProfile runs attribute work rather than acceptance timings: cancellation
+fell from 44.37 ms/402 calls to 30.73 ms/418 calls, and labelled gate construction
+from 73.53 to 63.44 ms/39 calls, while model construction remained substantial.
+Those runs preceded the final first-avatar construction refinement. A new avatar
+now receives its identity in its constructor instead of doing an immediate second
+font layout; later bindings still reuse it.
+
+The final installed Wayland recording also lacked usable scrolling frames and
+failed its movement check. It is retained in the aggregate; it does not supersede
+the rejected comparisons with a success claim. Correctness evidence is stronger:
+264 source/installed native tests passed, and the installed full GUI journey and
+high-contrast/16-point labels, conversations, refresh and paging passed. The smoke
+fixture now establishes its screenshot size before saving reading anchors; its
+previous late resize caused the same offset assertion in the pre-goal build.
+
+Performance workload version 4 uses relative input, avoiding absolute targets
+that fight GTK's native variable-height anchor corrections. Version 3 data remains
+historical. First-view buffering still binds about 205 cells for the 250-post
+fixture; viewport scans and remaining external/disclosure allocation are future
+work. General 60-fps, physical momentum, ghosting, GPU-energy and live-service
+acceptance remain unclaimed.
+
+
+## Reusable native post cells · 8 November 2026
+
+[Binding aggregates](performance-cells.json) retain a separate-process synthetic
+comparison of 1,000 invented text-only bindings in GNOME 51 under X11/Cairo.
+The construct mode discards each cell using the current code; it simulates the
+former lifecycle and is **not an old installed-binary baseline**. Reuse keeps
+one cell. Both include binding and cleanup on unmapped widgets.
+
+| Metric | Construct | Reuse |
+| --- | ---: | ---: |
+| Body-label trees built | 1,000 | 1 |
+| Action trees built | 1,000 | 1 |
+| Total binding/cleanup | 1,681.110 ms | 705.320 ms |
+| p50 binding/cleanup | 1.627 ms | 0.693 ms |
+| p95 binding/cleanup | 2.224 ms | 1.000 ms |
+| Maximum binding/cleanup | 9.211 ms | 9.334 ms |
+
+The tree counts establish eliminated construction; sampled wall times describe
+this workload only. Maximum latency did not improve in this run. There is no
+new compositor FPS, physical-momentum, photo-heavy scrolling, process-RSS or
+energy claim. Native regressions separately verify actual cell recycling over
+250 posts, current action targets, quote reuse, disclosure/mute transitions,
+selection cleanup and stale-media rejection. At that stage, first-view buffering,
+item-specific media/avatar/label structures and repeated viewport scans remained;
+the later four-target work above adds avatar/media reuse and lazy warnings.
+
+
 Skyloom targets a 16.67 ms frame budget on a 60 Hz display. That is a target, not an unconditional guarantee: the measurements below include missed frames and cold-view construction stalls. Keep tail latency visible when reviewing changes.
+
+
+### Actual 250-post scrolling probe
+
+[Scroll aggregates](performance-cell-scroll.json) retain the saved pre-refactor
+source baseline and the final installed candidate, both with matching compiled
+resource hashes and explicit X11/Cairo. Each single run includes mixed invented
+images/quotes/labels; before-paint to after-paint measures main-thread frame work,
+not GPU completion or physical input.
+
+| Frame work | Before | Installed candidate |
+| --- | ---: | ---: |
+| Cold scroll p95 | 33.858 ms | 43.049 ms |
+| Cold scroll maximum | 98.275 ms | 72.773 ms |
+| Warm scroll p95 | 63.135 ms | 59.781 ms |
+| Warm scroll maximum | 112.447 ms | 80.489 ms |
+
+**The comparator rejected this pair.** Cold scrolling travelled 11,347 versus
+14,675 pixels and bound 16 versus 26 rows; warm scrolling travelled 22,175 versus
+24,145 pixels and bound 50 versus 56 rows. It also flagged cold p95 frame/action
+regressions. The shared compositor and differing work prevent an overall speed
+claim. Dense frame-budget misses remain even though core construction is reduced.
+These results must not be reported as scrolling acceptance or a 60-fps fix.
+
 
 ## Thread prefetch adversarial pass — 1 November 2026
 

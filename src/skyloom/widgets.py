@@ -148,8 +148,27 @@ def remember_request(pending, future):
     future.add_done_callback(completed)
 
 
-def avatar(author, window, size=44, *, pending=None):
-    w = Adw.Avatar(size=size, text=author.name, show_initials=True)
+def clear_avatar(widget, window):
+    widget._image_serial = getattr(widget, "_image_serial", 0) + 1
+    for signal in getattr(widget, "_avatar_signals", ()):
+        widget.disconnect(signal)
+    widget._avatar_signals = []
+    if widget.get_custom_image() is not None:
+        window.images.unbind(widget)
+        widget.set_custom_image(None)
+    widget.set_text("")
+
+
+def avatar(author, window, size=44, *, pending=None, widget=None):
+    if widget is None:
+        # Supply identity during native construction: constructing an initials
+        # avatar with empty text and immediately changing it repeats font layout.
+        w = Adw.Avatar(size=size, text=author.name, show_initials=True)
+        w._avatar_signals = []
+    else:
+        w = widget
+        clear_avatar(w, window)
+        w.set_text(author.name)
     if (
         author.avatar
         and should_load_image(window, author.avatar)
@@ -179,9 +198,11 @@ def avatar(author, window, size=44, *, pending=None):
             w._image_serial = getattr(w, "_image_serial", 0) + 1
             release()
 
-        w.connect("unrealize", unrealized)
+        w._avatar_signals.append(w.connect("unrealize", unrealized))
         if media_binding.get() is None:
-            w.connect("map", lambda *_: load() if w.get_custom_image() is None else None)
+            w._avatar_signals.append(
+                w.connect("map", lambda *_: load() if w.get_custom_image() is None else None)
+            )
         start_image(w, load, release=release)
     return w
 
@@ -290,7 +311,12 @@ class PageFooter(Gtk.Box):
         self.message.set_label(text)
         self.message.set_visible(bool(text))
         self.more.set_visible(
-            bool(state.cursor or state.error or state.manual_available) and not state.busy
+            bool(
+                state.error
+                or state.manual_available
+                or (state.cursor and (not state.auto or self.view.pause_reason()))
+            )
+            and not state.busy
         )
         self.more.set_label(
             "Try again" if state.error else "Load posts" if state.manual_available else "Load more"
@@ -344,16 +370,19 @@ def post_positions(window):
 class FeedView(Gtk.Box):
     """One full-width virtualised scrolling surface, including its pager footer."""
 
-    def __init__(self, window, render=None, update=None):
+    def __init__(self, window, render=None, update=None, recycle=None, automatic_end=True):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, vexpand=True)
         self.reading = None
         self.feed = None
         self.input_serial = 0
+        self.last_scroll_activity = -float("inf")
         self.update_row = update
+        self.automatic_end = automatic_end
         self.window = window
         self.feed_preview = render is None
         self.connections = set()
         self.render = render or self.render_post
+        self.recycle = recycle or (self.render_post if render is None else None)
         self.load_more = lambda: None
         self.refresh = None
         self.focus_when_ready = False
@@ -385,7 +414,7 @@ class FeedView(Gtk.Box):
             flags=Gtk.EventControllerScrollFlags.BOTH_AXES,
             propagation_phase=Gtk.PropagationPhase.CAPTURE,
         )
-        scroll_input.connect("scroll", lambda *_: (self.user_input(), False)[1])
+        scroll_input.connect("scroll", self.scroll_event)
         self.scroll_input = scroll_input
         self.content_header = None
         self.fill_header = False
@@ -414,6 +443,7 @@ class FeedView(Gtk.Box):
         factory.connect("setup", self.setup)
         factory.connect("bind", self.bind)
         factory.connect("unbind", self.unbind)
+        factory.connect("teardown", self.teardown)
         self.list = Gtk.ListView(
             model=self.store, factory=factory, single_click_activate=False, show_separators=True
         )
@@ -443,7 +473,7 @@ class FeedView(Gtk.Box):
             "items-changed", lambda *_: getattr(self.window, "view_changed", lambda: None)()
         )
         adjustment = self.scroll.get_vadjustment()
-        adjustment.connect("value-changed", lambda *_: self.queue_check())
+        adjustment.connect("value-changed", self.scrolled)
         notice_signal = adjustment.connect("value-changed", self.update_notice.reached_top)
         self.cleanups.append(lambda: adjustment.disconnect(notice_signal))
         adjustment.connect("changed", lambda *_: self.queue_check())
@@ -557,6 +587,14 @@ class FeedView(Gtk.Box):
 
     def setup(self, _factory, item):
         item.set_child(Adw.Clamp(maximum_size=760, tightening_threshold=600))
+        item._post_row = PostRow(None, self.window) if self.recycle is not None else None
+
+    def teardown(self, _factory, item):
+        row = getattr(item, "_post_row", None)
+        if row is not None:
+            row.cancel()
+        item._post_row = None
+        item.set_child(None)
 
     def bind(self, _factory, item):
         value = item.get_item().post
@@ -566,7 +604,10 @@ class FeedView(Gtk.Box):
         requests = []
         token = media_binding.set((self, requests))
         try:
-            row = PageFooter(self) if value is None else self.render(value)
+            if isinstance(value, Post) and self.recycle is not None:
+                row = self.recycle(value, item._post_row)
+            else:
+                row = PageFooter(self) if value is None else self.render(value)
         finally:
             media_binding.reset(token)
         row._media_requests = requests
@@ -612,7 +653,7 @@ class FeedView(Gtk.Box):
             binding[0].disconnect(binding[1])
             item._changed = None
         row = getattr(item, "_row", None)
-        for request in getattr(row, "_media_requests", ()):
+        for request in tuple(getattr(row, "_media_requests", ())):
             request.cancel()
         if row and hasattr(row, "cancel"):
             row.cancel()
@@ -649,6 +690,23 @@ class FeedView(Gtk.Box):
             footer.sync()
         self.queue_check()
 
+    def scroll_event(self, *_args):
+        self.user_input()
+        self.last_scroll_activity = monotonic()
+        return False
+
+    def scrolled(self, *_args):
+        # Native kinetic movement has no new input events. Extend an input-led
+        # scrolling interval while its adjustment moves; do not treat programmatic
+        # navigation or an old, long-settled gesture as active momentum.
+        now = monotonic()
+        if now - self.last_scroll_activity < 0.15:
+            self.last_scroll_activity = now
+        self.queue_check()
+
+    def scrolling(self):
+        return monotonic() - self.last_scroll_activity < 0.15
+
     def queue_check(self):
         if self.check_pending or self.paging.closed or not self.paging_ready:
             return
@@ -665,6 +723,7 @@ class FeedView(Gtk.Box):
             self.check_tick = None
             if (
                 self.get_mapped()
+                and self.paging_ready
                 and not self.paging.closed
                 and getattr(self.window, "is_active", lambda: True)()
             ):
@@ -678,16 +737,18 @@ class FeedView(Gtk.Box):
                     return False
                 if self.check_start():
                     return False
-                adjustment = self.scroll.get_vadjustment()
-                self.paging.near_end(
-                    adjustment.get_value(), adjustment.get_upper(), adjustment.get_page_size()
-                )
+                if self.automatic_end:
+                    adjustment = self.scroll.get_vadjustment()
+                    self.paging.near_end(
+                        adjustment.get_value(), adjustment.get_upper(), adjustment.get_page_size()
+                    )
             return False
 
         # Wait for allocation after model changes, rather than reading the old end-of-page geometry.
         self.check_tick = self.add_tick_callback(check)
 
     def user_input(self):
+        self.last_scroll_activity = -float("inf")
         self.input_serial += 1
         self.cancel_arrivals()
         if self.position_tick is not None:
@@ -699,7 +760,7 @@ class FeedView(Gtk.Box):
         if self.reading:
             self.reading.changed()
 
-    def render_post(self, post):
+    def render_post(self, post, row=None):
         if isinstance(post, FeedGap):
             row = box(margin=18)
             row.append(
@@ -715,7 +776,11 @@ class FeedView(Gtk.Box):
                 control.set_sensitive(not post.busy)
                 row.append(control)
             return row
-        row = PostRow(post, self.window)
+        if row is None:
+            row = PostRow(post, self.window)
+        else:
+            row.bind_post(post)
+        row.remove_css_class("feed-thread-member")
         if post.uri in self.connections:
             row.add_css_class("feed-thread-member")
             row.body.prepend(label("Thread", "dim-label"))
@@ -750,32 +815,29 @@ class FeedView(Gtk.Box):
         selected_key = self.key(selected) if selected is not None else None
         self.key = key
         # Preserve object identities/scroll anchors when appending or trimming a page.
-        old = [self.model.get_item(i).post for i in range(self.model.get_n_items())]
+        entries = [self.model.get_item(i) for i in range(self.model.get_n_items())]
+        old = [entry.post for entry in entries]
         before, after = [key(x) for x in old], [key(x) for x in items]
         added = len(set(after) - set(before))
         for tag, a, b, c, d in reversed(
             SequenceMatcher(a=before, b=after, autojunk=False).get_opcodes()
         ):
             if tag != "equal":
-                self.model.splice(a, b - a, [PostObject(x) for x in items[c:d]])
+                replacement = [PostObject(x) for x in items[c:d]]
+                entries[a:b] = replacement
+                self.model.splice(a, b - a, replacement)
         for i, value in enumerate(items):
-            entry = self.model.get_item(i)
+            entry = entries[i]
             if key(value) in rebind:
-                self.model.splice(i, 1, [PostObject(value)])
-            elif entry.post != value:
-                if counters_only(entry.post, value) or (
-                    self.update_row is not None
-                    and isinstance(entry.post, Notice)
-                    and isinstance(value, Notice)
-                    and replace(entry.post, read=value.read) == value
-                ):
+                entries[i] = PostObject(value)
+                self.model.splice(i, 1, [entries[i]])
+            elif entry.post is not value and entry.post != value:
+                if self.can_update_item(entry.post, value):
                     entry.update(value)
                 else:
-                    self.model.splice(i, 1, [PostObject(value)])
-        self.entries = {
-            key(self.model.get_item(i).post): (i, self.model.get_item(i))
-            for i in range(self.model.get_n_items())
-        }
+                    entries[i] = PostObject(value)
+                    self.model.splice(i, 1, [entries[i]])
+        self.entries = {key(entry.post): (i, entry) for i, entry in enumerate(entries)}
         if items and (reset or not old):
             self.list.scroll_to(0, Gtk.ListScrollFlags(0), None)
             if self.content_header is not None:
@@ -789,6 +851,14 @@ class FeedView(Gtk.Box):
             self.focus_when_ready = False
             self.interaction.focus()
         return added
+
+    def can_update_item(self, previous, current):
+        return counters_only(previous, current) or (
+            self.update_row is not None
+            and isinstance(previous, Notice)
+            and isinstance(current, Notice)
+            and replace(previous, read=current.read) == current
+        )
 
     def motion_changed(self, settings, _ps):
         if not motion_allowed(self.window):
@@ -997,15 +1067,24 @@ class PostRow(Gtk.Box):
 
     def __init__(self, post, window, compact=False):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
-        self.post, self.window, self.pending = post, window, []
-        self.add_css_class("post-tile")
+        self.window, self.compact = window, compact
+        self.post = None
+        self.pending = []
         self._media_requests = []
-        self.alive = True
+        self.alive = False
         self.text_open_source = None
         self.text_press = None
         self.text_dragged = False
         self.quoted_rows = []
+        self.quote_cell = None
         self.online_actions = []
+        self.content = None
+        self.binding_serial = 0
+        self.image_releases = []
+        self.media_cells = []
+        self.media_bind_index = 0
+        self.gate = None
+        self.add_css_class("post-tile")
         self.body = box(spacing=10, margin=16 if compact else 20)
         self.append(self.body)
         cancel_click = Gtk.GestureClick(
@@ -1013,9 +1092,6 @@ class PostRow(Gtk.Box):
         )
         cancel_click.connect("pressed", self.cancel_text_open)
         self.add_controller(cancel_click)
-        self.update_property(
-            [Gtk.AccessibleProperty.LABEL], [f"Post by {post.author.name}. Open conversation"]
-        )
         if compact:
             self.set_focusable(True)
             self.add_css_class("quoted-post")
@@ -1025,44 +1101,67 @@ class PostRow(Gtk.Box):
         click = Gtk.GestureClick(button=Gdk.BUTTON_PRIMARY)
         click.connect("released", self.quoted_clicked)
         self.add_controller(click)
-        if post.context:
-            context = label(post.context, "dim-label")
-            context.add_css_class("caption")
-            self.body.append(context)
-        heading = box(False, 12)
-        self.heading = heading
+        self.context_label = label("", "dim-label")
+        self.context_label.add_css_class("caption")
+        self.body.append(self.context_label)
+        self.heading = box(False, 12)
+        self.body.append(self.heading)
         author = box(False, 10)
-        author.append(avatar(post.author, window, 36 if compact else 44, pending=self.pending))
+        self.author_content = author
+        self.avatar_cell = None
         identity = box(spacing=2)
-        name = label(post.author.name, "heading", ellipsize=Pango.EllipsizeMode.END)
-        name.set_wrap(False)
-        identity.append(name)
-        handle = label("@" + post.author.handle, "dim-label", ellipsize=Pango.EllipsizeMode.END)
-        handle.add_css_class("caption")
-        handle.set_wrap(False)
-        identity.append(handle)
+        self.name_label = label("", "heading", ellipsize=Pango.EllipsizeMode.END, wrap=False)
+        self.handle_label = label("", "dim-label", ellipsize=Pango.EllipsizeMode.END, wrap=False)
+        self.handle_label.add_css_class("caption")
+        identity.append(self.name_label)
+        identity.append(self.handle_label)
         author.append(identity)
-        # START consumes only the identity's natural width inside the expanding slot.
-        # The timestamp and empty header space remain part of the conversation target.
         self.author_button = Gtk.Button(child=author, hexpand=True, halign=Gtk.Align.START)
-        self.author_button.focus_key = ("post-author", post.uri)
         self.author_button.add_css_class("flat")
         self.author_button.add_css_class("post-author")
         self.author_button.set_tooltip_text("View profile")
-        self.author_button.update_property(
-            [Gtk.AccessibleProperty.LABEL], [f"View profile of {post.author.name}"]
+        self.author_button.connect(
+            "clicked", lambda _: self.window.profile(self.post.author.did) if self.alive else None
         )
-        self.author_button.connect("clicked", lambda _: window.profile(post.author.did))
-        heading.append(self.author_button)
-        timestamp = label(relative_time(post.created), "dim-label", wrap=False)
-        timestamp.add_css_class("caption")
-        heading.append(timestamp)
+        self.heading.append(self.author_button)
+        self.timestamp = label("", "dim-label", wrap=False)
+        self.timestamp.add_css_class("caption")
+        self.heading.append(self.timestamp)
         self.position_pill = label("", "conversation-position", wrap=False)
         self.position_pill.add_css_class("caption")
         self.position_pill.set_valign(Gtk.Align.CENTER)
-        heading.append(self.position_pill)
-        post_positions(window).bind(self)
-        self.body.append(heading)
+        self.heading.append(self.position_pill)
+        if post is not None:
+            self.bind_post(post)
+
+    def bind_post(self, post):
+        """Bind immutable data to a retained cell; callbacks always use the current post."""
+        self.cancel()
+        self.post, self.alive = post, True
+        self.set_opacity(1)
+        self.update_property(
+            [Gtk.AccessibleProperty.LABEL], [f"Post by {post.author.name}. Open conversation"]
+        )
+        self.context_label.set_label(post.context)
+        self.context_label.set_visible(bool(post.context))
+        self.name_label.set_label(post.author.name)
+        self.handle_label.set_label("@" + post.author.handle)
+        self.timestamp.set_label(relative_time(post.created))
+        self.author_button.focus_key = ("post-author", post.uri)
+        self.author_button.update_property(
+            [Gtk.AccessibleProperty.LABEL], [f"View profile of {post.author.name}"]
+        )
+        first_avatar = self.avatar_cell is None
+        self.avatar_cell = avatar(
+            post.author,
+            self.window,
+            36 if self.compact else 44,
+            pending=self.pending,
+            widget=self.avatar_cell,
+        )
+        if first_avatar:
+            self.author_content.prepend(self.avatar_cell)
+        post_positions(self.window).bind(self)
         if post.author.muted or post.author.blocking:
             self.body.append(
                 label(
@@ -1076,24 +1175,25 @@ class PostRow(Gtk.Box):
                 button(
                     "avatar-default-symbolic",
                     "View profile to change mute or block",
-                    lambda: window.profile(post.author.did),
+                    lambda: self.window.profile(self.post.author.did),
                     "View profile",
                 )
             )
-            return
-        labels = post.labels + post.author.labels
-        if labels:
-            self.body.append(
-                LabelledContent(
-                    window,
-                    ("post", post.uri),
-                    post.labels,
-                    lambda: self.build_content(self.post, window, compact),
-                    author_labels=post.author.labels,
-                )
+        elif post.labels or post.author.labels:
+            if self.content is not None and self.content.get_parent() is self.body:
+                self.body.remove(self.content)
+            self.gate = LabelledContent(
+                self.window,
+                ("post", post.uri),
+                post.labels,
+                lambda: self.build_content(self.post, self.window, self.compact),
+                author_labels=post.author.labels,
             )
+            self.body.append(self.gate)
         else:
-            self.body.append(self.build_content(post, window, compact))
+            content = self.build_content(post, self.window, self.compact)
+            if content.get_parent() is None:
+                self.body.append(content)
 
     def quoted_clicked(self, gesture, presses, _x, _y):
         if presses == 1 and self.alive:
@@ -1183,20 +1283,21 @@ class PostRow(Gtk.Box):
             GLib.source_remove(self.text_open_source)
             self.text_open_source = None
 
-    def build_content(self, post, window, compact):
-        content = box(spacing=10)
+    def create_text(self, window):
         text = Gtk.Label(
             xalign=0,
             wrap=True,
             selectable=True,
             use_markup=True,
-            label=markup(post.text, post.facets),
+            label="",
             hexpand=True,
         )
         text.add_css_class("post-body")
-        text.focus_key = ("post-text", post.uri)
         text.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
-        text.set_width_chars(1)
+        # GTK measures the complete wrapped layout at this minimum width.
+        # A one-character hint creates hundreds of unnecessary lines during the
+        # ListView cross-axis pass; eight stays below the row controls' minimum.
+        text.set_width_chars(8)
         text.connect("activate-link", lambda _l, uri: (window.open_uri(uri), True)[1])
         # Share the label's sequence so a plain click opens the post while drag/double-click
         # selection and rich-text links retain their native behaviour.
@@ -1216,11 +1317,29 @@ class PostRow(Gtk.Box):
         motion = Gtk.EventControllerMotion(propagation_phase=Gtk.PropagationPhase.CAPTURE)
         motion.connect("motion", self.text_motion)
         text.add_controller(motion)
-        content.append(text)
+        self.content.append(text)
+        self.text = text
+
+    def build_content(self, post, window, compact):
+        if self.content is None:
+            self.content = box(spacing=10)
+            self.create_text(window)
+            self.attachments = box(spacing=10)
+            self.content.append(self.attachments)
+        content = self.attachments
+        self.text.set_markup(markup(post.text, post.facets))
+        self.text.focus_key = ("post-text", post.uri)
+        self.text.select_region(0, 0)
+        actions = getattr(self, "actions", None)
+        self.media_bind_index = 0
         for media in post.images:
             self.add_image(media, content)
         if post.quote and not compact:
-            quoted = PostRow(post.quote, window, compact=True)
+            if self.quote_cell is None:
+                self.quote_cell = PostRow(post.quote, window, compact=True)
+            else:
+                self.quote_cell.bind_post(post.quote)
+            quoted = self.quote_cell
             self.quoted_rows.append(quoted)
             quoted.add_css_class("card")
             content.append(quoted)
@@ -1238,8 +1357,20 @@ class PostRow(Gtk.Box):
                 content.append(card)
         if post.unavailable:
             content.append(label(post.unavailable, "dim-label"))
+        content.set_visible(any(child.get_visible() for child in list_children(content)))
+        self.content.set_visible(True)
         if compact:
-            return content
+            return self.content
+        if actions is None:
+            self.create_actions(post, window)
+            actions = self.actions
+        self.menu.focus_key = ("post-menu", post.uri)
+        if actions.get_parent() is None:
+            self.content.append(actions)
+        self.update_counters(post)
+        return self.content
+
+    def create_actions(self, post, window):
         actions = box(False, 12)
         actions.add_css_class("post-actions")
         reply = button(
@@ -1266,31 +1397,20 @@ class PostRow(Gtk.Box):
             )
         )
         self.action_buttons = list(list_children(actions))
-        for index, b in enumerate(self.action_buttons):
+        for b in self.action_buttons:
             b.add_css_class("flat")
-            if (index == 1 and post.repost_uri) or (index == 2 and post.like_uri):
-                b.add_css_class("reaction-selected")
-                if index == 1:
-                    b.count.set_label("✓ " + b.count.get_label())
-                else:
-                    b.glyph.set_from_icon_name("skyloom-liked-symbolic")
-            busy = any(k[0] == post.uri for k in window.mutations)
-            if b is not reply and hasattr(window, "online_control"):
-                self.online_actions.append(b)
-                window.online_control(b, busy=busy)
-            else:
-                b.set_sensitive((b is reply or not window.read_only) and not busy)
+            b.add_css_class("post-action")
+        self.online_actions = self.action_buttons[1:]
         spacer = Gtk.Box(hexpand=True)
         actions.append(spacer)
         menu = Gtk.MenuButton(icon_name="view-more-symbolic", tooltip_text="Post actions")
         self.menu = menu
         menu.focus_key = ("post-menu", post.uri)
         menu.add_css_class("flat")
+        menu.add_css_class("post-action")
         menu.set_create_popup_func(self.create_post_menu)
         actions.append(menu)
-        content.append(actions)
-
-        return content
+        self.actions = actions
 
     def create_post_menu(self, menu):
         window = self.window
@@ -1309,53 +1429,79 @@ class PostRow(Gtk.Box):
 
             b = Gtk.Button(label=title)
             b.add_css_class("flat")
+            b.add_css_class("post-menu-item")
             b.connect("clicked", lambda _b, cb=clicked: cb())
             choices.append(b)
         pop.set_child(choices)
         menu.set_popover(pop)
 
     def add_image(self, media, content):
-        group = box(spacing=4)
-        group.add_css_class("card")
-        pic = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.COVER, height_request=220)
-        pic.set_alternative_text(media.alt if media.alt.strip() else "Image")
-        viewer = Gtk.Button(child=pic, tooltip_text="View image and description")
-        viewer.add_css_class("flat")
-        viewer.connect("clicked", lambda _: self.window.view_media(media))
-        group.append(viewer)
-        alt = None
-        if media.alt.strip():
-            alt = label(
-                "ALT · " + media.alt,
-                "dim-label",
-                margin_start=10,
-                margin_end=10,
-                margin_top=6,
-                margin_bottom=10,
-                selectable=True,
+        serial = self.binding_serial
+        index = self.media_bind_index
+        self.media_bind_index += 1
+        if index == len(self.media_cells):
+            group = box(spacing=4)
+            group.add_css_class("card")
+            group.pic = Gtk.Picture(
+                can_shrink=True, content_fit=Gtk.ContentFit.COVER, height_request=220
             )
-            group.append(alt)
+            group.viewer = Gtk.Button(child=group.pic)
+            group.viewer.add_css_class("flat")
+            group.media = None
+            group.viewer.connect(
+                "clicked",
+                lambda _: (
+                    self.window.view_media(group.media) if self.alive and group.media else None
+                ),
+            )
+            group.pic.connect("unrealize", lambda *_: self.window.images.unbind(group.pic))
+            group.alt = None
+            group.placeholder = None
+            group.append(group.viewer)
+            self.media_cells.append(group)
+        else:
+            group = self.media_cells[index]
+        group.media = media
+        pic, viewer = group.pic, group.viewer
+        pic.set_alternative_text(media.alt if media.alt.strip() else "Image")
+        viewer.set_tooltip_text("View image and description")
+        group.set_visible(True)
+        if media.alt.strip():
+            if group.alt is None:
+                group.alt = label(
+                    "",
+                    "dim-label",
+                    margin_start=10,
+                    margin_end=10,
+                    margin_top=6,
+                    margin_bottom=10,
+                    selectable=True,
+                )
+                group.append(group.alt)
+            group.alt.set_label("ALT · " + media.alt)
+            group.alt.set_visible(True)
         if should_load_image(self.window, media.url, media.local):
+            if viewer.get_child() is not pic:
+                viewer.set_child(pic)
 
             def loaded(pix):
-                if self.alive:
+                if self.alive and serial == self.binding_serial:
                     self.window.images.bind(pic, pix)
                     pic.set_paintable(pix)
                     pic.set_size_request(-1, 220)
 
             def failed(_msg):
-                if self.alive:
-                    if self.window.automatic_pause_reason():
-                        viewer.set_child(Gtk.Label(label="View image", height_request=220))
-                        return
-                    viewer.set_visible(False)
-                    group.append(
-                        label("Image unavailable", "dim-label", margin_start=10, margin_end=10)
-                    )
+                if self.alive and serial == self.binding_serial:
+                    # Preserve the reserved media rectangle and its activation target.
+                    # A late failure must not collapse a row during kinetic scrolling.
+                    pic.set_alternative_text("Image unavailable. Open to retry.")
+                    viewer.set_tooltip_text("Image unavailable. Open to retry.")
 
             def release():
                 pic.set_paintable(None)
                 self.window.images.unbind(pic)
+
+            self.image_releases.append((pic, release))
 
             def load():
                 cached = getattr(self.window.images, "cache", {}).get((media.url, media.local))
@@ -1370,15 +1516,20 @@ class PostRow(Gtk.Box):
                 remember_request(self.pending, future)
                 return future
 
-            pic.connect("unrealize", lambda *_: self.window.images.unbind(pic))
             start_image(pic, load, self, release)
         else:
-            viewer.set_child(Gtk.Label(label="View image"))
-        content.append(group)
+            if group.placeholder is None:
+                group.placeholder = Gtk.Label(label="View image", height_request=220)
+            if viewer.get_child() is not group.placeholder:
+                viewer.set_child(group.placeholder)
+        if group.get_parent() is None:
+            content.append(group)
 
     def update_counters(self, post):
         previous = self.post
-        self.post = replace(post, context=self.post.context)
+        self.post = (
+            post if post.context == self.post.context else replace(post, context=self.post.context)
+        )
         self.position_owner.remember((post,))
         buttons = getattr(self, "action_buttons", ())
         if not buttons:
@@ -1412,7 +1563,7 @@ class PostRow(Gtk.Box):
                     control.add_css_class("reaction-selected")
                 else:
                     control.remove_css_class("reaction-selected")
-                if index == 2 and selected != bool(previous.like_uri):
+                if index == 2:
                     control.glyph.set_from_icon_name(
                         "skyloom-liked-symbolic" if selected else "skyloom-like-symbolic"
                     )
@@ -1426,16 +1577,67 @@ class PostRow(Gtk.Box):
                 control.set_sensitive(not busy and (not index or not self.window.read_only))
 
     def cancel(self):
+        self.binding_serial += 1
         self.alive = False
-        self.position_owner.rows.discard(self)
+        if hasattr(self, "position_owner"):
+            self.position_owner.rows.discard(self)
         self.cancel_text_open()
+        self.text_press = None
+        self.text_dragged = False
         for request in self._media_requests:
             request.cancel()
+        self._media_requests.clear()
         for future in self.pending:
             if future:
                 future.cancel()
+        self.pending.clear()
+        for picture, release in self.image_releases:
+            picture._image_serial = getattr(picture, "_image_serial", 0) + 1
+            release()
+        self.image_releases.clear()
         for child in self.quoted_rows:
             child.cancel()
+        self.quoted_rows.clear()
+        if self.gate is not None:
+            self.window.content_gates.discard(self.gate)
+            self.gate.revealer.set_child(None)
+            self.gate = None
+        if self.content is not None:
+            for child in tuple(list_children(self.attachments)):
+                if child not in self.media_cells:
+                    self.attachments.remove(child)
+            for group in self.media_cells:
+                group.media = None
+                group.pic.set_alternative_text("Image")
+                group.set_visible(False)
+                if group.alt is not None:
+                    group.alt.set_label("")
+                    group.alt.set_visible(False)
+            self.text.set_label("")
+            self.text.focus_key = None
+            self.content.set_visible(False)
+        for child in tuple(list_children(self.body)):
+            if child not in (self.context_label, self.heading, self.content):
+                self.body.remove(child)
+        if self.avatar_cell is not None:
+            clear_avatar(self.avatar_cell, self.window)
+        for control in self.online_actions:
+            motion = getattr(self.window, "motion", None)
+            if motion is not None:
+                motion.finish(control)
+            control.set_opacity(1)
+            getattr(self.window, "online_controls", set()).discard(control)
+        if hasattr(self, "menu"):
+            self.menu.set_popover(None)
+            self.menu.focus_key = None
+        self.context_label.set_label("")
+        self.name_label.set_label("")
+        self.handle_label.set_label("")
+        self.timestamp.set_label("")
+        self.position_pill.set_visible(False)
+        self.author_button.focus_key = None
+        self._value = None
+        self.post = None
 
 
 PostRow.set_activate_signal_from_name("activate")

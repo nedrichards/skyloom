@@ -196,6 +196,7 @@ def main():
             home.render = lambda post: Gtk.Label(
                 label=post.text, wrap=True, margin_top=20, margin_bottom=20
             )
+            home.recycle = None
             home.feed_preview = False
 
         async def thread(uri, **_kwargs):
@@ -232,23 +233,24 @@ def main():
         def current():
             return window.interactions.current_view()
 
-        def scroll(progress):
+        def scroll_by(progress, direction):
             view = current()
             if view:
                 adjustment = view.scroll.get_vadjustment()
-                # A realistic 1800 logical px/s sweep, not a jump through every row.
-                extent = max(0, adjustment.get_upper() - adjustment.get_page_size())
+                # Apply relative input so GTK's variable-row anchor corrections
+                # do not become repeated jumps back to an absolute pixel target.
+                elapsed = min(progress, 4)
+                delta = max(0, elapsed - state.get("scroll_progress", 0)) * 1800
+                state["scroll_progress"] = elapsed
                 previous = adjustment.get_value()
-                adjustment.set_value(min(extent, progress * 1800))
+                adjustment.set_value(previous + direction * delta)
                 state["scroll_distance"] += abs(adjustment.get_value() - previous)
 
+        def scroll(progress):
+            scroll_by(progress, 1)
+
         def scroll_back(progress):
-            view = current()
-            if view:
-                adjustment = view.scroll.get_vadjustment()
-                previous = adjustment.get_value()
-                adjustment.set_value(max(0, 7200 - progress * 1800))
-                state["scroll_distance"] += abs(adjustment.get_value() - previous)
+            scroll_by(progress, -1)
 
         def counters_update():
             for post in window.pagers["following"].posts:
@@ -480,6 +482,7 @@ def main():
                 actions=[],
                 callbacks=[],
                 scroll_distance=0,
+                scroll_progress=0,
             )
             started = time.perf_counter()
             setup()
@@ -524,7 +527,7 @@ def main():
     window = application.window
     report = {
         "report_version": 1,
-        "workload_version": 3,
+        "workload_version": 4,
         "runtime": {
             "python": list(sys.version_info[:3]),
             "gtk": [Gtk.get_major_version(), Gtk.get_minor_version(), Gtk.get_micro_version()],

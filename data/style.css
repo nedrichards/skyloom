@@ -65,7 +65,14 @@
   outline-offset: -2px;
 }
 .post-author { padding: 4px; border-radius: 9px; }
-.post-actions button { min-height: 30px; padding: 3px 9px; font-weight: normal; }
+/* Direct classes keep action styling independent of post/body ancestor changes.
+ * GtkMenuButton owns its documented native button child; popup choices have
+ * their own class so opening a menu retains the same compact dimensions. */
+button.post-action, menubutton.post-action > button, button.post-menu-item {
+  min-height: 30px;
+  padding: 3px 9px;
+  font-weight: normal;
+}
 .post-actions { margin-top: 2px; }
 
 /* The chooser arrow and surface share one border, without an inset shadow seam. */

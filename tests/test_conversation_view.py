@@ -40,6 +40,81 @@ class ConversationViewTests(unittest.TestCase):
         self.addCleanup(self.native.destroy)
         self.assertTrue(settle(self.native))
 
+    def test_loading_state_keeps_loader_and_does_not_reposition_reader(self):
+        from unittest.mock import patch
+
+        from skyloom.conversation import Continuation
+
+        loader = next(row for row in self.view.rows if isinstance(row._value, Continuation))
+        control = loader.control
+        model_changes = []
+        self.view.model.connect("items-changed", lambda *_: model_changes.append(True))
+        with patch.object(
+            self.view.interaction, "restore", wraps=self.view.interaction.restore
+        ) as restore:
+            with patch.object(self.state, "project", wraps=self.state.project) as project:
+                self.view.sync(active=self.state.anchor, content_changed=False)
+                self.assertTrue(settle(self.native))
+                project.assert_not_called()
+            restore.assert_not_called()
+        current = next(row for row in self.view.rows if isinstance(row._value, Continuation))
+        self.assertIs(current, loader)
+        self.assertFalse(model_changes)
+        self.assertIs(current.control, control)
+        self.assertTrue(current._value.busy)
+        self.assertFalse(control.get_sensitive())
+        self.assertEqual(control.get_label(), "Loading…")
+
+    def test_appending_replies_below_anchor_issues_no_scroll_request(self):
+        from unittest.mock import patch
+
+        from skyloom.conversation import ThreadPage
+
+        parent = self.state.posts[-1]
+        reply = replace(
+            parent,
+            uri=parent.uri + "-new",
+            parent=(parent.uri, parent.cid),
+            text="Invented appended reply",
+        )
+        with patch.object(self.view.list, "scroll_to", wraps=self.view.list.scroll_to) as scroll:
+            self.state.merge(ThreadPage((parent, reply)), parent.uri)
+            self.view.sync()
+            self.assertTrue(settle(self.native))
+            scroll.assert_not_called()
+
+    def test_active_scroll_does_not_get_repositioned_by_prepend(self):
+        from unittest.mock import patch
+
+        from skyloom.conversation import ThreadPage
+
+        root = self.state.posts[0]
+        ancestor = replace(root, uri=root.uri + "-ancestor", parent=None)
+        self.view.scroll_event()
+        self.view.scrolled()  # Continued native momentum, without another input event.
+        self.assertTrue(self.view.scrolling())
+        with patch.object(self.view.list, "scroll_to", wraps=self.view.list.scroll_to) as scroll:
+            self.state.merge(
+                ThreadPage((ancestor,), edges=((root.uri, ancestor.uri),)),
+                ancestor.uri,
+                earlier=True,
+            )
+            self.view.sync()
+            self.assertTrue(settle(self.native))
+            scroll.assert_not_called()
+        self.view.user_input()  # A new explicit action ends the scrolling interval.
+        self.assertFalse(self.view.scrolling())
+
+    def test_conversation_uses_branch_geometry_not_generic_end_paging(self):
+        self.view.load_more = lambda: self.calls.append("unrelated end paging")
+        self.view.check_start = lambda: False
+        self.view.paging.complete(self.state.anchor, 1)
+        adjustment = self.view.scroll.get_vadjustment()
+        adjustment.set_value(adjustment.get_upper() - adjustment.get_page_size())
+        self.view.queue_check()
+        self.assertTrue(settle(self.native, ready=lambda: not self.view.check_pending))
+        self.assertEqual(self.calls, [])
+
     def test_projection_and_keyboard_share_order_skipping_branch_controls(self):
         from skyloom.conversation import Continuation
 

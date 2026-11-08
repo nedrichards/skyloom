@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Record the maintainer's improved scrolling retest and the remaining visual disturbance during new-item insertion in long conversations. Retain reviewed performance evidence and remove disposable local investigation outputs.
+
+- Keep conversation loading from restoring an obsolete request-start position or issuing competing scroll commands during recent wheel/momentum input. Patch loader status in place, avoid reprojecting unchanged thread content, and use branch-aware automatic loading with a reading-progress-renewed, directional lookahead budget.
+
+- Establish refresh-smoke screenshot geometry before saving reading anchors, preserving the original offset assertions across normal and large-text/high-contrast runs.
+
+- Reduce list-width layout work with an eight-character body-width hint while preserving actual wrapping and native selection. Retain avatar/media widgets and content/action parent chains across cell bindings; build warning-only disclosure controls on demand. Scope action CSS locally and reduce unchanged model/context and plain-markup allocations. Add multilingual/large-text geometry and stale-avatar/media regressions, and preserve rejected scrolling comparisons in the performance report.
+
+- Reuse native post headers, selectable body labels, reaction controls, menus, input controllers and quoted core cells across list bindings in feeds, profiles, search and conversations. Clear prior selection, popovers, delayed activation, label gates and media on recycling; guard late image callbacks with binding epochs.
+
+- Start automatic paging two viewports ahead and hide healthy Load more controls; preserve explicit recovery and policy overrides. Keep image tiles at their reserved height after download failure and when automatic images are disabled. Add a scrolling architecture review with remaining row-construction and viewport-scan costs.
+
 - Preserve the visible post and its pixel offset when Load posts in between enters its loading state, as well as on completion or retry.
 
 - Harden thread prefetch after adversarial review: preserve response anchors and original freshness, fetch ancestry-only cache misses, retain local reactions across older responses, and target visible deep replies. Cancel speculative requests for foreground work, recover canceled controllers, and clear snapshots on sign-out.

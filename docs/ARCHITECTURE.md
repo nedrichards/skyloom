@@ -9,7 +9,7 @@ Skyloom 0.1.0 is Python/GTK 4/libadwaita, installed by Meson into /app/share/sky
 - `refresh.py`, `refresh_monitor.py`: pure freshness/backoff/resume decisions plus Gio NetworkMonitor and PowerProfileMonitor signals. A nonblocking Python timerfd on CLOCK_BOOTTIME joins the GLib main loop, expires once at the freshness/backoff deadline across suspend without waking hardware, and is removed while ineligible, editing or busy. Focus/activation and coalesced worker completions re-evaluate the deadline; unrelated completions do not postpone it. Activation/network/power changes recheck immediately; fallback uses a one-shot, second-coalesced GLib timer for the same delay. Only active, signed-in, nonbusy eligible feed/notification pages refresh. Dialogs and text editing pause it. Refresh timing belongs to the active session; real cursors and reading windows are persisted independently. Older bare-list cache records remain readable.
 - `keyboard.py`, `interactions.py`, `list_interaction.py`, `list_state.py`: one shortcut registry drives GActions, context dispatch and native Adw.ShortcutsDialog help. The native SingleSelection cursor excludes loading controls. List focus is explicitly transferred before cursor movement. Held actions, popup/dialog/editor exclusions and hardware key release identity prevent accidental repeat mutations/navigation. Stable post keys plus pixel offsets restore reading positions after jumps or feed insertion. Touch-only pull-refresh uses a deliberate vertical threshold; active-destination double press offers top/Undo. Undo callbacks validate account generation, view liveness and reaction state.
 
-- `pagination.py`: event-driven autoload with one outstanding page, cursor-attempt guards, no-progress suppression, terminal-page detection and explicit retry after errors. `FeedView` flattens content and a footer model into one virtualised ListView directly inside a full-width ScrolledWindow. Per-row clamps retain the reading width; frame-aligned checks wait for new layout before requesting another page.
+- `pagination.py`: event-driven autoload two viewports ahead with one outstanding page, cursor-attempt guards, no-progress suppression, terminal-page detection and explicit retry after errors. `FeedView` flattens content and a footer model into one virtualised ListView directly inside a full-width ScrolledWindow. Per-row clamps retain the reading width; frame-aligned checks wait for new layout before requesting another page.
 - `domain.py`: frozen Author, Post, Media, Notice and Page DTOs; defensive lexicon/union mapping; timezone-aware formatters; bounded deduplicating Pager. Unknown count fields remain unknown rather than inventing statistics.
 - `richtext.py`: extended grapheme and byte constraints, escaped Pango markup, boundary-checked incoming UTF-8 facets, outgoing links/hashtags and DID-resolved mentions.
 - `service.py`: replaceable account/service adapter over the actual async SDK. App-password sign-in, restore, refresh callbacks and sign-out; feeds, threads, reactions, writing, profiles, follows, moderation, search and notifications. API operations are serialised to avoid refresh/mutation races. Requests time out; rate limits establish a shared Retry-After cooldown. Mutations are never automatically retried.
@@ -110,8 +110,21 @@ account/generation guards reject stale completions. Automatic failure does not
 retry. Conversation initial loading reuses a fresh snapshot containing its exact
 anchor; explicit refresh always requests the service. Branch/ancestor fragments
 do not replace full initial snapshots. Conversation loading examines native rows
-one viewport beyond visibility and shares a three-request lookahead budget across
-ancestor/reply continuations, retaining the existing 250-post cap and retry controls.
+one viewport beyond visibility and shares a three-request speculative lookahead
+budget across ancestor/reply continuations. Changing the first visible post renews
+the budget; reply lookahead follows the inferred reading direction. Visible loaders
+remain eligible independently of that budget. Conversations disable the generic
+feed-end pager, retaining the single request slot, 250-post cap and retry controls.
+
+Conversation status-only syncs reuse decorated posts and patch retained loader
+widgets without projecting the graph. Content merges capture the current viewport
+at completion, never at request start. Unchanged content before the first visible
+row needs no correction; stationary insertions above it settle the current anchor
+without an initial native reveal. Recent scroll input, extended by kinetic
+adjustment changes within 150 ms, suppresses background viewport/focus corrections.
+Expired activity cannot be restarted by programmatic adjustment changes. Explicit
+navigation retains its reveal behaviour; new input cancels pending restoration.
+Queued automatic checks recheck positioning readiness before requesting data.
 
 Adversarial review tightened cache ownership: immutable snapshots retain the actual
 request anchor, original network timestamp and an indexed set of fetched-subtree
@@ -207,7 +220,7 @@ Profile actions and the post filter share an Adw.WrapBox, using natural child wi
 
 ## Performance evidence
 
-[PERFORMANCE.md](PERFORMANCE.md) documents repeatable installed native frame/presentation, CPU, memory and allocation measurements, their scope and remaining frame-budget misses. Factories retain their clamp wrappers and use native separators; post menus are created on opening. Key-indexed model entries patch reaction controls without repeated list scans or body/media reconstruction.
+[PERFORMANCE.md](PERFORMANCE.md) documents repeatable installed native frame/presentation, CPU, memory and allocation measurements, their scope and remaining frame-budget misses. Factories retain their clamp wrappers, post headers, selectable body labels, action bars and input controllers across bindings, and use native separators; post menus are created on opening. Key-indexed model entries patch reaction controls without repeated list scans or body/media reconstruction.
 
 Notification read-state updates use the same model changed signal and a declared row updater. A fixed-size envelope fades without changing the subtitle or row geometry; the native accessible description announces read/unread state once. Item/row identity and focus remain. Other notification content changes still rebind.
 
@@ -237,3 +250,56 @@ Keyed list reconciliation owns presentation invalidation and the post-object ind
 Decoded media has a 48 MiB/32-entry LRU plus weak native-consumer accounting. List media releases its paintable outside a bounded viewport margin and on unmap, without changing its 220-pixel geometry; returning can use the encoded/decoded caches. Callback epochs and completed-future cleanup prevent stale reinstalls and hidden texture retention. Pixel accounting is an estimate, not renderer-memory or battery measurement.
 
 The appearance chooser uses the documented ComboRow/Popover CSS nodes. Its contents and arrow have matching theme border widths, with only an outer shadow on contents; the override is local to the chooser. GTK documents the arrow's custom overlap with the contents border/shadow in [Popover CSS nodes](https://docs.gtk.org/gtk4/class.Popover.html#css-nodes).
+
+## Momentum scrolling review
+
+[SCROLLING_REVIEW.md](SCROLLING_REVIEW.md) records current row-construction and geometry-scan costs. Healthy automatic paging hides its manual control; errors, cursor stalls and policy pauses preserve recovery. Failed images retain their reserved 220-pixel tile and explicit viewer action to avoid asynchronous row collapse. The maintainer reports improved scrolling, with remaining visual disturbance during new-item insertion in long conversations; see the roadmap.
+
+## Reusable post cells
+
+The shared factory creates a PostRow shell in setup and retains it on each native
+ListItem until teardown. Bind supplies current immutable data; unbind disconnects
+the model signal, cancels requests and releases textures, retires label gates,
+clears selection/delayed activation/popovers and drops the previous post. The
+native item, Clamp, header, body label, action controls and event controllers
+survive. Home, profiles, search and conversation post rows use this lifecycle.
+Non-post rows keep their specialised renderers. Native list buffering and the
+250-post reading-window limit are unchanged.
+
+Callbacks on retained controls read the current binding. Rebinding resets count,
+reaction glyph, sensitivity, accessible name, focus keys, context and conversation
+classes. A binding serial and per-image callback epochs reject retired image
+results. Labelled/muted/blocked transitions detach old content and preserve lazy
+disclosure; cancelled gates leave the window registry. One compact quoted cell
+is retained per post cell, with the same binding cleanup. Avatars and up to four media tiles are also retained per cell. Their binding
+handlers, current data and texture consumers are retired on recycling; callback
+epochs protect the reused native widgets. Label disclosures, external cards and
+branch controls remain item-specific. First-view native buffer size is unchanged.
+
+The lifecycle follows [Gtk.SignalListItemFactory](https://docs.gtk.org/gtk4/class.SignalListItemFactory.html).
+
+
+## Measured layout and allocation costs
+
+Body labels use an eight-character width request with native WORD_CHAR wrapping.
+The former one-character request made GTK shape hundreds of narrow lines during
+ListView cross-axis measurement. The larger hint remains below the existing row
+control minimum in the tested narrow/large-text cases; it does not impose a fixed
+row height or restrict displayed text. Latin, CJK, Arabic and unbroken URL tests
+compare row minima, allocated-width height requests and native selection.
+[GTK documents the width request separately from wrapping](https://docs.gtk.org/gtk4/method.Label.set_width_chars.html).
+
+Text, attachment-container and action-bar parent chains survive ordinary row
+bindings. Media slots retain their Picture/button/description widgets and clear
+hidden descriptions, paintables and current media; avatar binding handlers are
+disconnected before reuse. Disclosure transitions reparent content only when its
+owner changes. Warning-only controls are lazy until content is first hidden.
+Explicit action/menu-item CSS classes replace ancestor-dependent action styling;
+native geometry regressions compare the original and replacement declarations.
+
+Reconciliation snapshots model entries once and maintains that snapshot alongside
+splices. Identical immutable posts bypass tuple-building equality and unnecessary
+replacement DTOs. ThreadContext retains unchanged KnownMessage records while
+preserving LRU promotion and changed-metadata projection. Plain unfaceted markup
+escapes directly; UTF-8 byte/facet processing remains on the faceted path.
+[PERFORMANCE.md](PERFORMANCE.md) records measured scopes and rejected comparisons.

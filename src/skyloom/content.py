@@ -116,6 +116,17 @@ class LabelledContent(Gtk.Box):
 
         self.notice = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.notice.add_css_class("content-label-notice")
+        self.show_button = None
+        self.append(self.notice)
+        self.revealer = Gtk.Revealer(
+            transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN, transition_duration=150
+        )
+        self.append(self.revealer)
+        window.content_gates.add(self)
+        self.sync()
+
+    def build_notice(self):
+        """Construct warning-only controls only when hidden content needs them."""
         heading = Gtk.Box(spacing=10)
         heading.append(Gtk.Image(icon_name="view-conceal-symbolic", pixel_size=24))
         words = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=True)
@@ -127,13 +138,6 @@ class LabelledContent(Gtk.Box):
         self.show_button.add_css_class("pill")
         self.show_button.connect("clicked", lambda _: self.set_revealed(True))
         self.notice.append(self.show_button)
-        self.append(self.notice)
-        self.revealer = Gtk.Revealer(
-            transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN, transition_duration=150
-        )
-        self.append(self.revealer)
-        window.content_gates.add(self)
-        self.sync()
 
     def chip(self, title, icon, items, *, tooltip=None):
         chip = Gtk.MenuButton(
@@ -208,7 +212,9 @@ class LabelledContent(Gtk.Box):
         return self.revealer.get_reveal_child()
 
     def set_revealed(self, revealed):
-        focused = self.hide_button.has_focus() or self.show_button.has_focus()
+        focused = self.hide_button.has_focus() or (
+            self.show_button is not None and self.show_button.has_focus()
+        )
         states = self.window.revealed_labels
         states[self.key] = revealed
         if len(states) > 1024:
@@ -225,6 +231,8 @@ class LabelledContent(Gtk.Box):
         )
         if revealed and self.revealer.get_child() is None:
             self.revealer.set_child(self.build())
+        if not revealed and self.show_button is None:
+            self.build_notice()
         self.revealer.set_reveal_child(revealed)
         self.hide_button.set_visible(revealed)
         self.notice.set_visible(not revealed)

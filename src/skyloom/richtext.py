@@ -26,6 +26,10 @@ def validate(text, attachments=()):
 
 
 def markup(text, facets=()):
+    if not facets:
+        # Most rows have no facets: escaping needs neither a UTF-8 copy nor the
+        # intermediate validation/sort/output containers used for byte offsets.
+        return html.escape(text)
     raw = text.encode("utf-8")
     result, offset = [], 0
     valid = []

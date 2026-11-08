@@ -173,7 +173,7 @@ class ListInteraction:
             selected_key,
         )
 
-    def restore(self, place):
+    def restore(self, place, *, reveal=True):
         if place is None or self.view.paging.closed:
             return False
         serial = self.view.input_serial
@@ -194,7 +194,8 @@ class ListInteraction:
         if index is None:
             return False
         self.select(self.index(place.selected), focus=False)
-        self.view.list.scroll_to(index, Gtk.ListScrollFlags(0), None)
+        if reveal:
+            self.view.list.scroll_to(index, Gtk.ListScrollFlags(0), None)
 
         def correct():
             if serial != self.view.input_serial:
