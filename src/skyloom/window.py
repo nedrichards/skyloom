@@ -12,7 +12,7 @@ from .composer import Composer
 from .content import LabelledContent
 from .conversation import Continuation, Conversation
 from .conversation_view import ConversationView
-from .domain import Author, Pager, Post, find_post, safe_url
+from .domain import Pager, Post, find_post, safe_url
 from .errors import POST_UNAVAILABLE, UserError
 from .feed_coordination import FeedCoordination
 from .feed_state import FeedGap
@@ -33,7 +33,6 @@ from .thread_prefetch import HomeThreadPrefetch, ThreadCache
 from .widgets import (
     FeedView,
     NoticeRow,
-    PostRow,
     avatar,
     box,
     button,
@@ -737,12 +736,9 @@ class Window(Adw.ApplicationWindow):
         if automatic:
             view.set_posts(current.projected(coordination.gap_states if reading else None))
             if reading:
-                reading.restore(bookmark)
                 coordination.startup = False
                 coordination.unseen.update(arrivals)
                 coordination.unseen.intersection_update(p.uri for p in current.posts)
-            if not reading:
-                view.interaction.restore(place)
             count = len(coordination.unseen) if reading else len(arrivals)
             if count and arrivals:
                 title = "1 new post" if count == 1 else f"{count} new posts"
@@ -779,17 +775,13 @@ class Window(Adw.ApplicationWindow):
         key = "feed:" + feed
         if not cursor or key in self.page_requests:
             return
-        bookmark = reading.capture()
         coordination.gap_attempted.add((before, cursor))
         coordination.gap_states[before] = FeedGap(before, cursor, busy=True)
         view.set_posts(pager.projected(coordination.gap_states))
-        reading.restore(bookmark)
 
         def failed(message):
-            bookmark = reading.capture()
             coordination.gap_states[before] = FeedGap(before, cursor, error=message)
             view.set_posts(self.pagers[feed].projected(coordination.gap_states))
-            reading.restore(bookmark)
             view.paging.complete(self.pagers[feed].cursor, 0)
 
         def loaded(page):
@@ -809,7 +801,6 @@ class Window(Adw.ApplicationWindow):
             self.pagers[feed] = bridged
             view.paging.complete(bridged.cursor, len(bridged.posts) - len(current.posts))
             view.set_posts(bridged.projected(coordination.gap_states))
-            reading.restore(bookmark)
             reading.changed()
 
         submit_request(self, key, self.feed_page(feed, cursor), loaded, failed)
@@ -869,8 +860,6 @@ class Window(Adw.ApplicationWindow):
                 self.pagers[feed] = pager
             added = view.set_posts(pager.projected(), reset=reset)
             view.reading.ready = True
-            if not reset:
-                view.reading.restore(bookmark)
             view.reading.changed()
             view.load_more = lambda: self.load_feed(feed, reset=False)
             view.paging.complete(
@@ -1465,7 +1454,12 @@ class Window(Adw.ApplicationWindow):
                 if filters:
                     filters.set_sensitive(True)
                 pager = state["pager"]
-                pager.merge(result, reset=reset)
+                place = view.interaction.capture()
+                if reset:
+                    pager.merge(result, reset=True)
+                else:
+                    pager = pager.appended(result, anchor=place.key if place else None)
+                    state["pager"] = pager
                 added = view.set_posts(pager.posts, reset=reset)
                 view.load_more = lambda: more(False)
                 view.paging.complete(
@@ -1555,27 +1549,7 @@ class Window(Adw.ApplicationWindow):
             "people": False,
         }
 
-        def author_row(author):
-            row = Adw.ActionRow(
-                use_markup=False,
-                title=author.name,
-                subtitle="@" + author.handle,
-                activatable=True,
-                margin_start=16,
-                margin_end=16,
-            )
-            row.add_prefix(avatar(author, self))
-            row.connect("activated", lambda _: self.profile(author.did))
-            rows = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
-            rows.append(row)
-            return rows
-
-        view = SearchView(
-            self,
-            render=lambda value: (
-                author_row(value) if isinstance(value, Author) else PostRow(value, self)
-            ),
-        )
+        view = SearchView(self)
         entry, mode = view.entry, view.mode
         page.focus_widget, page.search_mode = entry, mode
         view.refresh = lambda: run(True)
@@ -1623,14 +1597,23 @@ class Window(Adw.ApplicationWindow):
                     return
                 if state["people"]:
                     authors, next_cursor = value
-                    results.merge(authors, next_cursor, reset=reset)
+                    place = view.interaction.capture()
+                    results.merge(
+                        authors, next_cursor, reset=reset, anchor=place.key if place else None
+                    )
                     added = view.set_items(results.items, lambda author: author.did, reset=reset)
                 else:
-                    state["pager"].merge(value, reset=reset)
+                    if reset:
+                        state["pager"].merge(value, reset=True)
+                    else:
+                        place = view.interaction.capture()
+                        state["pager"] = results.appended(
+                            value, anchor=place.key if place else None
+                        )
                     added = view.set_posts(state["pager"].posts, reset=reset)
                 view.load_more = lambda: run(False)
                 view.paging.complete(
-                    results.cursor,
+                    state["people_pager"].cursor if state["people"] else state["pager"].cursor,
                     view.model.get_n_items() if reset else added,
                     "No results found." if view.model.get_n_items() == 0 else "",
                 )
@@ -1666,7 +1649,12 @@ class Window(Adw.ApplicationWindow):
         records = RecordPager(notice_key)
 
         view = FeedView(
-            self, render=lambda notice: NoticeRow(notice, self), update=NoticeRow.update_notice
+            self,
+            render=lambda notice: NoticeRow(notice, self),
+            update=NoticeRow.update_notice,
+            recycle_record=lambda notice, row: (
+                row.bind_notice(notice) if row else NoticeRow(notice, self)
+            ),
         )
         view.refresh = lambda: load()
         view.auto_key = "notifications"
@@ -1677,7 +1665,8 @@ class Window(Adw.ApplicationWindow):
             if not page.get_parent() or view.paging.closed:
                 return
             notices, next_cursor, timestamp = value
-            records.merge(notices, next_cursor, reset=reset)
+            place = view.interaction.capture()
+            records.merge(notices, next_cursor, reset=reset, anchor=place.key if place else None)
             view.clear_update()
             added = view.set_items(records.items, notice_key, reset=reset)
             view.load_more = lambda: load(False)

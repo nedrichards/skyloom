@@ -2,12 +2,20 @@
 
 from gi.repository import Gtk
 
-from .widgets import FeedView, box, label
+from .widgets import AuthorRow, FeedView, box, label
 
 
 class SearchView(FeedView):
     def __init__(self, window, render=None):
-        super().__init__(window, render)
+        super().__init__(
+            window,
+            render,
+            recycle=self.render_post,
+            recycle_record=lambda author, row: (
+                row.bind_author(author) if row else AuthorRow(author, window)
+            ),
+        )
+        self.feed_preview = True
         self.search_started = False
         self.entry = Gtk.SearchEntry(placeholder_text="Search Bluesky", hexpand=True)
         self.entry.update_property([Gtk.AccessibleProperty.LABEL], ["Search posts or people"])

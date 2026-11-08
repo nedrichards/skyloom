@@ -235,6 +235,66 @@ class PostObject(GObject.Object):
         self.post = post
 
 
+class AuthorRow(Gtk.ListBox):
+    """A reusable people result with one retained avatar and native action row."""
+
+    def __init__(self, author, window):
+        super().__init__(selection_mode=Gtk.SelectionMode.NONE)
+        self.window, self.author = window, author
+        self.row = Adw.ActionRow(use_markup=False, activatable=True, margin_start=16, margin_end=16)
+        self.portrait = avatar(author, window)
+        self.row.add_prefix(self.portrait)
+        self.row.connect(
+            "activated", lambda _row: window.profile(self.author.did) if self.author else None
+        )
+        self.append(self.row)
+        self.bind_author(author)
+
+    def bind_author(self, author):
+        if self.author != author:
+            avatar(author, self.window, widget=self.portrait)
+        self.author = author
+        self.row.set_title(author.name)
+        self.row.set_subtitle("@" + author.handle)
+        return self
+
+    def cancel(self):
+        clear_avatar(self.portrait, self.window)
+        # Rebinding even the same identity must restore its avatar request.
+        self.author = None
+
+
+class FeedGapRow(Gtk.Box):
+    """Busy/error changes retain the gap control rather than replacing its row."""
+
+    def __init__(self, gap, view):
+        super().__init__(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=12,
+            margin_start=18,
+            margin_end=18,
+            margin_top=18,
+            margin_bottom=18,
+        )
+        self.message = label("", "dim-label")
+        self.control = button(
+            "view-refresh-symbolic",
+            "Load posts in between",
+            lambda: view.window.load_feed_gap(view, self.gap.before),
+            text="Load posts in between",
+        )
+        self.append(self.message)
+        self.append(self.control)
+        self.update_gap(gap)
+
+    def update_gap(self, gap):
+        self.gap = gap
+        self.message.set_label(gap.error or "Saved reading position · newer posts above")
+        self.control.set_label("Loading…" if gap.busy else "Load posts in between")
+        self.control.set_visible(bool(gap.cursor))
+        self.control.set_sensitive(not gap.busy)
+
+
 class NoticeRow(Gtk.ListBox):
     """Read-state changes keep the native notification row and its focus intact."""
 
@@ -249,7 +309,8 @@ class NoticeRow(Gtk.ListBox):
             margin_end=16,
         )
         self.window = window
-        self.row.add_prefix(avatar(notice.author, window))
+        self.portrait = avatar(notice.author, window)
+        self.row.add_prefix(self.portrait)
         self.marker = Gtk.Image(icon_name="mail-unread-symbolic", pixel_size=16)
         self.marker.add_css_class("unread-indicator")
         self.marker.set_tooltip_text("Unread notification")
@@ -259,13 +320,30 @@ class NoticeRow(Gtk.ListBox):
         self.row.connect(
             "activated",
             lambda _: (
-                window.profile(self.notice.author.did)
+                None
+                if self.notice is None
+                else window.profile(self.notice.author.did)
                 if self.notice.reason == "follow"
                 else window.thread(self.notice.subject or self.notice.uri)
             ),
         )
         self.append(self.row)
         self.update_notice(notice)
+
+    def bind_notice(self, notice):
+        if self.notice is None or self.notice.author != notice.author:
+            avatar(notice.author, self.window, widget=self.portrait)
+        self.row.set_title(notice.author.name)
+        self.row.set_subtitle(notice.reason.replace("-", " "))
+        self.update_notice(notice)
+        return self
+
+    def cancel(self):
+        clear_avatar(self.portrait, self.window)
+        motion = getattr(self.window, "motion", None)
+        if motion is not None:
+            motion.finish(self.marker)
+        self.notice = None
 
     def update_notice(self, notice):
         self.notice = notice
@@ -370,7 +448,15 @@ def post_positions(window):
 class FeedView(Gtk.Box):
     """One full-width virtualised scrolling surface, including its pager footer."""
 
-    def __init__(self, window, render=None, update=None, recycle=None, automatic_end=True):
+    def __init__(
+        self,
+        window,
+        render=None,
+        update=None,
+        recycle=None,
+        automatic_end=True,
+        recycle_record=None,
+    ):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, vexpand=True)
         self.reading = None
         self.feed = None
@@ -383,6 +469,7 @@ class FeedView(Gtk.Box):
         self.connections = set()
         self.render = render or self.render_post
         self.recycle = recycle or (self.render_post if render is None else None)
+        self.recycle_record = recycle_record
         self.load_more = lambda: None
         self.refresh = None
         self.focus_when_ready = False
@@ -453,6 +540,13 @@ class FeedView(Gtk.Box):
             vexpand=True, hscrollbar_policy=Gtk.PolicyType.NEVER, child=self.list
         )
         self.scroll.add_controller(self.scroll_input)
+        touch_input = Gtk.GestureClick(
+            touch_only=True, propagation_phase=Gtk.PropagationPhase.CAPTURE
+        )
+        touch_input.connect("pressed", lambda *_: self.scroll_event())
+        for signal in ("update", "cancel", "released"):
+            touch_input.connect(signal, self.touch_activity)
+        self.scroll.add_controller(touch_input)
         key_input = Gtk.EventControllerKey(propagation_phase=Gtk.PropagationPhase.CAPTURE)
         key_input.connect("key-pressed", lambda *_: (self.user_input(), False)[1])
         self.scroll.add_controller(key_input)
@@ -587,13 +681,14 @@ class FeedView(Gtk.Box):
 
     def setup(self, _factory, item):
         item.set_child(Adw.Clamp(maximum_size=760, tightening_threshold=600))
-        item._post_row = PostRow(None, self.window) if self.recycle is not None else None
+        item._post_row = None
+        item._record_row = None
 
     def teardown(self, _factory, item):
-        row = getattr(item, "_post_row", None)
-        if row is not None:
-            row.cancel()
-        item._post_row = None
+        for row in (getattr(item, "_post_row", None), getattr(item, "_record_row", None)):
+            if row is not None:
+                row.cancel()
+        item._post_row = item._record_row = None
         item.set_child(None)
 
     def bind(self, _factory, item):
@@ -606,6 +701,10 @@ class FeedView(Gtk.Box):
         try:
             if isinstance(value, Post) and self.recycle is not None:
                 row = self.recycle(value, item._post_row)
+                item._post_row = row
+            elif self.recycle_record is not None and isinstance(value, Author | Notice):
+                row = self.recycle_record(value, item._record_row)
+                item._record_row = row
             else:
                 row = PageFooter(self) if value is None else self.render(value)
         finally:
@@ -626,6 +725,8 @@ class FeedView(Gtk.Box):
             row._value = model.post
             if isinstance(row, PostRow):
                 row.update_counters(model.post)
+            elif isinstance(row, FeedGapRow):
+                row.update_gap(model.post)
             elif self.update_row is not None:
                 self.update_row(row, model.post)
 
@@ -689,6 +790,11 @@ class FeedView(Gtk.Box):
         for footer in list(self.footers):
             footer.sync()
         self.queue_check()
+
+    def touch_activity(self, *_args):
+        # A native pan cancels this observer; its final activity stamp lets
+        # subsequent adjustment movement extend the kinetic-scroll interval.
+        self.last_scroll_activity = monotonic()
 
     def scroll_event(self, *_args):
         self.user_input()
@@ -762,20 +868,7 @@ class FeedView(Gtk.Box):
 
     def render_post(self, post, row=None):
         if isinstance(post, FeedGap):
-            row = box(margin=18)
-            row.append(
-                label(post.error or "Saved reading position · newer posts above", "dim-label")
-            )
-            if post.cursor:
-                control = button(
-                    "view-refresh-symbolic",
-                    "Load posts in between",
-                    lambda *_: self.window.load_feed_gap(self, post.before),
-                    text="Loading…" if post.busy else "Load posts in between",
-                )
-                control.set_sensitive(not post.busy)
-                row.append(control)
-            return row
+            return FeedGapRow(post, self)
         if row is None:
             row = PostRow(post, self.window)
         else:
@@ -786,7 +879,7 @@ class FeedView(Gtk.Box):
             row.body.prepend(label("Thread", "dim-label"))
         return row
 
-    def set_posts(self, posts, reset=False, *, rebind=()):
+    def set_posts(self, posts, reset=False, *, rebind=(), preserve=True):
         previous = self.connections
         self.connections = set()
         if self.feed_preview:
@@ -806,9 +899,43 @@ class FeedView(Gtk.Box):
             lambda post: post.uri,
             reset=reset,
             rebind=set(rebind) | (previous ^ self.connections),
+            preserve=preserve,
         )
 
-    def set_items(self, items, key, reset=False, *, rebind=()):
+    def anchor_changed(self, place, items, rebind):
+        if place is None or place.key is self.content_header:
+            return False
+
+        def prefix(values):
+            result = []
+            for value in values:
+                result.append(value)
+                if self.key(value) == place.key:
+                    return result
+            return None
+
+        previous = [self.model.get_item(i).post for i in range(self.model.get_n_items())]
+        remaining = {self.key(item) for item in items}
+        # Native row removal can change the list's internal anchor even below
+        # the visible prefix (notably when a gap loader disappears).
+        if any(self.key(item) not in remaining for item in previous):
+            return True
+        before = prefix(previous)
+        after = prefix(items)
+        if before is None or after is None or len(before) != len(after):
+            return True
+        return any(
+            self.key(a) in rebind or (a is not b and a != b and not self.layout_unchanged(a, b))
+            for a, b in zip(before, after, strict=True)
+        )
+
+    def set_items(self, items, key, reset=False, *, rebind=(), preserve=True):
+        # Capture at completion, never at request start. Native anchoring is enough
+        # for appends and layout-stable updates; a scroll_to here would fight fling.
+        place = (
+            self.interaction.capture() if preserve and not reset and not self.scrolling() else None
+        )
+        restore_place = self.anchor_changed(place, items, rebind) if place else False
         posts = [item for item in items if isinstance(item, Post)]
         post_positions(self.window).remember(posts + [post.quote for post in posts if post.quote])
         selected = self.interaction.selected()
@@ -818,6 +945,27 @@ class FeedView(Gtk.Box):
         entries = [self.model.get_item(i) for i in range(self.model.get_n_items())]
         old = [entry.post for entry in entries]
         before, after = [key(x) for x in old], [key(x) for x in items]
+        focus = getattr(self.window, "get_focus", lambda: None)()
+        owner = focus
+        while owner is not None and owner is not self and not hasattr(owner, "_value"):
+            owner = owner.get_parent()
+        focused = getattr(owner, "_value", None) if owner is not self else None
+        if focused is not None and owner.is_ancestor(self):
+            identity = key(focused)
+            replacement = next((value for value in items if key(value) == identity), None)
+            replaced = (
+                replacement is None
+                or identity in rebind
+                or (replacement != focused and not self.can_update_item(focused, replacement))
+            )
+            if replaced:
+                # Removing a focused loader can make GTK reveal an unrelated row,
+                # even when the splice is below the reader. Transfer focus before
+                # unbinding, without an item-based scrolling request during momentum.
+                root = self.get_root()
+                if root is not None:
+                    root.set_focus(self.list)
+                restore_place = place is not None
         added = len(set(after) - set(before))
         for tag, a, b, c, d in reversed(
             SequenceMatcher(a=before, b=after, autojunk=False).get_opcodes()
@@ -850,14 +998,29 @@ class FeedView(Gtk.Box):
         if items and self.focus_when_ready:
             self.focus_when_ready = False
             self.interaction.focus()
+        if restore_place:
+            self.interaction.restore(place, reveal=False)
         return added
 
+    def layout_unchanged(self, previous, current):
+        if isinstance(previous, FeedGap) and isinstance(current, FeedGap):
+            return replace(previous, busy=current.busy) == current
+        return self.can_update_item(previous, current)
+
     def can_update_item(self, previous, current):
-        return counters_only(previous, current) or (
-            self.update_row is not None
-            and isinstance(previous, Notice)
-            and isinstance(current, Notice)
-            and replace(previous, read=current.read) == current
+        return (
+            (
+                isinstance(previous, FeedGap)
+                and isinstance(current, FeedGap)
+                and previous.before == current.before
+            )
+            or counters_only(previous, current)
+            or (
+                self.update_row is not None
+                and isinstance(previous, Notice)
+                and isinstance(current, Notice)
+                and replace(previous, read=current.read) == current
+            )
         )
 
     def motion_changed(self, settings, _ps):
@@ -897,7 +1060,7 @@ class FeedView(Gtk.Box):
         self.animate_arrivals = motion_allowed(self.window)
         self.paging_ready = False
         self.clear_update()
-        self.set_posts(posts)
+        self.set_posts(posts, preserve=False)
         if posts:
             self.list.grab_focus()
             self.interaction.select(self.interaction.positions()[0], focus=False)

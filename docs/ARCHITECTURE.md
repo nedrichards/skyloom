@@ -26,6 +26,19 @@ The controller remains intentionally straightforward: one window module owns nav
 
 Profile intro/biography/actions/filter and search fields are native Gtk.ListHeader content in the first Gtk.FlattenListModel section. The ListView remains directly inside its sole ScrolledWindow, retaining virtualisation and unchanged post/footer indices. The footer section supplies a header even with no posts. An explicit header owner handles GTK's new-bind-before-old-unbind ordering without double parenting or losing controls. Search keeps one view and entry across queries/mode changes; focused fields survive rebinding, and Ctrl+K remaps the header before focusing the entry.
 
+All timeline surfaces share completion-time, delta-aware anchor handling in
+`FeedView.set_items`: pure appends and layout-stable counter/read patches need no
+correction, active momentum suppresses corrections, and static prefix changes or
+row removals preserve the visible key/offset without an initial item-based jump.
+Focused rows transfer to the native list before removal. Conversations opt out
+and retain their specialised loader/projection policy. Profile and Search post
+paging use `Pager.appended` with the current anchor; people and notifications
+use the analogous bounded `RecordPager` path, retaining the actual request cursor
+when only part of a page fits. Search posts use shared post recycling. Native
+slots retain post shells lazily from first post bind, or separate reusable
+people/notification row and avatar shells, with binding-specific cleanup.
+
+
 GTK scroll_to(0) targets the first post rather than its section header, so initial/reset/top paths restore adjustment zero after allocation. Scroll snapshots distinguish a visible header offset from a post URI/offset, allowing top/Undo and Back to preserve introductory content too. Unmapped headers are excluded from geometry probes because GTK can return cached bounds. Expanded biography text is complete and profile controls wrap at narrow widths. Home, conversations, notifications and Drafts already use one primary content surface. The image viewer now puts the image, full description and copy control in one scroller.
 
 Verified upstream contracts: [ListView header factory](https://docs.gtk.org/gtk4/method.ListView.set_header_factory.html), [ListHeader lifecycle/properties](https://docs.gtk.org/gtk4/class.ListHeader.html) and [virtual list scrolling requirements](https://docs.gtk.org/gtk4/section-list-widget.html).

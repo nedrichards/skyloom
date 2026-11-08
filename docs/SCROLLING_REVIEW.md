@@ -11,7 +11,7 @@ momentum in a long conversation remains open in [the roadmap](ROADMAP.md).
 ## Findings and changes
 
 1. **Core reuse implemented; cold construction remains.** `FeedView` retains
-   a PostRow shell as well as the Clamp from setup. Bind now reuses the header,
+   a Clamp from setup and a PostRow shell from its first post bind. Later binds reuse the header,
    selectable text label, actions and controllers; quoted core cells are also
    reused. Unbind clears binding-specific state and media. First-view buffering
    still builds many cells, while label and external-card structures remain item-specific. Avatars/media slots
@@ -85,3 +85,46 @@ loading, with directional reply lookahead and a three-request budget renewed by
 reading progress. The single-request and retained-message bounds remain. See
 [the delivery report](DELIVERY_REPORT.md) for native and installed GUI evidence
 and the remaining physical-input acceptance limits.
+
+
+## Cross-view consistency audit
+
+The header selector is committed separately as `da9f783`. The follow-up audit
+traced every content surface rather than treating all timelines as identical.
+
+| Surface | Audited behaviour and changes |
+| --- | --- |
+| Home / every pinned feed / offline replay | Shared reusable post cells, bounded media and two-viewport paging were already in place. Removed unconditional completion-time scroll corrections. Shared delta handling now preserves static anchors for changes/removals while leaving appends and active momentum to native anchoring. Gap busy/error controls update in place. |
+| Conversations | Retains its specialised projection, in-place loaders, directional lookahead, current-anchor comparison and focus recovery. Explicitly opts out of the generic correction so it never schedules two competing restores. |
+| Profiles, including Posts / Replies / Media | Already used shared reusable post cells and one scroller. Paging now uses the reader-anchored bounded Pager append path rather than unconditional head trimming. |
+| Search posts | Previously constructed PostRow trees for every bind. Now uses the same retained post/quote/avatar/media cells and thread-decoration path as other post timelines. Paging also protects the current anchor and real cursor. |
+| Search people | Now retains native action-row and avatar widgets across binds. Its bounded record pager protects the reader and rewinds a partially retained page to the actual request cursor. |
+| Notifications | Retains fixed read-marker geometry and in-place Mark seen updates. Now recycles row/avatar shells and protects current anchors/cursors when loading beyond the record limit. Automatic refresh still offers its explicit update action. |
+| Drafts | One native scroller with at most 100 local, text-only draft actions; one guarded snapshot load, no incremental timeline insertion or media decode. No timeline-specific correction/recycling change is needed. |
+| Image viewer | One scroller containing the image, full description and copy action; bounded image rectangle, worker decode and closed-dialog guard already apply. |
+| Composer, Preferences, About, shortcut help, welcome/sign-in | Native bounded forms/dialogs, no append-driven timeline. Existing main-thread widget work, asynchronous service/storage and lifecycle guards remain. |
+
+The generic list captures its current visible key/pixel offset at completion,
+not at request start. It corrects static prepends, rebinds and removals, including
+removing a gap below the visible prefix: GTK can otherwise change its internal
+anchor. Focus transfers before a focused row is unbound. Plain appends,
+reaction/read-state patches and active input-led momentum issue no corrective
+scroll request. Existing input serials still cancel a pending correction after
+new input. The conversation path retains its own finer-grained loader rules.
+
+A passive native touch gesture observes activity and cancellation by the native
+pan, extending the shared kinetic interval without claiming input or changing
+pull-refresh semantics. Physical touchscreen and default-renderer acceptance
+remain required; this is not a claim that the reported compositor artifact is
+universally resolved.
+
+Native list slots allocate post cells on their first post bind and retain them
+thereafter. People/notification rows never construct unused PostRow trees.
+Unbind cancels requests, clears retained avatars and invalidates stale callbacks;
+teardown releases both post and record cells. No renderer override, global
+animation change, reduced history limit or new API was introduced.
+
+Validation and remaining limits are recorded in the current delivery report.
+The existing geometry-scan, checkpoint and cold-construction measurement work
+above remains relevant; this audit does not turn those open measurements into
+performance claims.

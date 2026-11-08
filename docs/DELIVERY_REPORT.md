@@ -1,5 +1,45 @@
 # Delivery report
 
+## Cross-view scrolling consistency — 8 November 2026
+
+Committed the approved header selector as `da9f783`, then audited every content
+surface against the recent Home and conversation changes. The full inventory and
+implementation rationale are in [the scrolling review](SCROLLING_REVIEW.md#cross-view-consistency-audit).
+
+Fixed missing Search post recycling, added people/notification row/avatar reuse,
+protected anchors and real cursors when profile/Search/notification windows fill,
+and moved general list corrections into shared completion-time delta handling.
+Appends, stable counter/read patches and active momentum issue no corrective
+scroll requests. Static structural changes/removals preserve the visible anchor;
+focused rows transfer before unbinding. Home gap busy/error states retain their
+control. Conversations keep their specialised projection and correction path.
+A passive native gesture tracks touch activity without claiming the sequence.
+
+The final source GNOME 51 X11/Cairo suite passed **279 tests, zero skips**.
+An initial run exposed raw-event marshalling errors and a gap-removal anchor
+regression; both were corrected using native gesture signals and static removal
+preservation before the passing run. No assertions were weakened and no new
+permanent tests were added. Offline pinned Flatpak build/export and local
+installation succeeded; all five changed modules match the installation byte
+for byte. The installed full demo smoke passed across Home, conversations,
+profiles, Search posts/people, notifications, draft/composer, image viewer,
+preferences, offline/error recovery and responsive light/dark layouts. Installed
+Search smoke also passed with high contrast and Adwaita Sans 16 at wide/narrow
+sizes.
+
+Disposable source and installed checks passed retained cursor replay at caps,
+anchor retention, Search post/people reuse, retained author/notification widget
+identity, current notification activation targets and safe unbound activation.
+They confirmed zero correction requests for appends, counter updates and active
+momentum, one correction for a static prepend, and passive touch activity state.
+The temporary check and captures were removed; existing demo captures restored.
+Lint, formatting, compilation, desktop metadata and schema checks passed.
+`./scripts/check.sh` reached the native step but nested Flatpak allocation was
+blocked, so native validation used the host route. GDK skipped-frame and
+frame-throttling warnings remain. Physical input, default-renderer momentum
+presentation and Orca remain separate acceptance gates; no universal frame-rate
+or ghosting claim is made.
+
 ## Header feed selection — 8 November 2026
 
 Home now hosts its adaptive feed selector entirely in the existing header. Its

@@ -245,7 +245,7 @@ class ConversationView(FeedView):
             if uri in self.presentation and self.presentation[uri] != value
         }
         restore_place = not scrolling and self.anchor_changed(place, decorated, rebind)
-        self.set_posts(decorated, rebind=rebind)
+        self.set_posts(decorated, rebind=rebind, preserve=False)
         self.presentation = presentation
         for row in tuple(self.rows):
             control = getattr(row, "control", None)
