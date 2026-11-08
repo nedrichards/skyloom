@@ -1,5 +1,21 @@
 # Delivery report
 
+## Automatic-only header adaptation — 8 November 2026
+
+Removed the manual feed-strip collapse/expand buttons, state and reserved width.
+The strip now uses that space for feed names; expanded, scrollable and dropdown
+states continue to follow actual header allocation automatically. Existing feed
+selection, focus handoff, scrolling and motion policy remain.
+
+Offline pinned build/export and local installation passed. All 11 installed
+navigation tests passed. A disposable real-Home check with six invented feeds
+confirmed the absence of manual controls/state, automatic expanded/scrollable/
+dropdown states through 1280 → 800 → 480 → 800 → 1280 resizing, retained selection
+and constant selector height. The check was removed afterward. No new permanent
+tests or development captures remain. Lint, formatting, compilation, desktop
+metadata and schema checks passed; `check.sh` could not allocate a nested Flatpak
+instance, so native checks used the host installed runtime.
+
 ## Cross-view scrolling consistency — 8 November 2026
 
 Committed the approved header selector as `da9f783`, then audited every content

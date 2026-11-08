@@ -14,7 +14,6 @@ class FeedSwitcher(Gtk.Box):
         self.width = -1
         self.tick = None
         self.closed = False
-        self.manual_compact = False
         self.mode = "compact"
         self.scroll_animation = None
         self.model_signal = None
@@ -39,13 +38,9 @@ class FeedSwitcher(Gtk.Box):
         self.row.append(self.previous)
         self.row.append(self.scroller)
         self.row.append(self.next)
-        self.collapse = self.control("pan-up-symbolic", "Collapse feed strip")
-        self.row.append(self.collapse)
         self.stack.add_named(self.row, "strip")
         self.compact = Gtk.Box(spacing=2, halign=Gtk.Align.CENTER)
         self.compact.append(picker)
-        self.expand = self.control("pan-down-symbolic", "Expand feed strip")
-        self.compact.append(self.expand)
         self.stack.add_named(self.compact, "compact")
         self.stack.set_visible_child_name("compact")
         factory = Gtk.SignalListItemFactory()
@@ -89,14 +84,11 @@ class FeedSwitcher(Gtk.Box):
     def bind_label(_factory, item):
         item.get_child().set_label(item.get_item().get_string())
 
-    def control(self, icon, title, direction=None):
+    def control(self, icon, title, direction):
         button = Gtk.Button(icon_name=icon, tooltip_text=title)
         button.update_property([Gtk.AccessibleProperty.LABEL], [title])
         button.add_css_class("flat")
-        if direction is None:
-            button.connect("clicked", self.toggle)
-        else:
-            button.connect("clicked", lambda _button: self.scroll(direction))
+        button.connect("clicked", lambda _button: self.scroll(direction))
         return button
 
     def model_changed(self, *_args):
@@ -141,7 +133,7 @@ class FeedSwitcher(Gtk.Box):
     def do_measure(self, orientation, for_size):
         if orientation == Gtk.Orientation.HORIZONTAL:
             minimum = self.compact.measure(orientation, -1)[0]
-            natural = self.strip.measure(orientation, -1)[1] + 34
+            natural = self.strip.measure(orientation, -1)[1]
             return minimum, max(minimum, min(880, natural)), -1, -1
         row = self.row.measure(orientation, -1)
         compact = self.compact.measure(orientation, -1)
@@ -174,17 +166,14 @@ class FeedSwitcher(Gtk.Box):
 
     def update_layout(self):
         minimum = self.compact.measure(Gtk.Orientation.HORIZONTAL, -1)[0]
-        natural = self.strip.measure(Gtk.Orientation.HORIZONTAL, -1)[1] + 34
-        compact = (
-            self.manual_compact or self.width < max(320, minimum + 48) or len(self.buttons) < 2
-        )
+        natural = self.strip.measure(Gtk.Orientation.HORIZONTAL, -1)[1]
+        compact = self.width < max(320, minimum + 48) or len(self.buttons) < 2
         mode = "compact" if compact else "expanded" if natural <= self.width else "scrollable"
         focus = self.get_root().get_focus() if self.get_root() else None
         move_focus = focus and focus.is_ancestor(self.row if compact else self.compact)
         self.stack.set_transition_duration(280 if allowed(self.window) else 0)
         self.previous.set_visible(mode == "scrollable")
         self.next.set_visible(mode == "scrollable")
-        self.expand.set_visible(len(self.buttons) > 1 and self.width >= max(320, minimum + 48))
         self.mode = mode
         self.stack.set_visible_child_name("compact" if compact else "strip")
         if move_focus:
@@ -216,10 +205,6 @@ class FeedSwitcher(Gtk.Box):
         self.next.set_sensitive(
             adjustment.get_value() + adjustment.get_page_size() < adjustment.get_upper() - 1
         )
-
-    def toggle(self, _button):
-        self.manual_compact = not self.manual_compact
-        self.update_layout()
 
     def stop_scroll(self, *_args):
         if self.scroll_animation:

@@ -2,10 +2,12 @@
 
 ## Unreleased
 
+- Remove the manual feed-strip collapse/expand controls and their reserved width. Keep automatic expanded, scrollable and dropdown states.
+
 - Apply shared momentum-aware, delta-based reading-anchor handling across Home/pinned feeds, profiles, Search and notifications. Avoid competing scroll corrections for appends and stable updates; preserve static anchors and focus when rows are removed. Keep conversation-specific loader handling independent.
 - Reuse Search post cells and people/notification row/avatar shells, retain gap controls during busy/error changes, and keep reader anchors plus real continuation cursors when bounded profile/Search/notification windows fill. Add passive native touch activity tracking without claiming scrolling gestures.
 
-- Keep Home feed selection inside the existing header: show a visible strip when space permits, scroll it horizontally as space tightens, and crossfade back to the dropdown at narrow widths. Preserve feed selection and reading state, with explicit collapse/expand and scroll controls. Remove the development prototype and captures.
+- Keep Home feed selection inside the existing header: show a visible strip when space permits, scroll it horizontally as space tightens, and crossfade back to the dropdown at narrow widths. Preserve feed selection and reading state, with automatic adaptation and scroll controls. Remove the development prototype and captures.
 
 - Animate narrow-window collapse on one 340 ms timeline: slide live content beneath a temporary in-memory render of the departing sidebar, avoiding the native sidebar spring finishing too quickly. Preserve reduced motion, resize reversals and native overlay controls.
 
