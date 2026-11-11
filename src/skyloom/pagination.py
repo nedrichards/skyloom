@@ -4,6 +4,7 @@
 class AutoPager:
     def __init__(self, load, changed=lambda: None):
         self.load, self.changed = load, changed
+        self.exhausted = False
         self.busy = False
         self.cursor = None
         self.error = ""
@@ -14,6 +15,7 @@ class AutoPager:
         self.manual_available = False
 
     def begin(self, message="Loading…", reset=False):
+        self.exhausted = False
         self.manual_available = False
         self.busy, self.error, self.message = True, "", message
         if reset:
@@ -24,11 +26,13 @@ class AutoPager:
         self.manual_available = False
         self.busy, self.error, self.message = False, "", message
         self.cursor = cursor
+        self.exhausted = not cursor
         # Empty/duplicate pages can still be traversed manually, but cannot spin.
         self.auto = bool(cursor) and added > 0 and cursor not in self.attempted
         self.changed()
 
     def fail(self, message):
+        self.exhausted = False
         self.busy, self.auto = False, False
         self.error, self.message = message, ""
         self.changed()

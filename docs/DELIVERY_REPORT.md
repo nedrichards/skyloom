@@ -1,5 +1,25 @@
 # Delivery report
 
+## Feed endpoint treatment — 11 November 2026
+
+Nonempty Home/pinned feeds now finish with quiet “End of feed” text and
+“There are no more posts to load.” after a completed page without a continuation
+cursor. The existing list footer owns the treatment; no extra scrolling surface
+or action was added. The endpoint has no additional divider above or below it.
+Initial/loading/error/manual-recovery states, empty feeds
+and other list types retain their existing presentation. Short pages with a
+cursor continue paging.
+
+The new native footer regression passed, covering terminal success, short and
+zero-progress cursor pages, loading, failure/retry, manual recovery, other lists
+and empty feeds. `check.sh` passed lint, formatting, compilation, desktop metadata
+and schemas; after removing the extra endpoint divider, its 280-test native run
+had 278 passes and two rendering/positioning failures in the distant-cell-recycling
+and deep-cached-restart fixtures. This remains a full-suite failure. Offline pinned Flatpak build/export and local
+installation passed. A separate X11/Cairo installed-code demo preview rendered
+two invented posts and the mapped endpoint, verified by an application-only
+capture. No live-service or physical-input acceptance is claimed.
+
 ## Feed arrival wording — 11 November 2026
 
 Feed arrival notices now say “New posts available” rather than presenting the

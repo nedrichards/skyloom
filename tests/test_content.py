@@ -1109,6 +1109,48 @@ class ContentTests(unittest.TestCase):
 
 @unittest.skipUnless(DISPLAY, "GNOME GTK display required")
 class PagingWidgetTests(unittest.TestCase):
+    def test_feed_end_requires_terminal_success_and_retained_posts(self):
+        from skyloom.pagination import AutoPager
+        from skyloom.widgets import PageFooter
+
+        view = SimpleNamespace(
+            feed=object(),
+            model=Gio.ListStore.new(Gtk.Label),
+            footers=WeakSet(),
+            paging=AutoPager(lambda: None),
+            pause_reason=lambda: "",
+        )
+        footer = PageFooter(view)
+        self.assertFalse(footer.end.get_visible())
+        view.model.append(Gtk.Label(label="Invented post"))
+        view.paging.complete(None, 1)
+        footer.sync()
+        self.assertTrue(footer.end.get_visible())
+        for cursor, added in (("next", 1), ("next", 0)):
+            view.paging.complete(cursor, added)
+            footer.sync()
+            self.assertFalse(footer.end.get_visible())
+        view.paging.complete(None, 1)
+        view.paging.begin()
+        footer.sync()
+        self.assertFalse(footer.end.get_visible())
+        view.paging.fail("Offline")
+        footer.sync()
+        self.assertFalse(footer.end.get_visible())
+        self.assertTrue(footer.more.get_visible())
+        view.paging.complete(None, 1)
+        view.paging.manual_available = True
+        footer.sync()
+        self.assertFalse(footer.end.get_visible())
+        view.paging.manual_available = False
+        view.feed = None
+        footer.sync()
+        self.assertFalse(footer.end.get_visible())
+        view.feed = object()
+        view.model.remove_all()
+        footer.sync()
+        self.assertFalse(footer.end.get_visible())
+
     def flush(self):
         self.assertTrue(
             settle(self.native_window, ready=lambda: not self.native_view.check_pending),

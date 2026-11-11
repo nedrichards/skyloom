@@ -377,12 +377,26 @@ class PageFooter(Gtk.Box):
         self.append(self.spinner)
         self.append(self.message)
         self.append(self.more)
+        self.end = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=8, margin_top=12, margin_bottom=16
+        )
+        self.end.append(label("End of feed", "heading", halign=Gtk.Align.CENTER))
+        self.end.append(
+            label("There are no more posts to load.", "dim-label", halign=Gtk.Align.CENTER)
+        )
+        self.append(self.end)
         view.footers.add(self)
         self.sync()
 
     def sync(self):
         state = self.view.paging
         self.set_visible(not getattr(self.view, "status_active", False))
+        self.end.set_visible(
+            self.view.feed is not None
+            and self.view.model.get_n_items() > 0
+            and state.exhausted
+            and not (state.busy or state.error or state.manual_available or state.message)
+        )
         self.spinner.set_visible(state.busy)
         self.spinner.set_spinning(state.busy and self.get_visible())
         text = state.error or state.message or (self.view.pause_reason() if state.cursor else "")
