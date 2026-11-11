@@ -411,13 +411,14 @@ class Window(Adw.ApplicationWindow):
         self.feed_picker.set_tooltip_text("Choose a feed")
         self.feed_picker.update_property([Gtk.AccessibleProperty.LABEL], ["Choose a feed"])
         self.feed_picker.connect("notify::selected", self.feed_changed)
-        self.feed_switcher = FeedSwitcher(self.feed_picker, self)
+        self.compose_button = button("list-add-symbolic", "New post (Ctrl+N)", self.compose)
+        self.refresh_button = button("view-refresh-symbolic", "Refresh feed (Ctrl+R)", self.refresh)
+        self.feed_switcher = FeedSwitcher(
+            self.feed_picker, self, (self.compose_button, self.refresh_button)
+        )
         home_header.set_title_widget(self.feed_switcher)
         home_toggle = self.navigation.create_toggle()
         home_header.pack_start(home_toggle)
-        home_header.pack_end(button("view-refresh-symbolic", "Refresh feed (Ctrl+R)", self.refresh))
-        self.compose_button = button("list-add-symbolic", "New post (Ctrl+N)", self.compose)
-        home_header.pack_end(self.compose_button)
         self.home_box = box(spacing=0)
         if self.demo:
             banner = Adw.Banner(title="Demo · invented posts, no account or network")

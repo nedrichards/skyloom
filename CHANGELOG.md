@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prioritise full feed names and selector controls in the Home header. Show New post, then Refresh, only when measured spare space includes an extra button-width allowance; keep both actions in the menu and keyboard shortcuts.
+
 - Give nonempty feeds quiet “End of feed” text when pagination has completed without a continuation cursor. Keep loading, retry, paused paging and empty-feed states distinct.
 
 - Say “New posts available” in feed arrival notifications instead of showing a partial count from fetched pages. Keep Go to top and reading-position Undo.

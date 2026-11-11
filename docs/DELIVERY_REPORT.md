@@ -1,5 +1,27 @@
 # Delivery report
 
+## Content-measured Home actions — 11 November 2026
+
+Feed names and selector controls take priority over optional header actions.
+New post then Refresh appear only when the remaining allocation covers twice
+their measured width plus spacing. The calculation uses the whole header-selector
+allocation, independent of current action visibility, and reserves both selector
+arrow widths. Hidden actions retain measurable native sizes and do not increase
+the minimum width. Menu actions and shortcuts remain available.
+
+The new native regression passed content-measured boundaries in both resize
+directions, repeated allocations without visibility oscillation, and a longer
+replacement feed list. The installed-code regression also passed keyboard focus
+handoff from a disappearing action back to the selected feed. Lint, formatting,
+compilation, desktop metadata and schema checks passed. The full native `check.sh` run completed 281 tests with 280 passes
+and one conversation loader-focus settling timeout; this is not a full-suite pass.
+Offline pinned build/export and local installation passed. A separate installed
+X11/Cairo demo preview passed at 480, 800 and 1280 pixels: two short feed names
+allowed both actions at 800/1280, compact 480 hid both, and five longer names at
+1280 kept the full names while hiding both actions. Application-only captures
+used invented content. Physical input, Orca and live-service acceptance remain
+unperformed.
+
 ## Feed endpoint treatment — 11 November 2026
 
 Nonempty Home/pinned feeds now finish with quiet “End of feed” text and

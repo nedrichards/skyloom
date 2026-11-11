@@ -22,6 +22,8 @@ Skyloom is a local development preview maintained by Nick Richards. It uses nati
 
 Reporting and unsupported video open Bluesky externally. DMs, native video, account switching, post deletion, bookmarks, server drafts, feed editing, full translation support and public distribution are not delivered. There are no inert controls for these features.
 
+Home header actions use measured content space: feed names and selector controls take priority, followed by New post and then Refresh. Each action requires twice its width plus spacing in spare room; visibility is calculated from the whole allocation independently of which actions are currently shown. Both actions remain in the menu and keyboard shortcuts.
+
 Nonempty feeds show quiet “End of feed” text and “There are no more posts to load.” when a completed page has no continuation cursor. Loading, failed requests, manual recovery and empty feeds keep their own states; a short page with a cursor is not treated as the end.
 
 Background refresh inserts arrivals above existing posts without reordering them or moving the reader. Restart restores the saved post/offset/selection and accepts a fresh head order; user input before that response preserves the live order instead. Manual refresh explicitly accepts the server's head order and goes to the top. Undo returns to the previous position while keeping refreshed data. Unchanged tiles retain identity, counters update in place and manual-refresh visible arrivals respect reduced motion.

@@ -1,15 +1,16 @@
 """One header-height feed selector with scrolling and a compact dropdown fallback."""
 
-from gi.repository import Adw, Gtk, Pango
+from gi.repository import Adw, Graphene, Gsk, Gtk, Pango
 
 from .motion import allowed
 
 
 class FeedSwitcher(Gtk.Box):
-    def __init__(self, picker, window):
+    def __init__(self, picker, window, actions=()):
         super().__init__(hexpand=True, halign=Gtk.Align.FILL)
         self.set_layout_manager(None)
         self.picker, self.window = picker, window
+        self.actions = tuple(actions)
         self.buttons = []
         self.width = -1
         self.tick = None
@@ -25,6 +26,8 @@ class FeedSwitcher(Gtk.Box):
             transition_duration=280,
         )
         self.append(self.stack)
+        for action in self.actions:
+            self.append(action)
         self.row = Gtk.Box(spacing=2)
         self.strip = Gtk.Box(spacing=2)
         self.previous = self.control("go-previous-symbolic", "Earlier feeds", -1)
@@ -135,18 +138,52 @@ class FeedSwitcher(Gtk.Box):
             minimum = self.compact.measure(orientation, -1)[0]
             natural = self.strip.measure(orientation, -1)[1]
             return minimum, max(minimum, min(880, natural)), -1, -1
-        row = self.row.measure(orientation, -1)
-        compact = self.compact.measure(orientation, -1)
-        return max(row[0], compact[0]), max(row[1], compact[1]), -1, -1
+        sizes = [self.row.measure(orientation, -1), self.compact.measure(orientation, -1)]
+        sizes.extend(action.measure(orientation, -1) for action in self.actions)
+        return max(size[0] for size in sizes), max(size[1] for size in sizes), -1, -1
 
     def do_size_allocate(self, width, height, baseline):
-        self.stack.allocate(width, height, baseline, None)
-        if width != self.width:
-            self.width = width
+        horizontal = Gtk.Orientation.HORIZONTAL
+        names = self.strip.measure(horizontal, -1)[1]
+        # Budget against the whole allocation, independent of current visibility.
+        # Reserve the selector controls and one extra action width as breathing room.
+        controls = sum(control.measure(horizontal, -1)[1] for control in (self.previous, self.next))
+        available = width - names - controls - 4
+        shown = []
+        focus = self.get_root().get_focus() if self.get_root() else None
+        for action in self.actions:
+            size = action.measure(horizontal, -1)[1]
+            visible = available >= 2 * (size + 6)
+            action.set_child_visible(visible)
+            if visible:
+                shown.append((action, size))
+                available -= size + 6
+            else:
+                available = -1
+                if focus is action or (focus and focus.is_ancestor(action)):
+                    selected = self.picker.get_selected()
+                    if self.mode != "compact" and selected < len(self.buttons):
+                        self.buttons[selected].grab_focus()
+                    else:
+                        self.picker.grab_focus()
+        selector_width = width - sum(size + 6 for _action, size in shown)
+        self.stack.allocate(selector_width, height, baseline, None)
+        x = selector_width
+        for action, size in shown:
+            x += 6
+            action_height = action.measure(Gtk.Orientation.VERTICAL, size)[1]
+            point = Graphene.Point().init(x, max(0, (height - action_height) / 2))
+            action.allocate(size, min(height, action_height), -1, Gsk.Transform().translate(point))
+            x += size
+        if selector_width != self.width:
+            self.width = selector_width
             self.queue()
 
     def do_snapshot(self, snapshot):
         self.snapshot_child(self.stack, snapshot)
+        for action in self.actions:
+            if action.get_child_visible():
+                self.snapshot_child(action, snapshot)
 
     def queue(self, *_args):
         if not self.closed and self.tick is None:
@@ -172,8 +209,8 @@ class FeedSwitcher(Gtk.Box):
         focus = self.get_root().get_focus() if self.get_root() else None
         move_focus = focus and focus.is_ancestor(self.row if compact else self.compact)
         self.stack.set_transition_duration(280 if allowed(self.window) else 0)
-        self.previous.set_visible(mode == "scrollable")
-        self.next.set_visible(mode == "scrollable")
+        self.previous.set_child_visible(mode == "scrollable")
+        self.next.set_child_visible(mode == "scrollable")
         self.mode = mode
         self.stack.set_visible_child_name("compact" if compact else "strip")
         if move_focus:
