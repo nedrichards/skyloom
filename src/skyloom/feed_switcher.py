@@ -16,6 +16,7 @@ class FeedSwitcher(Gtk.Box):
         self.tick = None
         self.closed = False
         self.mode = "compact"
+        self.layout_ready = False
         self.scroll_animation = None
         self.model_signal = None
         self.model = None
@@ -208,7 +209,8 @@ class FeedSwitcher(Gtk.Box):
         mode = "compact" if compact else "expanded" if natural <= self.width else "scrollable"
         focus = self.get_root().get_focus() if self.get_root() else None
         move_focus = focus and focus.is_ancestor(self.row if compact else self.compact)
-        self.stack.set_transition_duration(280 if allowed(self.window) else 0)
+        self.stack.set_transition_duration(280 if self.layout_ready and allowed(self.window) else 0)
+        self.layout_ready = True
         self.previous.set_child_visible(mode == "scrollable")
         self.next.set_child_visible(mode == "scrollable")
         self.mode = mode

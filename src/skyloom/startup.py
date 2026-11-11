@@ -53,6 +53,9 @@ class StartupStack(Gtk.Stack):
 
     def resolve(self, page):
         self.close()
+        # First-feed construction/layout can occupy the frame loop under load.
+        # Do not leave a partially faded startup title visible during that work.
+        self.set_transition_duration(0 if page == "shell" else 150)
         self.set_visible_child_name(page)
 
     def show_error(self, message):

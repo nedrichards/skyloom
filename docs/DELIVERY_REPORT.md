@@ -1,5 +1,50 @@
 # Delivery report
 
+## Content before header animation — 11 November 2026
+
+Startup now shows a native loading status and spinner beneath the Skyloom title.
+Cached posts appear first when available; an empty cache waits for the initial
+feed request. Empty/offline/error states also release the loading overlay so
+recovery remains accessible. After three frame callbacks with content exposed,
+the title crossfades into the feed selector, following the motion policy. The
+selector’s initial responsive layout still avoids a second crossfade. This
+supersedes the direct-header presentation reviewed below.
+
+Pinned-feed and unread-count requests start after the main content. Their errors
+now identify which request failed and offer Retry, guarded by account generation.
+The original generic startup toast could be produced by either request; the
+maintainer’s exact live-service failure has not been identified or reproduced.
+No credentials, live feed data or raw exception strings were inspected or logged.
+
+`check.sh` passed all 284 existing native tests with zero skips, plus lint,
+formatting, compilation, metadata and schema checks. Two subsequently added native
+regressions passed separately: delayed feed content renders beneath the title
+before selector/metadata, and a notification-count failure retries successfully.
+The final guard against a replaced shell is covered by these focused runs.
+Offline pinned build/export and local installation passed (app commit
+`ed47d327b1dad749c8ce92ac47b4cb887a15fa5594c929fc80c2682472ef3019`).
+The installed invented-data navigation smoke passed separately at 1280 pixels
+(light) and 480 pixels (dark). Real-system-load visual review and the original
+live-service error remain unverified.
+
+
+## Startup header presentation — 11 November 2026
+
+The transition into the signed-in shell now presents it directly, avoiding a
+partially faded startup title during cold feed construction/layout. The feed
+selector settles its initial responsive mode without a crossfade; subsequent
+responsive mode changes retain the existing 280 ms transition and motion policy.
+This avoids overlapping startup fades; it does not establish faster startup or
+guarantee smooth frames under system contention.
+
+`check.sh` passed lint, formatting, compilation, desktop metadata, schemas and
+284 native tests with zero skips. Offline pinned Flatpak build/export and local
+installation passed (app commit `083f53f72673d4617ad89f4405d85bf3d0a9085ff005aaff33e06027b214a951`).
+The installed invented-data navigation smoke passed separately, capturing
+1280-pixel light and 480-pixel dark layouts. The maintainer will review startup
+visuals under real system load; that condition was not reproduced by these checks.
+
+
 ## Meaningful position Undo — 11 November 2026
 
 Manual refresh now offers “Moved to top” only when the completion-time reading

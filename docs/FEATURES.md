@@ -100,3 +100,9 @@ Keyboard/menu Undo remains available after dismissal; reaction toasts retain fiv
 Reaching the top of a feed clears its pending new-post arrival notice and unseen count, regardless of the scrolling input.
 
 Loading posts in a saved-feed gap preserves the visible reading position while loading, on failure and when inserting the fetched posts.
+
+Startup shows a native loading state beneath the Skyloom title. The first feed
+or recovery state renders before the title fades into the feed selector. Its
+initial responsive mode settles without another fade; later responsive changes
+retain their normal animation. Pinned-feed and unread-count requests follow the
+main feed, with specific failure messages and Retry actions.

@@ -106,6 +106,72 @@ class StartupTests(unittest.TestCase):
         self.app.service.account = self.account
         return self.account
 
+    def test_feed_renders_under_title_before_selector_and_metadata(self):
+        from threading import Event
+
+        release = Event()
+        self.addCleanup(release.set)
+        original = self.app.service.feed
+        metadata = []
+
+        async def delayed_feed(*args, **kwargs):
+            await asyncio.to_thread(release.wait)
+            return await original(*args, **kwargs)
+
+        async def feeds():
+            metadata.append("feeds")
+            return [("following", "Following")]
+
+        self.app.service.feed = delayed_feed
+        self.app.service.feeds = feeds
+        self.open(self.restored_account)
+        self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
+        self.assertTrue(self.window.home_loading.get_visible())
+        self.assertTrue(self.window.home_spinner.get_spinning())
+        self.assertEqual(self.window.home_title.get_visible_child_name(), "title")
+        self.assertEqual(metadata, [])
+        rendered = []
+
+        def frame(*_args):
+            window = self.window
+            if window.pagers[window.feed_id].posts:
+                rendered.append(window.home_title.get_visible_child_name())
+            return True
+
+        tick = self.window.add_tick_callback(frame)
+        try:
+            release.set()
+            self.wait(lambda: self.window.home_title.get_visible_child_name() == "feeds")
+            self.wait(lambda: bool(metadata))
+            self.assertIn("title", rendered)
+            self.assertFalse(self.window.home_loading.get_visible())
+            self.assertFalse(self.window.home_spinner.get_spinning())
+        finally:
+            self.window.remove_tick_callback(tick)
+
+    def test_metadata_failure_identifies_request_and_retry_recovers(self):
+        self.open(self.restored_account)
+        self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
+        self.wait(lambda: self.window.home_title.get_visible_child_name() == "feeds")
+        self.wait(lambda: not self.app.worker.pending)
+        toasts = []
+
+        async def unavailable():
+            raise RuntimeError("Invented transport failure")
+
+        async def recovered():
+            return 7
+
+        self.app.service.unread = unavailable
+        with patch.object(self.window.overlay, "add_toast", toasts.append):
+            self.window.load_metadata()
+            self.wait(lambda: bool(toasts))
+            self.assertIn("notification count", toasts[0].get_title())
+            self.assertEqual(toasts[0].get_button_label(), "Retry")
+            self.app.service.unread = recovered
+            toasts[0].emit("button-clicked")
+            self.wait(lambda: self.window.notification_label.get_label() == "Notifications (7)")
+
     def test_branch_completion_preserves_reading_after_scroll_during_request(self):
         from dataclasses import replace
         from threading import Event

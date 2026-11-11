@@ -18,7 +18,7 @@ from .feed_coordination import FeedCoordination
 from .feed_state import FeedGap
 from .feed_switcher import FeedSwitcher
 from .interactions import Interactions
-from .motion import Feedback
+from .motion import Feedback, allowed
 from .navigation import Navigation
 from .preferences import Preferences
 from .profile_header import ProfileTitle
@@ -367,9 +367,7 @@ class Window(Adw.ApplicationWindow):
             self.refresh()
         else:
             self.load_initial_feed()
-        if not self.automatic_pause_reason():
-            self.load_metadata()
-        elif not self.demo:
+        if not self.demo and self.automatic_pause_reason():
             self.feed_metadata_loaded = False
             generation = self.generation
             self.worker.submit(
@@ -416,7 +414,12 @@ class Window(Adw.ApplicationWindow):
         self.feed_switcher = FeedSwitcher(
             self.feed_picker, self, (self.compose_button, self.refresh_button)
         )
-        home_header.set_title_widget(self.feed_switcher)
+        self.startup_pending = True
+        self.home_title = Gtk.Stack(hhomogeneous=False, vhomogeneous=True)
+        self.home_title.add_named(Adw.WindowTitle(title="Skyloom"), "title")
+        self.home_title.add_named(self.feed_switcher, "feeds")
+        self.home_title.set_visible_child_name("title")
+        home_header.set_title_widget(self.home_title)
         home_toggle = self.navigation.create_toggle()
         home_header.pack_start(home_toggle)
         self.home_box = box(spacing=0)
@@ -431,7 +434,15 @@ class Window(Adw.ApplicationWindow):
         self.home_box.append(self.offline_banner)
         self.feed_stack = Gtk.Stack(vexpand=True)
         self.home_box.append(self.feed_stack)
-        self.home_toolbar.set_content(self.home_box)
+        self.home_loading = Adw.StatusPage(
+            title="Loading your feed…",
+            description="Your saved posts will appear first while Skyloom connects.",
+        )
+        self.home_spinner = Gtk.Spinner(spinning=True, width_request=32, height_request=32)
+        self.home_loading.set_child(self.home_spinner)
+        self.home_content = Gtk.Overlay(child=self.home_box)
+        self.home_content.add_overlay(self.home_loading)
+        self.home_toolbar.set_content(self.home_content)
         self.home_page = Adw.NavigationPage.new(self.home_toolbar, "Following")
         self.home_page.set_tag("home")
         self.home_page.navigation_button = home_toggle
@@ -531,6 +542,31 @@ class Window(Adw.ApplicationWindow):
         self.split.set_show_sidebar(not self.split.get_collapsed())
         self.stack.add_named(self.navigation.root, "shell")
 
+    def finish_home_startup(self):
+        if not self.startup_pending:
+            return
+        self.startup_pending = False
+        self.home_spinner.set_spinning(False)
+        self.home_loading.set_visible(False)
+        generation = self.generation
+        frames = 0
+
+        def rendered(_widget, _clock):
+            nonlocal frames
+            if self.closing or generation != self.generation or _widget is not self.home_content:
+                return False
+            frames += 1
+            if frames < 3:
+                return True
+            self.home_title.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+            self.home_title.set_transition_duration(150 if allowed(self) else 0)
+            self.home_title.set_visible_child_name("feeds")
+            if not self.automatic_pause_reason():
+                self.load_metadata()
+            return False
+
+        self.home_content.add_tick_callback(rendered)
+
     def set_feeds(self, options):
         if options == self.feed_options:
             return
@@ -544,21 +580,26 @@ class Window(Adw.ApplicationWindow):
         self.feed_metadata_loaded = True
         generation = self.generation
 
-        def failed(msg):
+        def failed(area, msg):
             if generation == self.generation:
                 self.feed_metadata_loaded = False
                 if not automatic:
-                    self.toast(msg)
+                    toast = Adw.Toast(title=f"Couldn’t update {area}. {msg}", button_label="Retry")
+                    toast.connect(
+                        "button-clicked",
+                        lambda *_: self.load_metadata() if generation == self.generation else None,
+                    )
+                    self.overlay.add_toast(toast)
 
         self.worker.submit(
             self.service.feeds(),
             lambda choices: self.set_feeds(choices) if generation == self.generation else None,
-            failed,
+            lambda msg: failed("pinned feeds", msg),
         )
         self.worker.submit(
             self.service.unread(),
             lambda count: self.unread_received(count) if generation == self.generation else None,
-            failed,
+            lambda msg: failed("the notification count", msg),
         )
 
     def unread_received(self, count):
@@ -640,6 +681,8 @@ class Window(Adw.ApplicationWindow):
             self.sync_offline()
             if not pager.posts and not self.automatic_pause_reason():
                 self.load_feed(feed, reset=True)
+            else:
+                self.finish_home_startup()
             if self.refresh_monitor:
                 self.refresh_monitor.changed()
 
@@ -647,6 +690,7 @@ class Window(Adw.ApplicationWindow):
             if generation == self.generation:
                 view.load_more = self.refresh
                 view.paging.fail(msg)
+                self.finish_home_startup()
 
         submit_request(self, key, cached(), ready, failed)
 
@@ -845,7 +889,7 @@ class Window(Adw.ApplicationWindow):
             pager = self.pagers[feed]
             if reset:
                 self.interactions.policy(key).finished(time.time(), True)
-                if not getattr(self, "feed_metadata_loaded", False):
+                if not self.startup_pending and not getattr(self, "feed_metadata_loaded", False):
                     self.load_metadata()
             if reset and pager.posts:
                 self.show_feed_update(feed, page, baseline)
@@ -869,6 +913,7 @@ class Window(Adw.ApplicationWindow):
             )
             if feed == self.feed_id:
                 self.sync_offline()
+                self.finish_home_startup()
 
         def cached(page, msg):
             if generation != self.generation:
@@ -880,6 +925,7 @@ class Window(Adw.ApplicationWindow):
             view.paging.fail(msg)
             if feed == self.feed_id:
                 self.sync_offline()
+                self.finish_home_startup()
 
         def failed(msg):
             if generation == self.generation:
