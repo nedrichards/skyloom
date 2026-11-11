@@ -739,9 +739,9 @@ class Window(Adw.ApplicationWindow):
                 coordination.startup = False
                 coordination.unseen.update(arrivals)
                 coordination.unseen.intersection_update(p.uri for p in current.posts)
-            count = len(coordination.unseen) if reading else len(arrivals)
-            if count and arrivals:
-                title = "1 new post" if count == 1 else f"{count} new posts"
+            if arrivals:
+                # A head page can omit further arrivals behind its cursor.
+                title = "New posts available"
 
                 def go_to_top():
                     if reading:

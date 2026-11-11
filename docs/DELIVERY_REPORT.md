@@ -1,5 +1,22 @@
 # Delivery report
 
+## Feed arrival wording — 11 November 2026
+
+Feed arrival notices now say “New posts available” rather than presenting the
+number of newly fetched records as a total. Refresh requests fetch a 30-post head
+page; further arrivals may remain behind its cursor. Keep the existing arrival
+identity tracking, Go to top action, dismissal deduplication and position Undo.
+The existing installed refresh smoke now asserts the new wording.
+
+Lint, formatting, compilation, desktop metadata and schema checks passed. The
+initial sandboxed `check.sh` could not start Flatpak; outside that sandbox the
+279-test native run completed with 272 passes and seven rendering/positioning
+failures (six keyboard fixtures and one navigation fixture). This is not a clean
+full-suite pass. Offline pinned Flatpak build/export and local installation
+passed. The installed invented-data refresh smoke passed separately on X11/Cairo,
+including the visible notice, Go to top and reading-position checks; GDK emitted
+frame-timing warnings. No live-account or physical-input acceptance was performed.
+
 ## Automatic-only header adaptation — 8 November 2026
 
 Removed the manual feed-strip collapse/expand buttons, state and reserved width.

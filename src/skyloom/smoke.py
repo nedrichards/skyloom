@@ -1790,9 +1790,9 @@ class Smoke:
         view = self.refresh_view
         assert tuple(self.w.pagers["following"].posts[1:]) == self.refresh_before
         assert bool(view.pending_update)
-        assert view.update_notice.title == "1 new post"
+        assert view.update_notice.title == "New posts available"
         assert self.app.lookup_action("show-new").get_enabled()
-        notice = self.find_text_widget(self.w.overlay, "1 new post")
+        notice = self.find_text_widget(self.w.overlay, "New posts available")
         if notice is None or not notice.get_mapped():
             return False
         if view.position_tick is not None:
