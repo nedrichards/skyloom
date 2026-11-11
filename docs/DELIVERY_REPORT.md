@@ -1,5 +1,25 @@
 # Delivery report
 
+## Meaningful position Undo — 11 November 2026
+
+Manual refresh now offers “Moved to top” only when the completion-time reading
+position was away from the top and its target remains restorable. Refreshing at
+the top does not offer Undo for new posts, counters or selection changes. No-op
+top actions and invalid position offers preserve an existing Undo. Shared restore
+validation rejects absent targets and closed views. Conversation return ignores
+already-visible or missing opened targets. Position Undo retains refreshed posts,
+local reactions, history and cursors.
+
+`check.sh` passed lint, formatting, compilation, desktop metadata, schemas and
+283 native tests with zero skips. A subsequently added conversation no-op case
+and three refresh/top regressions all passed separately against installed code
+on X11/Cairo. The regressions cover repeated refresh at the top with unchanged
+posts, arrivals and counter changes; preservation of existing Undo; missing
+positions; real top/refresh jumps; and retained data after restoring position.
+Offline pinned Flatpak build/export and local installation passed. The installed
+invented-data refresh GUI smoke passed separately on X11/Cairo. Human input,
+Orca and live-account acceptance remain unperformed.
+
 ## Content-measured Home actions — 11 November 2026
 
 Feed names and selector controls take priority over optional header actions.

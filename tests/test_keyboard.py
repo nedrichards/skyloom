@@ -183,6 +183,45 @@ class KeyboardTests(unittest.TestCase):
         self.assertFalse(self.view.reveal_rows)
         self.assertTrue(all(row.get_opacity() == 1 for row in self.view.rows))
 
+    def test_refresh_at_top_does_not_offer_undo_for_data_or_selection_changes(self):
+        from skyloom.domain import Page, Pager
+        from skyloom.window import Window
+
+        self.window.feed_views = {"following": self.view}
+        self.window.pagers = {"following": Pager(list(self.posts), "tail")}
+        self.window.load_feed = lambda *_args, **_kwargs: None
+        self.view.interaction.select(3, focus=False)
+        self.assertTrue(self.view.interaction.at_top())
+        new = replace(self.posts[0], uri=self.posts[0].uri + "-new")
+        for posts in (self.posts, [new, *self.posts], [replace(new, likes=7), *self.posts]):
+            Window.show_feed_update(self.window, "following", Page(tuple(posts), "head"))
+            self.assertTrue(settle(self.window, 350, lambda: self.view.arrival_tick is None))
+            self.assertTrue(self.view.interaction.at_top())
+            self.assertIsNone(self.window.interactions.undo_action)
+            self.assertIsNone(self.window.interactions.undo_toast)
+        self.assertEqual(self.window.pagers["following"].posts[0].likes, 7)
+
+    def test_noop_top_and_unrestorable_position_keep_existing_undo(self):
+        from skyloom.list_state import ListPlace
+
+        controller = self.window.interactions
+        controller.offer_undo("Reaction changed", lambda: None)
+        pending, toast = controller.undo_action, controller.undo_toast
+        self.assertTrue(controller.top())
+        self.assertIs(controller.undo_action, pending)
+        self.assertIs(controller.undo_toast, toast)
+        for place in (None, ListPlace("missing-post", 0)):
+            self.assertFalse(controller.offer_position_undo("Moved to top", self.view, place))
+            self.assertIs(controller.undo_action, pending)
+        self.view.interaction.move("last")
+        self.pump()
+        self.assertTrue(controller.top())
+        self.pump()
+        self.assertEqual(controller.undo_toast.get_title(), "Moved to top")
+        jump = controller.undo_action
+        self.assertTrue(controller.top())
+        self.assertIs(controller.undo_action, jump)
+
     def test_show_and_undo_preserve_history_cursor_position_and_local_reactions(self):
         from skyloom.domain import Page, Pager
         from skyloom.window import Window
@@ -208,6 +247,7 @@ class KeyboardTests(unittest.TestCase):
         self.window.show_feed_update("following", Page((new, *self.posts[:9]), "head"), baseline)
         self.assertTrue(settle(self.window, 350, lambda: self.view.arrival_tick is None))
         refreshed = self.window.pagers["following"]
+        self.assertEqual(self.window.interactions.undo_toast.get_title(), "Moved to top")
         self.assertEqual(refreshed.cursor, "oldest")
         self.assertEqual(len(refreshed.posts), 21)
         self.assertEqual(refreshed.posts[1], liked)

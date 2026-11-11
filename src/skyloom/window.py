@@ -694,6 +694,7 @@ class Window(Adw.ApplicationWindow):
         previous = self.pagers[feed]
         live = {post.uri: post for post in previous.posts}
         place = view.interaction.capture()
+        jump_origin = None if view.interaction.at_top() else place
         attempted = set(view.paging.attempted)
         if pending:
             attempted.discard(previous.cursor)
@@ -760,9 +761,7 @@ class Window(Adw.ApplicationWindow):
                 coordination.startup = False
                 coordination.unseen.clear()
             view.show_latest(current.projected(), arrivals)
-            self.interactions.offer_undo(
-                "Latest posts shown", lambda: view.interaction.restore(place), view
-            )
+            self.interactions.offer_position_undo("Moved to top", view, jump_origin)
         view.paging.complete(current.cursor, max(1, len(arrivals)) if current.posts else 0)
         if reading:
             reading.changed()

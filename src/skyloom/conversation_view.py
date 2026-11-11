@@ -105,12 +105,15 @@ class ConversationView(FeedView):
         )
 
     def return_to_opened(self):
+        target = self.state.anchor
+        if self.interaction.index(target) is None or any(
+            row._value.uri == target for _, row in self.interaction.visible_rows()
+        ):
+            return False
         place = self.interaction.capture()
-        self.focus_post(self.state.anchor)
-        if place is not None:
-            self.window.interactions.offer_undo(
-                "Returned to opened post", lambda: self.interaction.restore(place), self
-            )
+        self.focus_post(target)
+        self.window.interactions.offer_position_undo("Returned to opened post", self, place)
+        return True
 
     def focus_body(self):
         for _, row in self.interaction.visible_rows():

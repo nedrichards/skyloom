@@ -154,6 +154,20 @@ class ListInteraction:
             self.select(self.index(self.view.key(row._value)), focus=False)
             self.view.activate_item(self.view.list, self.view.store.get_selected())
 
+    def at_top(self):
+        adjustment = self.view.scroll.get_vadjustment()
+        return adjustment.get_value() <= adjustment.get_lower() + 0.5
+
+    def can_restore(self, place):
+        return (
+            place is not None
+            and not self.view.paging.closed
+            and (
+                (self.view.content_header is not None and place.key is self.view.content_header)
+                or self.index(place.key) is not None
+            )
+        )
+
     def capture(self):
         selected = self.selected()
         selected_key = self.view.key(selected) if selected is not None else None
@@ -174,7 +188,7 @@ class ListInteraction:
         )
 
     def restore(self, place, *, reveal=True):
-        if place is None or self.view.paging.closed:
+        if not self.can_restore(place):
             return False
         serial = self.view.input_serial
         if place.key is self.view.content_header:

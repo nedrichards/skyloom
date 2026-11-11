@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Offer refresh Undo only for a real jump from a restorable reading position, labelled “Moved to top”. Keep refresh-at-top and repeated top actions from replacing existing Undo, reject missing restore targets, and ignore conversation return actions whose target is already visible or absent. Refreshed data remains loaded after position Undo.
+
 - Prioritise full feed names and selector controls in the Home header. Show New post, then Refresh, only when measured spare space includes an extra button-width allowance; keep both actions in the menu and keyboard shortcuts.
 
 - Give nonempty feeds quiet “End of feed” text when pagination has completed without a continuation cursor. Keep loading, retry, paused paging and empty-feed states distinct.

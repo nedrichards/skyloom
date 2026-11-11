@@ -40,6 +40,21 @@ class ConversationViewTests(unittest.TestCase):
         self.addCleanup(self.native.destroy)
         self.assertTrue(settle(self.native))
 
+    def test_return_to_opened_ignores_visible_or_missing_targets(self):
+        from unittest.mock import patch
+
+        self.assertTrue(
+            any(
+                row._value.uri == self.state.anchor
+                for _, row in self.view.interaction.visible_rows()
+            )
+        )
+        with patch.object(self.view, "focus_post", wraps=self.view.focus_post) as focus:
+            self.assertFalse(self.view.return_to_opened())
+            self.state.anchor = "at://did:example:invented/app.bsky.feed.post/missing"
+            self.assertFalse(self.view.return_to_opened())
+            focus.assert_not_called()
+
     def test_loading_state_keeps_loader_and_does_not_reposition_reader(self):
         from unittest.mock import patch
 

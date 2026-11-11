@@ -26,7 +26,7 @@ Home header actions use measured content space: feed names and selector controls
 
 Nonempty feeds show quiet “End of feed” text and “There are no more posts to load.” when a completed page has no continuation cursor. Loading, failed requests, manual recovery and empty feeds keep their own states; a short page with a cursor is not treated as the end.
 
-Background refresh inserts arrivals above existing posts without reordering them or moving the reader. Restart restores the saved post/offset/selection and accepts a fresh head order; user input before that response preserves the live order instead. Manual refresh explicitly accepts the server's head order and goes to the top. Undo returns to the previous position while keeping refreshed data. Unchanged tiles retain identity, counters update in place and manual-refresh visible arrivals respect reduced motion.
+Background refresh inserts arrivals above existing posts without reordering them or moving the reader. Restart restores the saved post/offset/selection and accepts a fresh head order; user input before that response preserves the live order instead. Manual refresh explicitly accepts the server's head order and goes to the top. “Moved to top” offers position Undo only when the reader was away from the top and the captured position remains available; refreshing at the top creates no Undo. Undo returns to the previous position while keeping refreshed data. Unchanged tiles retain identity, counters update in place and manual-refresh visible arrivals respect reduced motion.
 
 Each pending update batch is announced once. Window activity, menus and returning
 to a page do not replay its toast; Show new items and Ctrl+Shift+Home retain the

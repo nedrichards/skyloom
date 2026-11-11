@@ -317,16 +317,21 @@ class Interactions:
         self.window.toast("Undoing reaction…" if result == "pending" else "Undone.")
         return True
 
+    def offer_position_undo(self, title, view, place):
+        if not view.interaction.can_restore(place):
+            return False
+        self.offer_undo(title, lambda: view.interaction.restore(place), view)
+        return True
+
     def top(self):
         view = self.current_view()
         if not view or not view.model.get_n_items():
             return False
-        adjustment = view.scroll.get_vadjustment()
-        if adjustment.get_value() <= 1:
+        if view.interaction.at_top():
             view.top_peek.pulse()
             return True
         place = view.interaction.top()
-        self.offer_undo("Moved to top", lambda: view.interaction.restore(place), view)
+        self.offer_position_undo("Moved to top", view, place)
         return True
 
     def focus_pane(self):
