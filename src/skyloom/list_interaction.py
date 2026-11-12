@@ -1,7 +1,5 @@
 """Native list cursor, stable reading positions and deliberate touch refresh."""
 
-from dataclasses import replace
-
 from gi.repository import Gdk, Gtk
 
 from .domain import Author, Notice, Post
@@ -90,12 +88,17 @@ class ListInteraction:
         rows = self.visible_rows()
         target = self.index(self.view.key(rows[0][1]._value)) if rows else positions[0]
         if preserve_position and (rows or self.view.header_visible()):
-            place = self.capture()
             visible = {self.view.key(row._value) for _y, row in rows}
             if current in positions and self.view.key(self.selected()) in visible:
                 target = current
-            self.select(target)
-            return self.restore(replace(place, selected=self.view.key(self.selected())))
+            self.select(target, focus=False)
+            # grab_focus/scroll_to reveal the selected row (even a partly visible
+            # one), then a restore visibly snaps back. Transfer logical focus
+            # without asking GTK to reposition the viewport at all.
+            root = self.view.get_root()
+            if root is not None:
+                root.set_focus(self.view.list)
+            return True
         return self.select(current if current in positions else target)
 
     def move(self, command):

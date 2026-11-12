@@ -107,4 +107,8 @@ initial responsive mode settles without another fade; later responsive changes
 retain their normal animation. Pinned-feed and unread-count requests follow the
 main feed, with specific failure messages and Retry actions.
 
-Go to top reloads the newest page if it has fallen outside the bounded feed reading window, even when the scrollbar is already at the start of retained history. Explicit refresh replaces an in-flight gap or older-page request. A leading saved-history gap remains manually loadable rather than automatically chasing cursors.
+Home double-click/double-tap, Ctrl+Home and the arrival notification’s Go to top all request the newest feed page, even when an older head page remains loaded or the scrollbar is already at the start of retained history. Explicit refresh replaces an in-flight gap or older-page request. A leading saved-history gap remains manually loadable rather than automatically chasing cursors.
+
+Startup loading occupies its own page with the full-colour Skyloom icon, a single message and a native spinner. The feed and its pagination footer appear only when cached/live content or a recovery state is ready; the header selector follows after content has rendered.
+
+A single click/tap on the active navigation destination transfers focus into the visible list without scrolling or refreshing. Double-click/double-tap retains the explicit top action.

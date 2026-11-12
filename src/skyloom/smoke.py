@@ -1805,7 +1805,11 @@ class Smoke:
 
     def refresh_shown(self) -> bool:
         view = self.refresh_view
-        if view.arrival_tick is not None or view.position_tick is not None:
+        if (
+            "feed:following" in self.w.page_requests
+            or view.arrival_tick is not None
+            or view.position_tick is not None
+        ):
             return False
         assert view.scroll.get_vadjustment().get_value() <= 1
         assert self.w.pagers["following"].cursor == self.refresh_cursor

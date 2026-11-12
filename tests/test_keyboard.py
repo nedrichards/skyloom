@@ -378,13 +378,13 @@ class KeyboardTests(unittest.TestCase):
         from skyloom.reading import ReadingSession
         from skyloom.window import Window
 
-        for leading_gap in (False, True):
-            with self.subTest(leading_gap=leading_gap):
+        for leading_gap, known_head in ((False, False), (True, False), (False, True)):
+            with self.subTest(leading_gap=leading_gap, known_head=known_head):
                 before = self.posts[0].uri
                 pager = Pager(
                     list(self.posts),
                     "tail",
-                    page_starts={before: "older-page"},
+                    page_starts={before: None if known_head else "older-page"},
                     gaps={before: "between"} if leading_gap else {},
                 )
                 self.window.pagers = {"following": pager}
@@ -887,6 +887,54 @@ class KeyboardTests(unittest.TestCase):
         self.assertTrue(self.view.paging.request())
         self.assertEqual(calls, [True])
 
+    def test_home_double_press_returns_to_head_after_native_focus_handoff(self):
+        from unittest.mock import Mock
+
+        from skyloom.domain import Page, Pager
+        from skyloom.feed_coordination import FeedCoordination
+        from skyloom.window import Window
+
+        posts = [
+            replace(
+                self.posts[0],
+                uri=f"at://invented/double-home/{i}",
+                text="Invented varying-height post. " * (1 + i % 17),
+            )
+            for i in range(250)
+        ]
+        pager = Pager()
+        pager.merge(Page(tuple(posts), "tail"), reset=True)
+        self.window.pagers = {"following": pager}
+        self.window.feed_views = {"following": self.view}
+        self.window.feed_id = "following"
+        self.window.auto_feeds = set()
+        self.window.feed_view = lambda: self.view
+        self.window.load_feed = Mock()
+        self.window.refresh = lambda: Window.refresh(self.window)
+        self.view.feed = FeedCoordination(self.window, self.view, "following")
+        self.window.navigation = SimpleNamespace(reveal_content=lambda: None)
+        self.view.set_posts(posts)
+        self.view.interaction.select(225)
+        self.pump()
+        place = self.view.interaction.capture()
+        button = Gtk.Button(label="Home fixture")
+        controller = self.window.interactions.install_destination(button, "home")
+        controller.emit("pressed", 1, 0.0, 0.0)
+        self.window.interactions.navigate("home")
+        controller.emit("pressed", 2, 0.0, 0.0)
+        self.window.load_feed.assert_called_once_with("following", reset=True)
+        self.pump()
+        newest = replace(posts[0], uri="at://invented/double-home/newest")
+        Window.show_feed_update(self.window, "following", Page((newest, *posts[:29]), "head"))
+        self.assertTrue(settle(self.window, 350, lambda: self.view.arrival_tick is None))
+        self.assertLessEqual(self.view.scroll.get_vadjustment().get_value(), 1)
+        self.assertEqual(self.view.interaction.capture().key, newest.uri)
+        self.assertTrue(self.window.interactions.undo())
+        self.pump()
+        restored = self.view.interaction.capture()
+        self.assertEqual(restored.key, place.key)
+        self.assertAlmostEqual(restored.offset, place.offset, delta=3)
+
     def test_double_press_only_jumps_when_destination_was_already_active(self):
         button = Gtk.Button(label="Home fixture")
         controller = self.window.interactions.install_destination(button, "home")
@@ -922,6 +970,44 @@ class KeyboardTests(unittest.TestCase):
         self.assertFalse(native_row.is_focus())
         self.assertTrue(row.action_buttons[2].is_focus())
         self.assertEqual(self.window.interactions.context(), "control")
+
+    def test_single_home_press_never_scrolls_or_refreshes_during_focus_handoff(self):
+        from unittest.mock import Mock
+
+        button = Gtk.Button(label="Home fixture")
+        self.page.set_child(None)
+        toolbar = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        header.pack_start(button)
+        toolbar.add_top_bar(header)
+        toolbar.set_content(self.view)
+        self.page.set_child(toolbar)
+        self.window.navigation = SimpleNamespace(reveal_content=lambda: None)
+        self.window.refresh = Mock()
+        button.connect("clicked", lambda *_: self.window.interactions.navigate("home"))
+        controller = self.window.interactions.install_destination(button, "home")
+        self.pump()
+        self.view.interaction.select(0)
+        self.view.scroll.get_vadjustment().set_value(1800)
+        self.pump()
+        place = self.view.interaction.capture()
+        adjustment = self.view.scroll.get_vadjustment()
+        before = adjustment.get_value()
+        observed = []
+        signal = adjustment.connect("value-changed", lambda adj: observed.append(adj.get_value()))
+        try:
+            controller.emit("pressed", 1, 0.0, 0.0)
+            button.grab_focus()
+            button.emit("clicked")
+            self.pump(350)
+        finally:
+            adjustment.disconnect(signal)
+        self.window.refresh.assert_not_called()
+        self.assertTrue(all(abs(value - before) <= 3 for value in observed), observed)
+        restored = self.view.interaction.capture()
+        self.assertEqual(restored.key, place.key)
+        self.assertAlmostEqual(restored.offset, place.offset, delta=3)
+        self.assertTrue(self.view.interaction.move("next"))
 
     def test_active_destination_focus_preserves_mouse_scrolled_reading_position(self):
         self.view.interaction.select(0)

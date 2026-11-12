@@ -328,15 +328,11 @@ class Interactions:
         if not view or not view.model.get_n_items():
             return False
         if view.feed is not None:
-            pager = self.window.pagers[view.feed.feed]
-            # The bounded reading window can have evicted the newest page.
-            # Its first retained row is then not the feed's actual top.
-            if pager.posts and (
-                pager.posts[0].uri in pager.gaps
-                or (pager.page_starts and None not in pager.page_starts.values())
-            ):
-                self.window.refresh()
-                return True
+            # A loaded head marker only describes an earlier snapshot. Every
+            # explicit feed-top action resolves the newest page, including Home
+            # double presses; the loaded window is not an authoritative top.
+            self.window.refresh()
+            return True
         if view.interaction.at_top():
             view.top_peek.pulse()
             return True

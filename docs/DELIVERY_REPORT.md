@@ -1,5 +1,95 @@
 # Delivery report
 
+## Single Home tap without a scroll bounce — 12 November 2026
+
+A native regression reproduced a single-tap focus handoff moving the adjustment
+from 1800 to 1710 pixels and back to 1800. The existing final-position checks
+missed that visible intermediate motion. Active-destination navigation called
+`ListInteraction.focus(preserve_position=True)`, which revealed a selected row
+and then restored the captured anchor. A partly visible row or old offscreen
+selection could therefore cause the reveal/restore bounce even without refresh.
+
+Preserving focus now selects a visible row without a reveal request and transfers
+logical focus directly through the native root. It issues neither scroll_to nor
+a deferred position correction. This shared path also serves pane/back focus
+handoffs. Explicit keyboard movement still reveals its target normally. The new
+single-Home regression records every adjustment change, rejects transient motion
+and unintended refresh, checks the exact reading anchor, and exercises subsequent
+keyboard movement. It fails before the change and passes afterward alongside the
+existing mouse-scroll focus and double-Home/newest-page/Undo tests.
+
+The first full run exposed one obsolete conversation assertion that required
+exactly one restore call. That correction used to come from focus transfer and
+is intentionally absent now. The regression now requires the new reply to be
+inserted and retains its exact post/pixel-anchor checks; the focused case passes.
+The final `check.sh` rerun passed all 289 native tests with zero skips plus lint,
+formatting, compilation and desktop/schema validation in X11/Cairo through the
+host Flatpak boundary. Offline pinned build/export and local installation passed.
+Four installed regressions passed sequentially afterward: single-Home transient
+motion, mouse-scroll focus preservation, double-Home/newest-page/Undo and
+conversation branch insertion. Tests use invented data; physical taps, live feeds
+and default-renderer Wayland presentation remain human acceptance limits. A
+running user window must be relaunched to load the updated installed code.
+The installed navigation GUI smoke also passed afterward at wide/light and
+narrow/dark sizes. A GDK frame-timing warning was emitted; no rendering-performance
+result is claimed.
+
+## Home double-press and explicit feed top — 12 November 2026
+
+Home double-press, Ctrl+Home and the arrival notification already shared
+`Interactions.top`; there was no separate navigation implementation to patch.
+The first fix still chose a local scroll whenever saved metadata suggested a
+head page was retained. That only established a previous snapshot's top, not the
+newest feed page. All explicit feed-top actions now request the head through the
+same refresh/reconciliation path regardless of page metadata. This supersedes
+the conditional missing-head behaviour recorded below. Non-feed list top actions
+keep their local scrolling behaviour. Refresh failures retain readable content
+and position, and pending tail/gap requests are still superseded.
+
+The new native regression delivers the two Home gesture presses with the first
+click's actual navigation/focus handoff between them, over 250 variable-height
+invented posts. It verifies a head request despite a retained head marker, newest
+post landing and precise reading-position Undo. It fails against commit
+`4c3129d` and passes with the change. The prior missing-head regression also now
+covers a retained-head snapshot. The refresh GUI smoke waits for the explicit
+head request before checking its resulting position.
+
+`check.sh` passed lint, formatting, compilation, desktop/schema validation and
+288 native tests with zero skips using the documented host Flatpak boundary and
+X11/Cairo environment. Offline pinned build/export and local installation passed;
+the Home gesture and extended head/gap/Undo regressions also passed against
+installed application code (two tests). The installed refresh/arrival-notification
+GUI smoke passed sequentially afterward, including head refresh and Undo. It
+emitted a GDK frame-timing warning; no performance result is claimed. All data
+was invented. These native controller tests do not establish physical double-tap delivery or live-account
+behaviour; human confirmation on the reported feed remains required.
+
+## Single startup loading page — 12 November 2026
+
+The startup status page previously overlaid a still-mapped feed list. Its
+transparent background exposed the list's loading footer and row separator,
+producing duplicate progress messages. Home now switches between separate loading
+and feed children in a native Gtk.Stack. The loading page uses the existing
+full-colour Skyloom icon, one heading and the existing native spinner; it adds no
+new animation, remote asset, timer or media-decoding path. This is a brief
+progress state rather than a persistent empty-feed illustration. Cached/live
+content and errors still release loading before the header selector transition.
+
+The delayed-feed regression now also asserts that feed content is unmapped during
+loading and mapped after completion. This protects both the visual separation
+and the existing content-before-header sequence.
+
+`check.sh` passed all 287 native tests with zero skips plus lint, formatting,
+compilation, desktop and schema checks in the documented X11/Cairo host-runtime
+environment. Offline pinned build/export and local reinstall passed. The
+installed content-before-header regression passed; an installed delayed-cache
+fixture then captured the full-colour loading page at 800/light and 480/dark and
+verified the handoff to feed content. The preview emitted a GDK skipped-frame
+warning; these are functional/visual checks, not a measured startup-speed or
+Wayland rendering claim. All fixture content was invented. Physical input and
+live-account acceptance remain open. The loading changes were reviewed locally alongside the navigation follow-ups;
+the preceding top-navigation fix is committed as `4c3129d`.
+
 ## Go to top from retained history — 12 November 2026
 
 Tracing the bounded feed window found that older-page appends can evict the

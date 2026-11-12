@@ -56,7 +56,7 @@ The app password is used transiently. Refreshable session tokens are stored thro
 - Image descriptions are shown only when supplied; images without descriptions have no empty ALT section.
 - Video opens externally. DMs, video upload, multi-account use, post deletion are not included.
 
-Double-click or double-tap the active navigation destination to return to the top. Ctrl+Home does the same; the toast’s Undo button, U or Ctrl+Z restores your reading position. Pull down deliberately from the top on a touchscreen to refresh.
+A single click or tap on the active navigation destination preserves your reading position. Double-click or double-tap it to return to the top. For feeds, this requests the newest page rather than stopping at the start of the loaded reading window; a failed refresh keeps your position. Ctrl+Home does the same; the toast’s Undo button, U or Ctrl+Z restores your reading position. Pull down deliberately from the top on a touchscreen to refresh.
 
 Use Down/Up or J/K to select posts, Home/End for the first/last loaded item, Page Up/Down or Space/Shift+Space to scroll, and Enter to open. Selection alone never opens a post or marks notifications read. F6/Shift+F6 switches panes, including narrow-window navigation. Ctrl+1–5 opens Home, Search, Notifications, your Profile and Drafts. With a post selected, R replies, Q quotes, L likes, Shift+R reposts, B opens Bluesky, M opens its menu and Ctrl+Shift+C copies its link. Text fields, selections, dialogs and focused controls keep their native keys and editor Undo.
 

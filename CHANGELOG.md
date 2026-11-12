@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Keep a single tap on the active Home destination still throughout the focus handoff. Select a visible row and transfer logical list focus without scrolling it into view and snapping back; keep double-tap refresh and position Undo.
+
+- Make every explicit feed-top action request the newest page, including Home double-click/double-tap and Ctrl+Home when an older head page is still loaded. Keep the same refresh, error recovery and position Undo path for arrival notifications.
+
+- Give startup loading its own content page so the feed loading footer and separator cannot show through. Use one loading message, the existing full-colour Skyloom icon and a native spinner, then reveal feed content before the header transition.
+
 - Make Go to top fetch the newest feed page when paging has evicted it from the reading window, including when the viewport is already at a leading gap. Explicit refresh supersedes pending gap/tail requests; leading gaps remain manually loadable without automatic request cascades.
 
 - Show a native loading state beneath the Skyloom title at startup. Render the first cached/live feed or recovery state before fading the title into the feed selector. Settle the selector’s first responsive layout without another fade. Load pinned feeds and notification counts after the main feed; identify supporting-request failures and offer Retry.

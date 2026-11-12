@@ -128,6 +128,8 @@ class StartupTests(unittest.TestCase):
         self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
         self.assertTrue(self.window.home_loading.get_visible())
         self.assertTrue(self.window.home_spinner.get_spinning())
+        self.assertEqual(self.window.home_content.get_visible_child_name(), "loading")
+        self.assertFalse(self.window.home_box.get_mapped())
         self.assertEqual(self.window.home_title.get_visible_child_name(), "title")
         self.assertEqual(metadata, [])
         rendered = []
@@ -146,6 +148,8 @@ class StartupTests(unittest.TestCase):
             self.assertIn("title", rendered)
             self.assertFalse(self.window.home_loading.get_visible())
             self.assertFalse(self.window.home_spinner.get_spinning())
+            self.assertEqual(self.window.home_content.get_visible_child_name(), "feed")
+            self.assertTrue(self.window.home_box.get_mapped())
         finally:
             self.window.remove_tick_callback(tick)
 
@@ -175,7 +179,6 @@ class StartupTests(unittest.TestCase):
     def test_branch_completion_preserves_reading_after_scroll_during_request(self):
         from dataclasses import replace
         from threading import Event
-        from unittest.mock import patch
 
         from test_conversation import node
 
@@ -217,30 +220,27 @@ class StartupTests(unittest.TestCase):
         view = window.nav.get_visible_page().content_view
         self.assertTrue(settle(window, ready=lambda: view.position_tick is None))
         self.assertFalse(branch.author.following)
-        with patch.object(view.interaction, "restore", wraps=view.interaction.restore) as restore:
-            view.load(branch=branch.uri)
-            self.wait(started.is_set)
-            view.interaction.move("last")
+        view.load(branch=branch.uri)
+        self.wait(started.is_set)
+        view.interaction.move("last")
 
-            def past_branch():
-                place = view.interaction.capture()
-                return (
-                    view.position_tick is None
-                    and place is not None
-                    and view.entries[place.key][0] > view.entries[branch.uri][0]
-                )
+        def past_branch():
+            place = view.interaction.capture()
+            return (
+                view.position_tick is None
+                and place is not None
+                and view.entries[place.key][0] > view.entries[branch.uri][0]
+            )
 
-            self.assertTrue(settle(window, ready=past_branch))
-            reading = view.interaction.capture()
-            restore.reset_mock()
-            release.set()
-            self.wait(lambda: not window.page_requests)
-            self.assertTrue(settle(window, ready=lambda: view.position_tick is None))
-            self.assertEqual(restore.call_count, 1)
-            self.assertEqual(restore.call_args.args[0].key, reading.key)
-            actual = view.interaction.capture()
-            self.assertEqual(actual.key, reading.key)
-            self.assertAlmostEqual(actual.offset, reading.offset, delta=3)
+        self.assertTrue(settle(window, ready=past_branch))
+        reading = view.interaction.capture()
+        release.set()
+        self.wait(lambda: not window.page_requests)
+        self.assertTrue(settle(window, ready=lambda: view.position_tick is None))
+        self.assertIn(reply.uri, view.entries)
+        actual = view.interaction.capture()
+        self.assertEqual(actual.key, reading.key)
+        self.assertAlmostEqual(actual.offset, reading.offset, delta=3)
 
     def test_thread_lookahead_renews_only_after_reading_progress(self):
         from dataclasses import replace

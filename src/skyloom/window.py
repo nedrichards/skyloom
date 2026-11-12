@@ -434,14 +434,15 @@ class Window(Adw.ApplicationWindow):
         self.home_box.append(self.offline_banner)
         self.feed_stack = Gtk.Stack(vexpand=True)
         self.home_box.append(self.feed_stack)
-        self.home_loading = Adw.StatusPage(
-            title="Loading your feed…",
-            description="Your saved posts will appear first while Skyloom connects.",
-        )
+        self.home_loading = Adw.StatusPage(title="Loading your feed…", icon_name=APP_ID)
         self.home_spinner = Gtk.Spinner(spinning=True, width_request=32, height_request=32)
         self.home_loading.set_child(self.home_spinner)
-        self.home_content = Gtk.Overlay(child=self.home_box)
-        self.home_content.add_overlay(self.home_loading)
+        # Loading owns the content area: an overlay lets the list's loading
+        # footer and separator show through and exposes two progress messages.
+        self.home_content = Gtk.Stack(vexpand=True)
+        self.home_content.add_named(self.home_loading, "loading")
+        self.home_content.add_named(self.home_box, "feed")
+        self.home_content.set_visible_child_name("loading")
         self.home_toolbar.set_content(self.home_content)
         self.home_page = Adw.NavigationPage.new(self.home_toolbar, "Following")
         self.home_page.set_tag("home")
@@ -547,6 +548,7 @@ class Window(Adw.ApplicationWindow):
             return
         self.startup_pending = False
         self.home_spinner.set_spinning(False)
+        self.home_content.set_visible_child_name("feed")
         self.home_loading.set_visible(False)
         generation = self.generation
         frames = 0
