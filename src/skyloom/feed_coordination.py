@@ -19,6 +19,9 @@ class FeedCoordination:
             if (
                 isinstance(gap, FeedGap)
                 and gap.cursor
+                # A leading gap has no retained head to bridge from. Leave it
+                # manual; Go to top fetches the actual newest page instead.
+                and gap.before != self.window.pagers[self.feed].posts[0].uri
                 and not gap.busy
                 and not gap.error
                 and (gap.before, gap.cursor) not in self.gap_attempted

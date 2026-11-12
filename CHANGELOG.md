@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Make Go to top fetch the newest feed page when paging has evicted it from the reading window, including when the viewport is already at a leading gap. Explicit refresh supersedes pending gap/tail requests; leading gaps remain manually loadable without automatic request cascades.
+
 - Show a native loading state beneath the Skyloom title at startup. Render the first cached/live feed or recovery state before fading the title into the feed selector. Settle the selector’s first responsive layout without another fade. Load pinned feeds and notification counts after the main feed; identify supporting-request failures and offer Retry.
 
 - Offer refresh Undo only for a real jump from a restorable reading position, labelled “Moved to top”. Keep refresh-at-top and repeated top actions from replacing existing Undo, reject missing restore targets, and ignore conversation return actions whose target is already visible or absent. Refreshed data remains loaded after position Undo.

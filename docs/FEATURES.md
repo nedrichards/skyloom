@@ -106,3 +106,5 @@ or recovery state renders before the title fades into the feed selector. Its
 initial responsive mode settles without another fade; later responsive changes
 retain their normal animation. Pinned-feed and unread-count requests follow the
 main feed, with specific failure messages and Retry actions.
+
+Go to top reloads the newest page if it has fallen outside the bounded feed reading window, even when the scrollbar is already at the start of retained history. Explicit refresh replaces an in-flight gap or older-page request. A leading saved-history gap remains manually loadable rather than automatically chasing cursors.

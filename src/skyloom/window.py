@@ -863,11 +863,18 @@ class Window(Adw.ApplicationWindow):
         if pending:
             pending.cancel()
         key = "feed:" + self.feed_id
-        if self.feed_id in self.auto_feeds:
-            pending = self.page_requests.pop(key, None)
-            if pending:
-                pending.cancel()
-            self.auto_feeds.discard(self.feed_id)
+        # An explicit head refresh supersedes tail/gap loading as well as
+        # automatic refresh. Otherwise Go to top silently loses to that request.
+        pending = self.page_requests.pop(key, None)
+        if pending:
+            pending.cancel()
+        self.auto_feeds.discard(self.feed_id)
+        view = self.feed_views[self.feed_id]
+        busy_gaps = [before for before, gap in view.feed.gap_states.items() if gap.busy]
+        for before in busy_gaps:
+            del view.feed.gap_states[before]
+        if busy_gaps:
+            view.set_posts(self.pagers[self.feed_id].projected(view.feed.gap_states))
         self.feed_views[self.feed_id].clear_update()
         self.load_feed(self.feed_id, reset=True)
 

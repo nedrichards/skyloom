@@ -369,6 +369,62 @@ class KeyboardTests(unittest.TestCase):
             unchanged()
             self.assertIn(inserted, self.window.pagers["following"].posts)
 
+    def test_top_fetches_evicted_head_and_supersedes_gap_request(self):
+        from unittest.mock import Mock
+
+        from skyloom.domain import Page, Pager
+        from skyloom.feed_coordination import FeedCoordination
+        from skyloom.feed_state import FeedGap
+        from skyloom.reading import ReadingSession
+        from skyloom.window import Window
+
+        for leading_gap in (False, True):
+            with self.subTest(leading_gap=leading_gap):
+                before = self.posts[0].uri
+                pager = Pager(
+                    list(self.posts),
+                    "tail",
+                    page_starts={before: "older-page"},
+                    gaps={before: "between"} if leading_gap else {},
+                )
+                self.window.pagers = {"following": pager}
+                self.window.feed_views = {"following": self.view}
+                self.window.feed_id = "following"
+                self.window.auto_feeds = set()
+                self.window.refresh = lambda: Window.refresh(self.window)
+                self.window.feed_view = lambda: self.view
+                self.window.load_feed = Mock()
+                self.view.feed = FeedCoordination(self.window, self.view, "following")
+                self.view.reading = ReadingSession(self.window, self.view, "following")
+                if leading_gap:
+                    self.view.feed.gap_states[before] = FeedGap(before, "between", busy=True)
+                self.view.set_posts(pager.projected(self.view.feed.gap_states))
+                self.pump()
+                if not leading_gap:
+                    self.view.interaction.move("last")
+                    self.pump()
+                place = self.view.interaction.capture()
+                pending = Mock()
+                self.window.page_requests["feed:following"] = pending
+                self.assertTrue(self.window.interactions.top())
+                pending.cancel.assert_called_once()
+                self.window.load_feed.assert_called_once_with("following", reset=True)
+                self.assertNotIn(before, self.view.feed.gap_states)
+                self.pump()
+                # No cascade of automatic cursor requests from a leading gap.
+                self.assertFalse(self.view.feed.autoload_gap())
+                new = replace(self.posts[0], uri=self.posts[0].uri + "-newest")
+                Window.show_feed_update(self.window, "following", Page((new,), "head"))
+                self.assertTrue(settle(self.window, 350, lambda: self.view.arrival_tick is None))
+                self.assertLessEqual(self.view.scroll.get_vadjustment().get_value(), 1)
+                self.assertEqual(self.view.interaction.capture().key, new.uri)
+                if not leading_gap:
+                    self.assertTrue(self.window.interactions.undo())
+                    self.pump()
+                    restored = self.view.interaction.capture()
+                    self.assertEqual(restored.key, place.key)
+                    self.assertAlmostEqual(restored.offset, place.offset, delta=3)
+
     def test_stale_undo_toast_cannot_execute_a_newer_action(self):
         calls = []
         first = self.window.interactions.offer_undo("First", lambda: calls.append("first"))

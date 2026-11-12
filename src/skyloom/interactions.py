@@ -327,6 +327,16 @@ class Interactions:
         view = self.current_view()
         if not view or not view.model.get_n_items():
             return False
+        if view.feed is not None:
+            pager = self.window.pagers[view.feed.feed]
+            # The bounded reading window can have evicted the newest page.
+            # Its first retained row is then not the feed's actual top.
+            if pager.posts and (
+                pager.posts[0].uri in pager.gaps
+                or (pager.page_starts and None not in pager.page_starts.values())
+            ):
+                self.window.refresh()
+                return True
         if view.interaction.at_top():
             view.top_peek.pulse()
             return True

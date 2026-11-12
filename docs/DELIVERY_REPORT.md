@@ -1,5 +1,35 @@
 # Delivery report
 
+## Go to top from retained history — 12 November 2026
+
+Tracing the bounded feed window found that older-page appends can evict the
+newest page and leave a gap as the first retained row. The top action previously
+used only the scroll adjustment, so it could stop at that gap and treat it as
+already at the top. Automatic visible-gap loading could then chase successive
+cursors. An explicit head refresh also returned without loading while a gap/tail
+request occupied the feed request key.
+
+Go to top now recognises missing-head page metadata and leading gaps, requests
+the newest page through the existing refresh/reconciliation path, and retains
+position Undo. Explicit refresh cancels the superseded feed request and clears
+its busy gap state; request identity guards reject stale completions. Leading
+gaps stay available for manual loading but do not trigger automatic cascades.
+Ordinary jumps with a retained newest page keep their existing scrolling path.
+
+The invented-data regression fails for both missing-head cases against the
+original top action and passes with the fix. `scripts/check.sh` passed lint,
+formatting, compilation, desktop/schema checks and 287 native tests with zero
+skips using the documented host Flatpak boundary and X11/Cairo environment.
+The final regression additionally verifies deep-position Undo; it and the
+existing gap retry/insertion and distant-top/Undo tests passed against installed
+application code (three tests). Offline pinned build/export and local reinstall
+passed. The installed `refresh` GUI smoke passed sequentially after the tests;
+it emitted a GDK frame-timing warning, so this is functional evidence rather
+than a rendering-performance claim. No account data or credentials were read.
+Physical input, the reported
+live feed and default-renderer Wayland presentation remain human acceptance
+limits; these automated checks do not establish them.
+
 ## Content before header animation — 11 November 2026
 
 Startup now shows a native loading status and spinner beneath the Skyloom title.
