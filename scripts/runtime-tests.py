@@ -20,14 +20,15 @@ def result_errors(result, allowed_skips=()):
 def require_runtime():
     import gi
 
+    gi.require_version("Gdk", "4.0")
     gi.require_version("Gtk", "4.0")
     gi.require_version("Adw", "1")
     gi.require_version("GdkPixbuf", "2.0")
-    from gi.repository import Adw, Gtk
+    from gi.repository import Adw, Gdk, Gtk
 
     if sys.version_info < (3, 14):  # noqa: UP036 — this gate rejects an unsupported interpreter.
         raise RuntimeError("The native gate requires the supported Python 3.14 runtime.")
-    if not Gtk.init_check():
+    if not Gtk.init_check() or Gdk.Display.get_default() is None:
         raise RuntimeError(
             "The native gate requires an available graphical display; skips are not acceptance."
         )

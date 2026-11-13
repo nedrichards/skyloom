@@ -5,101 +5,22 @@ from dataclasses import replace
 from types import SimpleNamespace
 from weakref import WeakSet
 
-from gtk_support import settle
+from content_fixture import ContentFixture
+from gtk_support import DISPLAY, settle
 
-try:
-    import gi
-
-    gi.require_version("Gtk", "4.0")
-    gi.require_version("Adw", "1")
+if DISPLAY:
     from gi.repository import Adw, Gio, Gtk
-
-    DISPLAY = Gtk.init_check()
-    if DISPLAY:
-        Adw.init()
-except ImportError, ValueError, AttributeError:
-    DISPLAY = False
 
 
 @unittest.skipUnless(DISPLAY, "GNOME GTK display required")
 class ContentTests(unittest.TestCase):
     def setUp(self):
-        from skyloom import APP_ID
-        from skyloom.domain import Author, Media, Post
+        fixture = ContentFixture()
+        self.window, self.post, self.requests = fixture.window, fixture.post, fixture.requests
 
-        schema = Gio.SettingsSchemaSource.get_default().lookup(APP_ID, True)
-        self.assertIsNotNone(schema)
-        settings = Gio.Settings.new_full(schema, Gio.memory_settings_backend_new(), None)
-        self.requests = []
-
-        def get(url, local=False):
-            self.requests.append(url)
-
-            async def result():
-                return None
-
-            return result()
-
-        def submit(coro, *args, **kwargs):
-            coro.close()
-
-        self.window = SimpleNamespace(
-            settings=settings,
-            content_gates=WeakSet(),
-            revealed_labels={},
-            images=SimpleNamespace(
-                get=get,
-                has_cached=lambda *_args: False,
-                bind=lambda *_: None,
-                unbind=lambda *_: None,
-            ),
-            worker=SimpleNamespace(submit=submit),
-            read_only=False,
-            mutations=set(),
-            profile=lambda *_: None,
-            open_uri=lambda *_: None,
-            thread=lambda *_: None,
-            compose=lambda **_: None,
-            mutate=lambda *_: None,
-            copy=lambda *_: None,
-            toast=lambda *_: None,
-            preferences=lambda: None,
-            view_media=lambda *_: None,
-            views=[],
-        )
-        self.post = Post(
-            "at://did:example:labelled/app.bsky.feed.post/1",
-            "fixture-cid",
-            Author("did:example:labelled", "labelled.invalid", "Labelled fixture"),
-            "This labelled post remains readable.",
-            "2026-10-27T08:00:00Z",
-            labels=("sexual",),
-            images=(Media("demo-landscape", "Invented landscape", local=True),),
-        )
-
-    def labels(self, widget):
-        from skyloom.widgets import list_children
-
-        result = []
-        if isinstance(widget, Gtk.Label):
-            result.append(widget.get_text())
-        for child in list_children(widget):
-            result.extend(self.labels(child))
-        return result
-
-    def walk(self, widget):
-        from skyloom.widgets import list_children
-
-        yield widget
-        for child in list_children(widget):
-            yield from self.walk(child)
-
-    def pump(self, milliseconds=100):
-        from gi.repository import GLib
-
-        loop = GLib.MainLoop()
-        GLib.timeout_add(milliseconds, lambda: (loop.quit(), False)[1])
-        loop.run()
+    labels = ContentFixture.labels
+    walk = ContentFixture.walk
+    pump = ContentFixture.pump
 
     def test_unrelated_prefetch_does_not_rewrite_unchanged_mounted_pills(self):
         from test_conversation import node

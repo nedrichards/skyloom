@@ -7,20 +7,10 @@ import weakref
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from gtk_support import settle
+from gtk_support import DISPLAY, settle
 
-try:
-    import gi
-
-    gi.require_version("Gtk", "4.0")
-    gi.require_version("Adw", "1")
+if DISPLAY:
     from gi.repository import Adw, Gio, Gtk
-
-    DISPLAY = Gtk.init_check()
-    if DISPLAY:
-        Adw.init()
-except ImportError, ValueError, AttributeError:
-    DISPLAY = False
 
 
 @unittest.skipUnless(DISPLAY, "GNOME GTK display required")

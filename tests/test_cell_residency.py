@@ -4,26 +4,20 @@ import unittest
 from concurrent.futures import Future
 from dataclasses import replace
 
-try:
-    import gi
+from gtk_support import DISPLAY
 
-    gi.require_version("Gtk", "4.0")
-    from gi.repository import Gtk
-
-    DISPLAY = Gtk.init_check()
-except ImportError, ValueError, AttributeError:
-    DISPLAY = False
+if DISPLAY:
+    pass
 
 
 @unittest.skipUnless(DISPLAY, "GNOME GTK display required")
 class CellResidencyTests(unittest.TestCase):
     def test_avatar_media_and_core_parent_chains_survive_recycling(self):
-        from test_content import ContentTests
+        from content_fixture import ContentFixture
 
         from skyloom.widgets import PostRow
 
-        fixture = ContentTests()
-        fixture.setUp()
+        fixture = ContentFixture()
         callbacks, futures = [], []
 
         def submit(coro, *handlers):
@@ -78,12 +72,11 @@ class CellResidencyTests(unittest.TestCase):
         self.assertEqual(opened, list(post.images))
 
     def test_reused_avatar_rejects_previous_author_completion_and_bounds_handlers(self):
-        from test_content import ContentTests
+        from content_fixture import ContentFixture
 
         from skyloom.widgets import PostRow
 
-        fixture = ContentTests()
-        fixture.setUp()
+        fixture = ContentFixture()
         callbacks, futures = [], []
 
         def submit(coro, loaded):
@@ -130,12 +123,11 @@ class CellResidencyTests(unittest.TestCase):
         self.assertEqual(avatar.get_text(), "")
 
     def test_counter_update_keeps_identical_immutable_post_without_copy(self):
-        from test_content import ContentTests
+        from content_fixture import ContentFixture
 
         from skyloom.widgets import PostRow
 
-        fixture = ContentTests()
-        fixture.setUp()
+        fixture = ContentFixture()
         post = replace(fixture.post, labels=(), images=())
         row = PostRow(post, fixture.window)
         self.addCleanup(row.cancel)

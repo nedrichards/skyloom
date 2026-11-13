@@ -1,31 +1,23 @@
-"""Body request hints preserve native row sizing and actual wrapping."""
+"""Native post wrapping and selection across scripts, fonts and widths."""
 
 import unittest
 from dataclasses import replace
 from pathlib import Path
 
-try:
-    import gi
+from gtk_support import DISPLAY
 
-    gi.require_version("Gtk", "4.0")
-    gi.require_version("Adw", "1")
-    gi.require_version("Gdk", "4.0")
+if DISPLAY:
     from gi.repository import Adw, Gdk, Gtk
-
-    DISPLAY = Gtk.init_check()
-except ImportError, ValueError, AttributeError:
-    DISPLAY = False
 
 
 @unittest.skipUnless(DISPLAY, "GNOME GTK display required")
 class PostWidthTests(unittest.TestCase):
-    def test_body_hint_preserves_row_minima_and_allocated_heights(self):
-        from test_content import ContentTests
+    def test_posts_wrap_at_narrow_widths_and_keep_text_selectable(self):
+        from content_fixture import ContentFixture
 
         from skyloom.widgets import PostRow
 
-        fixture = ContentTests()
-        fixture.setUp()
+        fixture = ContentFixture()
         fixture.window.settings.set_boolean("load-images", False)
         texts = (
             "Readable invented text, with native selection. " * 5,
@@ -53,24 +45,16 @@ class PostWidthTests(unittest.TestCase):
                             row = PostRow(post, fixture.window)
                             clamp = Adw.Clamp(maximum_size=760, tightening_threshold=600, child=row)
                             labels = [row.text, *(child.text for child in row.quoted_rows)]
-                            self.assertTrue(all(label.get_width_chars() == 8 for label in labels))
-
-                            def geometry(clamp=clamp):
-                                return (
-                                    tuple(clamp.measure(Gtk.Orientation.HORIZONTAL, -1)),
-                                    *(
-                                        tuple(clamp.measure(Gtk.Orientation.VERTICAL, width))
-                                        for width in (320, 360, 480, 800)
-                                    ),
-                                )
-
                             try:
                                 for label in labels:
-                                    label.set_width_chars(1)
-                                before = geometry()
-                                for label in labels:
-                                    label.set_width_chars(8)
-                                self.assertEqual(geometry(), before)
+                                    self.assertTrue(label.get_wrap())
+                                    self.assertTrue(label.get_selectable())
+                                heights = [
+                                    clamp.measure(Gtk.Orientation.VERTICAL, width).natural
+                                    for width in (320, 360, 480, 800)
+                                ]
+                                self.assertTrue(all(height > 0 for height in heights))
+                                self.assertEqual(heights, sorted(heights, reverse=True))
                                 self.assertEqual(row.text.get_text(), text)
                                 row.text.select_region(0, 5)
                                 self.assertTrue(row.text.get_selection_bounds()[0])

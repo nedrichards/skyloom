@@ -192,6 +192,11 @@ class KeyboardSmoke:
 
     def first_selected(self):
         self.check(
+            self.down_seen,
+            "X11 injected Down never reached GTK. Run the optional keyboard harness "
+            "on a desktop that permits XTest input delivery; controller tests remain separate.",
+        )
+        self.check(
             self.view.store.get_selected() == 0,
             f"Down from header did not select/focus the first post: before={self.header_before}, after={self.view.store.get_selected()}, delivered={self.down_seen}, context={getattr(self, 'down_context', 'none')}, events={self.input_events}",
         )

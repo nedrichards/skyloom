@@ -4,12 +4,12 @@ import unittest
 from dataclasses import replace
 from types import SimpleNamespace
 
-import test_content
-from gtk_support import settle
+from content_fixture import ContentFixture
+from gtk_support import DISPLAY, settle
 from test_conversation import node
 
 
-@unittest.skipUnless(test_content.DISPLAY, "GNOME GTK display required")
+@unittest.skipUnless(DISPLAY, "GNOME GTK display required")
 class ConversationViewTests(unittest.TestCase):
     def setUp(self):
         from gi.repository import Gtk
@@ -17,8 +17,7 @@ class ConversationViewTests(unittest.TestCase):
         from skyloom.conversation import Conversation, thread_from
         from skyloom.conversation_view import ConversationView
 
-        fixture = test_content.ContentTests()
-        fixture.setUp()
+        fixture = ContentFixture()
         self.labels = fixture.labels
         self.owner = fixture.window
         self.calls = []

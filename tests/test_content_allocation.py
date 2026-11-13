@@ -4,18 +4,10 @@ import unittest
 from types import SimpleNamespace
 from weakref import WeakSet
 
-try:
-    import gi
+from gtk_support import DISPLAY
 
-    gi.require_version("Gtk", "4.0")
-    gi.require_version("Adw", "1")
-    from gi.repository import Adw, Gio, Gtk
-
-    DISPLAY = Gtk.init_check()
-    if DISPLAY:
-        Adw.init()
-except ImportError, ValueError, AttributeError:
-    DISPLAY = False
+if DISPLAY:
+    from gi.repository import Gio, Gtk
 
 
 @unittest.skipUnless(DISPLAY, "GNOME GTK display required")

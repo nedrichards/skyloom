@@ -1,6 +1,26 @@
-"""Wait for real rendered frames and controller work, with a bounded deadline."""
+"""Shared native display setup and bounded rendered-frame waits."""
 
 import time
+
+
+def init_display():
+    try:
+        import gi
+
+        gi.require_version("Gtk", "4.0")
+        gi.require_version("Adw", "1")
+        gi.require_version("Gdk", "4.0")
+        from gi.repository import Adw, Gdk, Gtk
+
+        if not Gtk.init_check() or Gdk.Display.get_default() is None:
+            return False
+        Adw.init()
+        return True
+    except ImportError, ValueError, AttributeError:
+        return False
+
+
+DISPLAY = init_display()
 
 
 def settle(window, milliseconds=150, ready=lambda: True):

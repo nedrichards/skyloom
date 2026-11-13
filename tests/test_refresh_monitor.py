@@ -5,18 +5,16 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-import test_startup
-from gtk_support import settle
+from gtk_support import DISPLAY, settle
+from startup_fixture import StartupFixture
 
 
-@unittest.skipUnless(test_startup.DISPLAY, "GNOME GTK display required")
-class MonitorIntegrationTests(unittest.TestCase):
+@unittest.skipUnless(DISPLAY, "GNOME GTK display required")
+class MonitorIntegrationTests(StartupFixture, unittest.TestCase):
     def test_real_window_monitor_reuses_deadline_and_resumes_after_busy_and_cost_gates(self):
         from skyloom.refresh import Connection
 
-        fixture = test_startup.StartupTests()
-        fixture.setUp()
-        self.addCleanup(fixture.cleanup)
+        fixture = self
         fixture.open(fixture.restored_account)
         fixture.wait(lambda: fixture.window.stack.get_visible_child_name() == "shell")
         fixture.wait(lambda: not fixture.window.page_requests)
