@@ -12,16 +12,22 @@ def counts(text: str) -> tuple[int, int]:
     return len(regex.findall(r"\X", text)), len(text.encode("utf-8"))
 
 
-def validate(text, attachments=()):
+def validate(text, attachments=(), video=None):
     graphemes, size = counts(text)
     if graphemes > 300 or size > 3000:
         return "Posts allow 300 characters and 3000 UTF-8 bytes."
-    if not text.strip() and not attachments:
-        return "Write something or add an image."
+    if not text.strip() and not attachments and video is None:
+        return "Write something or add media."
+    if video is not None and attachments:
+        return "Attach images or one video to a post."
     if len(attachments) > 4:
         return "You can attach up to four images."
     if any(not a.alt.strip() for a in attachments):
         return "Add a description for each image."
+    if video is not None:
+        from .video_upload import validate_video
+
+        return validate_video(video)
     return ""
 
 

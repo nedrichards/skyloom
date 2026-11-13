@@ -15,6 +15,7 @@ Start in `src/skyloom/`. The application uses native GTK 4/libadwaita widgets;
 | Profile editing and people lists | `profile_service.py`, `profile_editor.py`, `people_view.py` |
 | Private bookmarks | `bookmark_service.py`, `bookmark_view.py` |
 | Reply and quote controls | `thread_service.py`, `thread_controls.py` |
+| Video playback and preparation/upload | `video_player.py`, `video_stream.py`, `video_upload.py` |
 | Background work | `worker.py`, `request_scope.py` |
 | Drafts and local data | `composer.py`, `storage.py` |
 | Images | `media.py` |
@@ -46,6 +47,15 @@ responses restoring deleted content. Bookmarks use Bluesky's private service,
 separate from the local feed reading-position bookmarks. Thread/post gate writes
 preserve unrelated fields and compare record versions; separate reply and quote
 saves make partial failures explicit.
+
+Video playback uses GStreamer URI decoding through a `Gtk.MediaStream` and
+`Gtk.Video` controls. Only an explicit play action creates a player; closing it
+or changing accounts releases the pipeline. The Flatpak audio socket enables sound.
+Video preparation runs under the account storage lease on a worker, validates
+MP4/H.264/AAC, strips metadata without re-encoding, and retains private copies
+until sign-out. Upload streams to the fixed Bluesky video service using scoped,
+short-lived service authorisation and bounded processing polls. Uploads and post
+creation are never automatically retried.
 
 See `storage.py` and `media.py` for retention limits and cleanup. These are local
 application files, not separately encrypted backups. Use temporary demo storage

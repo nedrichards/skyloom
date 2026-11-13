@@ -481,11 +481,15 @@ class Service(BookmarkService, ProfileService, ThreadService):
     def draft_save(self, key, value):
         return self._local("put", "draft:" + key, value, serial=True)
 
-    async def send(self, text, attachments=(), reply=None, quote=None):
-        error = validate(text, attachments)
+    async def send(
+        self, text, attachments=(), reply=None, quote=None, *, video=None, expected_account=None
+    ):
+        error = validate(text, attachments, video)
         if error:
             raise UserError(error)
         async with self.authenticated():
+            if expected_account is not None and self.account is not expected_account:
+                raise UserError("The signed-in account changed. Reopen the composer.")
 
             async def resolve(handle):
                 return (
@@ -521,6 +525,10 @@ class Service(BookmarkService, ProfileService, ThreadService):
                     blob = (await self.client.upload_blob(payload)).blob
                     images.append(models.AppBskyEmbedImages.Image(alt=a.alt, image=blob))
                 embed = models.AppBskyEmbedImages.Main(images=images)
+            if video is not None:
+                from .video_upload import upload_video
+
+                embed = await upload_video(self, video)
             if quote:
                 record = models.AppBskyEmbedRecord.Main(record={"uri": quote.uri, "cid": quote.cid})
                 embed = (

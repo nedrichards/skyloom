@@ -8,6 +8,8 @@
 
 - Control reply and quote permissions, hide and restore replies, and detach and reattach quotes with ownership and record-version checks.
 
+- Play videos with native controls and sound, without feed autoplay. Prepare and upload described MP4 clips, retaining drafts on failure and stripping metadata from private copies.
+
 - Edit your display name, description, profile picture and banner with conflict checks and preserved profile metadata. Browse paged followers and following from profile counts.
 
 - Delete your own posts with confirmation, ownership and record-version checks. Keep deleted placeholders across feeds, conversations, quoted posts and account-local caches, including stale responses.

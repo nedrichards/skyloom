@@ -4,6 +4,102 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Public homepage metadata remains a release gate.
 
+## atproto 0.0.74 — 13 November 2026
+
+Verified the latest release from live PyPI metadata and the upstream changelog:
+[0.0.74](https://pypi.org/project/atproto/0.0.74/) was released on 12 November
+([release notes](https://github.com/MarshalX/atproto/blob/main/CHANGES.md#version-0074)). Updated `pyproject.toml`, runtime/development
+locks, hashed requirements and the Flatpak dependency manifest. The wheel digest
+was checked against PyPI; all other dependency versions and wheel pins remain
+unchanged. `pip check` passed. The maintained dependency generator timed out on
+the sandbox's Python network route and completed through the host route.
+
+The SDK boundary now uses the public serializer for models, blobs and unknown
+`DotDict` records, replacing three duplicated serializers. This fixes attribute
+probing that could mistake a missing `DotDict.model_dump` for a callable method.
+Five new regression tests cover unknown records, nested extension fields in
+profile/gate write round trips and typed page-item access without dumping unused
+response metadata. Feeds, profile feeds, search, people and bookmarks use the
+new page-item interface; notifications map typed fields directly, avoiding
+serialization of unused embedded post records. Each UI request still loads one
+page, with the existing bounded windows, cursor protection and cancellation.
+The SDK's parsing changes apply without bypassing its validation. No performance
+claim is made from the upgrade.
+
+Twenty focused SDK/profile/thread contracts passed with 0.0.74. The rebuilt and
+installed GNOME 51 X11/Cairo suite passed **355 tests with zero skips**. The pinned
+offline build/export/install passed, the installed SDK version is 0.0.74, and all
+55 installed Python modules matched source. `./scripts/check.sh` passed its
+non-runtime stages and hit the nested Flatpak instance boundary; the host-launched
+installed suite supplied the runtime gate. The full installed demo GUI smoke
+passed with the normal desktop renderer; frame-timing warnings remain visible.
+Live service interoperability remains unperformed; existing human acceptance
+limits below still apply.
+
+## Account and post features — 13 November 2026
+
+Implemented private server bookmarks, own-profile editing, follower/following
+browsing, reply/quote permissions, hidden replies and detached quotes, plus native
+video playback and upload. Post deletion retains content-stripped placeholders
+and persistent tombstones. Mutations use ownership/session guards and never queue
+offline or retry automatically. Bookmark reconciliation covers AppView lag and
+queued cache checkpoints; deleted bookmarked posts remain removable.
+
+The final installed GNOME 51 X11/Cairo suite passed **350 tests with zero skips**.
+Coverage includes actual pinned-SDK HTTP contracts, destructive confirmation,
+record conflicts and session changes, native lists/dialogs, failed-edit/draft
+recovery, metadata-stripping ffmpeg preparation and sign-out cleanup. An invented
+H.264/HLS stream decoded and rendered frames with advancing timestamps; native
+mute/volume delegation passed. The built-in GTK media backend failed HLS here,
+so playback uses GStreamer URI decoding exposed through `Gtk.MediaStream` and
+native `Gtk.Video` controls. Upload checks quotas, streams bytes once, validates
+processing jobs and polls with a finite deadline. MP4/H.264/AAC clips are limited
+to 10 minutes/300 MB; no lossy transcoding is included.
+
+`./scripts/check.sh` passed its lint/format/compilation/shell/desktop/schema
+stages, then hit the nested Flatpak instance boundary. Its native runtime stage
+was supplied by the full host-launched installed-app suite above. The pinned
+offline Flatpak build/export/install passed, all 54 installed Python modules
+matched source, and the sandbox permission review confirmed the audio socket
+needed for playback. At this feature gate, no dependency version/hash pins changed;
+the subsequent SDK upgrade is recorded above.
+
+The full installed demo GUI smoke passed with the normal desktop renderer after
+the navigation assertion update. Invented-data captures of the new profile
+editor, bookmarks page, thread controls and video composer were inspected at
+480 pixels, with normal styling and high contrast/16-point text. Controls wrap
+and long dialogs scroll. The review script was temporary; captures stay ignored.
+
+The first integration run exposed old widget fixtures missing account context
+and an HLS readiness assertion that ran before the first rendered frame. Both
+were corrected without removing assertions. The smoke runner's destination
+assertion now includes Bookmarks. A GDK skipped-frame warning occurred in the
+otherwise passing native suite, and the GUI smoke emitted frame-timing warnings;
+no performance improvement is claimed.
+
+Live-account deletion/indexing, bookmark synchronisation, profile/media upload,
+gate propagation and remote playback remain untested. No real account was
+mutated or captured. Physical input, audible output, Orca and accessibility
+acceptance remain open; the automated pipeline/mute tests do not prove them.
+
+## Post deletion — 13 November 2026
+
+Own-post menus now offer confirmed deletion. The service validates the signed-in
+repository, post collection and displayed record CID before `deleteRecord` with
+`swapRecord`; a missing record is already deleted. There is no mutation retry or
+offline queue. Deleted placeholders strip content/media/actions while retaining
+reading position and thread edges. Account-local tombstones prevent stale AppView
+responses and cache checkpoints from restoring deleted content; thread snapshots
+and nested quotes reconcile the same deletion.
+
+The affected service/domain/storage tests passed 51 tests in the installed GNOME
+runtime using checkout modules and invented HTTP records. Twelve focused deletion
+and thread-cache tests also passed. Ruff passed. The host Python environment lacks
+GI and nested Flatpak execution cannot allocate an instance, so these checks ran
+through the permitted host Flatpak route. Combined installed-module and full native
+evidence is above. No live post was deleted; live-service
+propagation, physical input and accessibility acceptance remain unperformed.
+
 ## Repository cleanup — 13 November 2026
 
 Removed historical documentation, benchmark output, generated icon previews and
@@ -32,3 +128,26 @@ and source keyboard runs. The corrected harness reports this as unavailable inpu
 not a failed J shortcut. Physical input acceptance remains open. GDK emitted a
 skipped-frame warning during otherwise passing native runs; no performance claim
 is made.
+
+
+## Profile editing and follow browsing — 2026-11-13
+
+Own profiles now offer a native editor for display name, description, avatar and
+banner. The PDS record snapshot preserves labels, pinned posts and unknown fields;
+writes use the original CID (or create the absent literal `self` record) and are
+never automatically retried. Name/description limits include graphemes and UTF-8
+bytes. Images reuse metadata-stripping, bounded preparation. Failed saves retain
+entered values; account/generation guards reject stale completions. AppView may
+index new profile images after the successful PDS write; refreshing the profile
+loads the current indexed images.
+
+Follower and following counts open bounded, cursor-paged native people lists,
+sharing virtualised rows, one scrolling surface, profile activation and retry.
+The atproto 0.0.73 SDK already provided the required profile repository and graph
+endpoints; the 0.0.74 upgrade above supersedes that dependency evidence. Eight actual-SDK mock contracts and three
+native demo integration tests passed in the installed GNOME 51 runtime with source
+modules under X11/Cairo. These cover metadata preservation, record conflicts,
+missing profiles, invalid images, ownership, cursor/viewer mapping, failed-edit
+retention and navigation. They do not establish live account interoperability or
+physical-input/Orca acceptance. Full build/install verification is recorded with
+the combined feature gate.

@@ -311,9 +311,13 @@ class DemoService(DemoThreadService):
         async with self.draft_lock:
             await asyncio.to_thread(self.storage.put, self.account.did, "draft:" + key, value)
 
-    async def send(self, text, attachments=(), reply=None, quote=None):
+    async def send(
+        self, text, attachments=(), reply=None, quote=None, *, video=None, expected_account=None
+    ):
         await self.pause()
-        if error := validate(text, attachments):
+        if expected_account is not None and self.account is not expected_account:
+            raise UserError("The signed-in account changed. Reopen the composer.")
+        if error := validate(text, attachments, video):
             raise UserError(error)
 
         async def resolve(handle):
@@ -329,9 +333,18 @@ class DemoService(DemoThreadService):
             images=tuple(Media(a.path, a.alt, local=True) for a in attachments),
             root=(reply.root or (reply.uri, reply.cid)) if reply else None,
             quote=quote,
+            video=self.demo_video(video),
         )
         self.posts.insert(0, p)
         return SimpleNamespace(uri=p.uri, cid=p.cid)
+
+    @staticmethod
+    def demo_video(video):
+        if video is None:
+            return None
+        from .domain import Video
+
+        return Video(video.path, video.alt, width=video.width, height=video.height, local=True)
 
     async def sign_out(self):
         async with self.draft_lock:

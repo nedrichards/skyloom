@@ -1,7 +1,8 @@
 """A responsive composer with durable drafts and guarded close/send operations."""
 
 import asyncio
-from dataclasses import asdict
+import threading
+from dataclasses import asdict, replace
 
 from gi.repository import Adw, Gio, GLib, Gtk
 
@@ -9,6 +10,7 @@ from .keyboard import match
 from .richtext import counts, validate
 from .service import Attachment
 from .storage import post_restore
+from .video_upload import VideoAttachment
 from .widgets import box, button, label
 
 
@@ -21,9 +23,14 @@ class Composer(Adw.Dialog):
             can_close=False,
         )
         self.window, self.reply, self.quote = window, reply, quote
+        self.account = window.service.account
+        self.generation = window.generation
         self.key = "reply:" + reply.uri if reply else "quote:" + quote.uri if quote else "new"
         self.key = draft_key or self.key
         self.attachments = []
+        self.video = None
+        self.preparing = False
+        self.prepare_cancel = None
         self.sending = False
         self.ready = False
         self.closed = False
@@ -74,14 +81,18 @@ class Composer(Adw.Dialog):
             column_spacing=10,
         )
         content.append(self.attach_box)
-        footer = box(False, 12)
+        footer = Adw.WrapBox(child_spacing=6, line_spacing=6)
         self.add = button(
             "insert-image-symbolic", "Attach JPEG or PNG image", self.choose_image, "Add image"
         )
         footer.append(self.add)
+        self.add_video = button(
+            "camera-video-symbolic", "Attach an MP4 video", self.choose_video, "Add video"
+        )
+        footer.append(self.add_video)
         self.count = label("", "dim-label", hexpand=True, xalign=1)
-        footer.append(self.count)
         content.append(footer)
+        content.append(self.count)
         self.feedback = label("Loading saved draft…", "dim-label", selectable=True)
         content.append(self.feedback)
         scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, child=content)
@@ -104,8 +115,18 @@ class Composer(Adw.Dialog):
     def text(self):
         return self.buffer.get_text(self.buffer.get_start_iter(), self.buffer.get_end_iter(), True)
 
+    def alive(self):
+        return (
+            not self.closed
+            and self.window.generation == self.generation
+            and self.window.service.account is self.account
+        )
+
+    def validation(self):
+        return validate(self.text(), self.attachments, self.video)
+
     def loaded(self, saved):
-        if self.closed:
+        if not self.alive():
             return
         if saved.get("reply") or saved.get("quote"):
             self.reply = post_restore(saved["reply"]) if saved.get("reply") else None
@@ -120,6 +141,7 @@ class Composer(Adw.Dialog):
             self.set_title("Reply" if self.reply else "Quote post")
         self.buffer.set_text(saved.get("text", ""))
         self.attachments = [Attachment(**x) for x in saved.get("attachments", [])]
+        self.video = VideoAttachment(**saved["video"]) if saved.get("video") else None
         self.ready = True
         self.editor.set_editable(True)
         self.render_attachments()
@@ -131,14 +153,16 @@ class Composer(Adw.Dialog):
         self.feedback.set_label("Couldn’t restore the draft. " + msg)
         self.editor.set_editable(False)
         self.add.set_sensitive(False)
+        self.add_video.set_sensitive(False)
         self.send_button.set_sensitive(False)
 
     def snapshot(self):
-        if not self.text().strip() and not self.attachments:
+        if not self.text().strip() and not self.attachments and self.video is None:
             return {}
         return {
             "text": self.text(),
             "attachments": [asdict(a) for a in self.attachments],
+            "video": asdict(self.video) if self.video else None,
             "reply": asdict(self.reply) if self.reply else None,
             "quote": asdict(self.quote) if self.quote else None,
         }
@@ -149,10 +173,18 @@ class Composer(Adw.Dialog):
         self.revision += 1
         n, size = counts(self.text())
         self.count.set_label(f"{300 - n} characters · {size}/3000 bytes")
-        error = validate(self.text(), self.attachments)
+        error = self.validation()
         self.feedback.set_label(error or "Draft saves automatically on this device.")
         self.update_send_sensitivity()
-        self.add.set_sensitive(len(self.attachments) < 4 and not self.sending)
+        self.add.set_sensitive(
+            len(self.attachments) < 4
+            and self.video is None
+            and not self.sending
+            and not self.preparing
+        )
+        self.add_video.set_sensitive(
+            not self.attachments and self.video is None and not self.sending and not self.preparing
+        )
         if self.save_timer:
             GLib.source_remove(self.save_timer)
         self.save_timer = GLib.timeout_add(450, self.autosave)
@@ -163,7 +195,8 @@ class Composer(Adw.Dialog):
             and not self.closed
             and not self.window.read_only
             and not self.sending
-            and not validate(self.text(), self.attachments)
+            and not self.preparing
+            and not self.validation()
         )
 
     def autosave(self):
@@ -177,7 +210,12 @@ class Composer(Adw.Dialog):
     def choose_image(self):
         service = self.window.service
         account = service.account
-        if self.closed or account is None:
+        if (
+            self.closed
+            or account is None
+            or getattr(self, "video", None) is not None
+            or getattr(self, "preparing", False)
+        ):
             return
         storage = service.storage
         token = storage.token(account.did)
@@ -194,9 +232,21 @@ class Composer(Adw.Dialog):
                 file = dialog.open_finish(result)
             except GLib.Error:
                 return
-            if self.closed or service.account is not account or not file or not file.get_path():
+            if (
+                self.closed
+                or service.account is not account
+                or not file
+                or not file.get_path()
+                or getattr(self, "video", None) is not None
+                or getattr(self, "preparing", False)
+                or len(self.attachments) >= 4
+            ):
                 return
+            self.preparing = True
             self.add.set_sensitive(False)
+            if hasattr(self, "add_video"):
+                self.add_video.set_sensitive(False)
+                self.update_send_sensitivity()
 
             async def make():
                 return await asyncio.to_thread(
@@ -205,13 +255,73 @@ class Composer(Adw.Dialog):
 
             def ready(path):
                 if path is not None and not self.closed and service.account is account:
+                    self.preparing = False
                     self.attachments.append(Attachment(path, ""))
                     self.render_attachments()
                     self.changed()
 
             def failed(msg):
                 if not self.closed and service.account is account:
+                    self.preparing = False
                     self.add.set_sensitive(True)
+                    if hasattr(self, "add_video"):
+                        self.changed()
+                    self.feedback.set_label(msg)
+
+            self.window.worker.submit(make(), ready, failed)
+
+        chooser.open(self.window, None, picked)
+
+    def choose_video(self):
+        if not self.alive() or self.preparing or self.attachments or self.video is not None:
+            return
+        service, account = self.window.service, self.account
+        storage, token = service.storage, service.storage.token(account.did)
+        chooser = Gtk.FileDialog(title="Choose an MP4 video")
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        file_filter = Gtk.FileFilter(name="MP4 videos")
+        file_filter.add_mime_type("video/mp4")
+        filters.append(file_filter)
+        chooser.set_filters(filters)
+
+        def picked(dialog, result):
+            try:
+                file = dialog.open_finish(result)
+            except GLib.Error:
+                return
+            if (
+                not self.alive()
+                or not file
+                or not file.get_path()
+                or self.attachments
+                or self.preparing
+                or self.video is not None
+            ):
+                return
+            self.preparing = True
+            self.prepare_cancel = threading.Event()
+            cancel = self.prepare_cancel
+            self.changed()
+            self.feedback.set_label("Preparing video… The original file is unchanged.")
+
+            async def make():
+                return await asyncio.to_thread(
+                    storage.run, account.did, token, "prepare_video", file.get_path(), cancel
+                )
+
+            def ready(video):
+                if self.alive():
+                    self.preparing = False
+                    self.prepare_cancel = None
+                    self.video = video
+                    self.render_attachments()
+                    self.changed()
+
+            def failed(msg):
+                if self.alive():
+                    self.preparing = False
+                    self.prepare_cancel = None
+                    self.changed()
                     self.feedback.set_label(msg)
 
             self.window.worker.submit(make(), ready, failed)
@@ -221,6 +331,43 @@ class Composer(Adw.Dialog):
     def render_attachments(self):
         while child := self.attach_box.get_first_child():
             self.attach_box.remove(child)
+        if self.video is not None:
+            group = box(spacing=8, margin=8)
+            group.add_css_class("card")
+            group.append(label(f"Video · {self.video.duration:.0f} seconds", "heading"))
+            group.append(label("Description required", "caption"))
+            description = Gtk.Entry(
+                text=self.video.alt, placeholder_text="Describe what matters in this video"
+            )
+            description.update_property([Gtk.AccessibleProperty.LABEL], ["Video description"])
+
+            def describe(entry):
+                if self.video is not None:
+                    self.video = replace(self.video, alt=entry.get_text())
+                    self.changed()
+
+            description.connect("changed", describe)
+            group.append(description)
+
+            def preview():
+                from .domain import Video
+                from .video_player import open_video
+
+                open_video(self.window, Video(self.video.path, self.video.alt, local=True))
+
+            group.append(
+                button("media-playback-start-symbolic", "Preview video", preview, "Preview")
+            )
+
+            def remove_video():
+                self.video = None
+                self.render_attachments()
+                self.changed()
+
+            group.append(
+                button("edit-delete-symbolic", "Remove video", remove_video, "Remove video")
+            )
+            self.attach_box.append(group)
         for index, attachment in enumerate(self.attachments):
             group = box(spacing=8, margin=8)
             group.add_css_class("card")
@@ -269,25 +416,45 @@ class Composer(Adw.Dialog):
             self.attach_box.append(group)
 
     def send(self):
-        if self.sending or self.window.read_only or validate(self.text(), self.attachments):
+        if (
+            not self.alive()
+            or self.preparing
+            or self.sending
+            or self.window.read_only
+            or self.validation()
+        ):
             return
         self.sending = True
         self.send_button.set_sensitive(False)
         self.cancel_button.set_sensitive(False)
         self.add.set_sensitive(False)
+        self.add_video.set_sensitive(False)
         self.editor.set_editable(False)
         self.attach_box.set_sensitive(False)
-        self.feedback.set_label("Publishing…")
+        self.feedback.set_label("Uploading and processing video…" if self.video else "Publishing…")
         if self.save_timer:
             GLib.source_remove(self.save_timer)
             self.save_timer = None
 
+        service, account = self.window.service, self.account
+
         async def publish():
-            await self.window.service.draft_save(self.key, self.snapshot_value)
-            result = await self.window.service.send(
-                self.send_text, self.send_attachments, self.reply, self.quote
+            if service.account is not account:
+                return None
+            await service.draft_save(self.key, self.snapshot_value)
+            if service.account is not account:
+                return None
+            kwargs = {"video": self.send_video} if self.send_video else {}
+            result = await service.send(
+                self.send_text,
+                self.send_attachments,
+                self.reply,
+                self.quote,
+                expected_account=account,
+                **kwargs,
             )
-            await self.window.service.draft_save(self.key, {})
+            if service.account is account:
+                await service.draft_save(self.key, {})
             return result
 
         self.snapshot_value, self.send_text, self.send_attachments = (
@@ -295,13 +462,18 @@ class Composer(Adw.Dialog):
             self.text(),
             tuple(self.attachments),
         )
+        self.send_video = self.video
 
         def success(_result):
+            if not self.alive():
+                return
             self.window.toast("Demo post added" if self.window.demo else "Post published")
             self.force_close()
             self.window.refresh()
 
         def failure(msg):
+            if not self.alive():
+                return
             self.sending = False
             self.cancel_button.set_sensitive(True)
             self.editor.set_editable(True)
@@ -320,7 +492,7 @@ class Composer(Adw.Dialog):
         if not self.ready:
             self.force_close()
             return
-        if not self.text().strip() and not self.attachments:
+        if not self.text().strip() and not self.attachments and self.video is None:
             self.window.worker.submit(
                 self.window.service.draft_save(self.key, {}),
                 lambda _: self.force_close(),
@@ -363,6 +535,8 @@ class Composer(Adw.Dialog):
 
     def on_closed(self, *_args):
         self.closed = True
+        if self.prepare_cancel is not None:
+            self.prepare_cancel.set()
         if self.save_timer:
             GLib.source_remove(self.save_timer)
             self.save_timer = None

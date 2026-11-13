@@ -1519,6 +1519,24 @@ class PostRow(Gtk.Box):
         self.media_bind_index = 0
         for media in post.images:
             self.add_image(media, content)
+        if post.video:
+            from .video_player import open_video
+
+            play_content = box(False, 12, margin=12)
+            play_content.append(Gtk.Image(icon_name="media-playback-start-symbolic", pixel_size=32))
+            video_description = box(spacing=4)
+            video_description.append(label("Play video", "heading"))
+            video_description.append(label("Streams when played", "dim-label"))
+            play_content.append(video_description)
+            play = Gtk.Button(child=play_content)
+            play.set_tooltip_text("Play video; downloads begin when opened")
+            play.update_property([Gtk.AccessibleProperty.LABEL], ["Play video"])
+            play.connect("clicked", lambda _button, video=post.video: open_video(window, video))
+            if not post.video.local:
+                window.online_control(play)
+            content.append(play)
+            if post.video.alt.strip():
+                content.append(label(post.video.alt, "dim-label", selectable=True))
         if post.quote and not compact:
             if self.quote_cell is None:
                 self.quote_cell = PostRow(post.quote, window, compact=True)

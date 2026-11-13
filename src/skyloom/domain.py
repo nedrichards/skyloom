@@ -33,6 +33,16 @@ class Media:
 
 
 @dataclass(frozen=True, slots=True)
+class Video:
+    playlist: str
+    alt: str = ""
+    thumbnail: str = ""
+    width: int = 0
+    height: int = 0
+    local: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class Post:
     uri: str
     cid: str
@@ -56,6 +66,7 @@ class Post:
     bookmarked: bool = False
     reply_disabled: bool = False
     embedding_disabled: bool = False
+    video: Video | None = None
 
     @property
     def link(self):
@@ -270,6 +281,7 @@ def deleted_post(post):
         images=(),
         quote=None,
         external=None,
+        video=None,
         labels=(),
         likes=0,
         reposts=0,
@@ -346,7 +358,7 @@ def post_from(d: dict, depth=0) -> Post:
     rec = d.get("record") or {}
     viewer = d.get("viewer") or {}
     embed = d.get("embed") or {}
-    images, quoted, external, unavailable = [], None, None, ""
+    images, quoted, external, unavailable, video = [], None, None, "", None
     kind = embed.get("$type", "")
     media = embed.get("media", embed)
     images.extend(
@@ -357,7 +369,19 @@ def post_from(d: dict, depth=0) -> Post:
         e = media["external"]
         external = (safe_url(e.get("uri", "")), e.get("title", "Link"), e.get("description", ""))
     if "video" in kind or "video" in media.get("$type", ""):
-        unavailable = "Video — open this post in Bluesky to play it."
+        playlist = safe_https_url(media.get("playlist", ""))
+        if playlist:
+            ratio = media.get("aspectRatio") or {}
+            width, height = ratio.get("width", 0), ratio.get("height", 0)
+            video = Video(
+                playlist,
+                media.get("alt", ""),
+                safe_https_url(media.get("thumbnail", "")),
+                width if isinstance(width, int) and 0 < width <= 100000 else 0,
+                height if isinstance(height, int) and 0 < height <= 100000 else 0,
+            )
+        else:
+            unavailable = "This video is unavailable."
     if "record" in embed and depth < 2:
         q = embed["record"]
         if "record" in q:
@@ -387,6 +411,7 @@ def post_from(d: dict, depth=0) -> Post:
         images=tuple(images),
         quote=quoted,
         external=external,
+        video=video,
         labels=labels,
         root=(root["uri"], root["cid"]) if root else None,
         unavailable=unavailable,

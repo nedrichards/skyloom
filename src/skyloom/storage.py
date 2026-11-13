@@ -20,6 +20,7 @@ from .domain import (
     Page,
     Pager,
     Post,
+    Video,
     find_post,
     reconcile_deleted,
 )
@@ -36,6 +37,7 @@ def post_restore(d):
             "facets": tuple(d.get("facets", [])),
             "external": tuple(d["external"]) if d.get("external") else None,
             "images": tuple(Media(**i) for i in d["images"]),
+            "video": Video(**d["video"]) if d.get("video") else None,
             "quote": post_restore(d["quote"]) if d.get("quote") else None,
             "root": tuple(d["root"]) if d.get("root") else None,
             "parent": tuple(d["parent"]) if d.get("parent") else None,
@@ -492,6 +494,12 @@ class Storage:
         directory = self.base / (hashlib.sha256(account.encode()).hexdigest() + "-images")
         return prepare(path, directory)
 
+    def prepare_video(self, account, path, cancel=None):
+        from .video_upload import prepare_video
+
+        directory = self.base / (hashlib.sha256(account.encode()).hexdigest() + "-videos")
+        return prepare_video(path, directory, cancel=cancel)
+
     def clear(self, account, token=None):
         with self._io_lock(account):
             if token is not None and token != self.token(account):
@@ -518,5 +526,9 @@ class Storage:
             self._last_cleanup.pop(account, None)
             shutil.rmtree(
                 self.base / (hashlib.sha256(account.encode()).hexdigest() + "-images"),
+                ignore_errors=True,
+            )
+            shutil.rmtree(
+                self.base / (hashlib.sha256(account.encode()).hexdigest() + "-videos"),
                 ignore_errors=True,
             )

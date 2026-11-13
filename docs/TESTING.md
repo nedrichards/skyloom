@@ -36,6 +36,19 @@ Shared display setup lives in `tests/gtk_support.py`; reusable content and
 startup fixtures live beside it. Test classes should use these helpers rather
 than instantiate other test classes.
 
+The feature tests cover deletion confirmation and cache tombstones, private
+bookmarks, profile conflicts, people paging and thread controls with invented
+records. Video tests use the runtime's ffmpeg/ffprobe to prepare tiny generated
+clips and a loopback HLS fixture to assert decoded/rendered frames, timestamps
+and native mute/volume delegation. They do not exercise a real account or prove
+audible output. Native composer tests verify descriptions and durable video
+draft recovery after upload failure.
+
+`test_sdk.py` exercises atproto's public serializer, unknown `DotDict` records,
+nested extension-field round trips and typed page-item access without serialising
+unused response metadata. Existing SDK/HTTP contracts cover the production
+feed/search/notification, profile, bookmark, thread and upload paths.
+
 ## Display troubleshooting
 
 Wayland full-suite runs have timed out waiting for native frames. To diagnose

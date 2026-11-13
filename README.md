@@ -5,8 +5,7 @@ A personal project by Nick Richards, independent of Bluesky.
 
 ![Skyloom with invented demo posts](screenshots/showcase/home-1280-light.png)
 
-The bits of Bluesky I use work fine. DMs, video upload and multiple accounts
-are not included.
+The bits of Bluesky I use work fine. DMs and multiple accounts are not included.
 
 ## Install and launch
 
@@ -42,7 +41,8 @@ revoke the app password in Bluesky.
 - Choose a feed from the Home header. Open a post to read its conversation;
   Alt+Left returns to your reading position.
 - Ctrl+N composes, Ctrl+Enter publishes and Ctrl+R refreshes. Attach up to four
-  JPEG/PNG images, each with a description. Failed publishing preserves the draft;
+  JPEG/PNG images or one MP4 video, with descriptions. Videos must use H.264
+  video and AAC audio, at most 10 minutes and 300 MB. Failed publishing preserves the draft;
   after a timeout, check your profile before retrying.
 - New-post notifications keep your reading position. Go to top jumps to the
   newest posts; Undo restores your position. Double-click Home or use Ctrl+Home
@@ -54,6 +54,8 @@ revoke the app password in Bluesky.
 - Your post menu also opens reply and quote controls. On replies to your thread,
   hide a reply; on quotes of your posts, detach the quote. Restore these from the
   original post's controls. Hidden replies can still be opened directly.
+- Select Play video to open native playback with sound and playback controls.
+  Videos play only after you choose them; there is no feed autoplay.
 - Preferences controls appearance, downloads and labelled-content warnings.
   Labelled content is visible by default; explicit mutes and blocks remain separate.
 - Open your profile to edit its name, description and images. Select follower or
@@ -64,10 +66,12 @@ revoke the app password in Bluesky.
 
 No analytics or custom backend. Automatic downloads respect connection and power
 policy; image downloads can be disabled in Preferences. Upload copies remove
-image metadata; original files are untouched.
+image metadata; prepared video copies remove metadata and chapters. Original
+files are untouched. Explicit video playback downloads the selected stream,
+including on metered connections.
 
-Drafts, prepared images and cached posts stay in private application storage,
-without separate encryption. Prepared images remain until sign-out. See
+Drafts, prepared media and cached posts stay in private application storage,
+without separate encryption. Prepared media remain until sign-out. See
 [storage locations](docs/ARCHITECTURE.md#storage-locations-and-retention).
 
 ## Development and contributions
