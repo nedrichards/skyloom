@@ -49,6 +49,8 @@ revoke the app password in Bluesky.
   to fetch the newest page.
 - Preferences controls appearance, downloads and labelled-content warnings.
   Labelled content is visible by default; explicit mutes and blocks remain separate.
+- Open your profile to edit its name, description and images. Select follower or
+  following counts on any profile to browse people.
 - Use F1 or Ctrl+? for keyboard help. Preferences and About are in the main menu.
 
 ## Privacy

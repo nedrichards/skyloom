@@ -20,7 +20,9 @@ from .feed_switcher import FeedSwitcher
 from .interactions import Interactions
 from .motion import Feedback, allowed
 from .navigation import Navigation
+from .people_view import open_people
 from .preferences import Preferences
+from .profile_editor import ProfileEditor
 from .profile_header import ProfileTitle
 from .reading import ReadingSession
 from .records import RecordPager
@@ -1365,6 +1367,10 @@ class Window(Adw.ApplicationWindow):
 
         load()
 
+    def follow_people(self, author, kind):
+        return open_people(self, author, kind)
+
+
     def profile(self, actor):
         page, toolbar, header = self.new_page("Profile")
         page.destination = "profile" if actor == self.service.account.did else None
@@ -1424,16 +1430,25 @@ class Window(Adw.ApplicationWindow):
                 )
             else:
                 intro.append(biography())
-            statistics = []
+            statistics = Adw.WrapBox(child_spacing=6, line_spacing=6)
             for value, title in [
                 (author.followers, "followers"),
                 (author.following_count, "following"),
                 (author.posts_count, "posts"),
             ]:
                 if value is not None:
-                    statistics.append(f"{value:,} {title}")
-            if statistics:
-                intro.append(label(" · ".join(statistics), "dim-label"))
+                    if title in ("followers", "following"):
+                        statistics.append(
+                            button(
+                                "",
+                                f"Browse {title}",
+                                lambda kind=title: self.follow_people(author, kind),
+                                f"{value:,} {title}",
+                            )
+                        )
+                    else:
+                        statistics.append(label(f"{value:,} {title}", "dim-label"))
+            intro.append(statistics)
             controls = Adw.WrapBox(child_spacing=6, line_spacing=6)
             if author.did != self.service.account.did:
                 follow = button(
@@ -1465,6 +1480,21 @@ class Window(Adw.ApplicationWindow):
                         )
                     )
                 )
+            if author.did == self.service.account.did:
+
+                def edited(updated):
+                    state["author"] = updated
+                    render()
+                    self.toast("Profile saved.")
+
+                edit = button(
+                    "",
+                    "Edit your profile",
+                    lambda: ProfileEditor(self, guard(self, page, edited), author).present(self),
+                    "Edit profile",
+                )
+                controls.append(self.online_control(edit))
+                page.profile_edit = edit
             browser = button(
                 "web-browser-symbolic",
                 "Open profile / report in Bluesky",

@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from .conversation import ThreadPage
 from .domain import Media, Notice, Page, Post, author_from, find_post
 from .errors import UserError
+from .profile_service import COLLECTION, EditableProfile, validate_profile
 from .richtext import facets_for, validate
 from .storage import Storage
 
@@ -131,8 +132,68 @@ class DemoService:
         )
         return ThreadPage((replace(p, context="Selected post"), reply))
 
+    async def editable_profile(self):
+        await self.pause()
+        author = await self.profile(self.account.did)
+        record = getattr(
+            self,
+            "profile_record",
+            {"$type": COLLECTION, "displayName": author.name, "description": author.bio},
+        )
+        return EditableProfile(
+            self.account.did,
+            str(getattr(self, "profile_revision", 0)),
+            json.dumps(record),
+            self.account,
+        )
+
+
+    async def update_profile(self, original, name, description, avatar=None, banner=None):
+        await self.pause()
+        if (
+            original.did != self.account.did
+            or (original.account is not None and original.account is not self.account)
+            or original.cid != str(getattr(self, "profile_revision", 0))
+        ):
+            raise UserError("This profile changed. Reopen the profile editor.")
+        if error := validate_profile(name, description):
+            raise UserError(error)
+        record = original.record
+        record.update(displayName=name, description=description)
+        for field, value in (("avatar", avatar), ("banner", banner)):
+            if value is not None:
+                record[field] = value
+        self.profile_record = record
+        self.profile_revision = getattr(self, "profile_revision", 0) + 1
+        current = await self.profile(self.account.did)
+        self.profile_override = replace(
+            current,
+            name=name or current.handle,
+            bio=description,
+            avatar=current.avatar if avatar is None else avatar,
+            banner=current.banner if banner is None else banner,
+        )
+        self.posts = [
+            replace(post, author=self.profile_override)
+            if post.author.did == self.account.did
+            else post
+            for post in self.posts
+        ]
+        return self.profile_override
+
+
+    async def follow_people(self, actor, kind, cursor=None):
+        await self.pause()
+        if kind not in ("followers", "following"):
+            raise UserError("This people list is not supported.")
+        authors = {post.author.did: post.author for post in self.posts if post.author.did != actor}
+        return tuple(authors.values()) if cursor is None else (), None
+
+
     async def profile(self, actor):
         await self.pause()
+        if actor == self.account.did and hasattr(self, "profile_override"):
+            return self.profile_override
         a = next((p.author for p in self.posts if p.author.did == actor), self.account)
         return replace(
             a,

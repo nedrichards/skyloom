@@ -16,6 +16,7 @@ from .credentials import KeyringError, SecretStore
 from .domain import Notice, Page, author_from, feed_from, post_from
 from .errors import POST_UNAVAILABLE, UserError
 from .network import new_client
+from .profile_service import ProfileService
 from .richtext import facets_for, validate
 from .storage import Storage
 
@@ -44,7 +45,7 @@ class Attachment:
 _CURRENT_ACCOUNT = object()
 
 
-class Service:
+class Service(ProfileService):
     def __init__(self, client=None, secrets=None, storage=None, client_factory=new_client):
         self.client_factory = client_factory
         self.client = client or self.client_factory()

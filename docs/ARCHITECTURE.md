@@ -12,6 +12,7 @@ Start in `src/skyloom/`. The application uses native GTK 4/libadwaita widgets;
 | Keyboard and gestures | `keyboard.py`, `interactions.py` |
 | Immutable records and text | `domain.py`, `richtext.py` |
 | AT Protocol and authentication | `service.py`, `network.py`, `credentials.py` |
+| Profile editing and people lists | `profile_service.py`, `profile_editor.py`, `people_view.py` |
 | Background work | `worker.py`, `request_scope.py` |
 | Drafts and local data | `composer.py`, `storage.py` |
 | Images | `media.py` |
