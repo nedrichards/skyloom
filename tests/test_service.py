@@ -450,6 +450,49 @@ class Contract(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(self.requests[-1][0].endswith("getRecord"))
             del self.deletion_subject
 
+    async def test_delete_post_checks_ownership_and_version_and_keeps_tombstone(self):
+        from dataclasses import replace
+
+        await self.login()
+        post = (await self.service.feed()).posts[0]
+        count = len(self.requests)
+        for target in (
+            replace(post, author=Author("did:example:other", "other.invalid", "Other")),
+            replace(post, uri=URI.replace("app.bsky.feed.post", "app.bsky.feed.like")),
+            replace(post, uri=URI + "/extra"),
+        ):
+            with self.assertRaises(UserError):
+                await self.service.delete_post(target)
+        self.assertEqual(len(self.requests), count)
+        with self.assertRaisesRegex(UserError, "changed"):
+            await self.service.delete_post(replace(post, cid="different"))
+        result = await self.service.delete_post(post)
+        self.assertTrue(result.unavailable)
+        self.assertEqual(result.text, "")
+        deletion = next(r for r in reversed(self.requests) if r[0].endswith("deleteRecord"))
+        self.assertEqual(
+            deletion[1],
+            {"repo": DID, "collection": "app.bsky.feed.post", "rkey": "test", "swapRecord": CID},
+        )
+        # AppView can still return the old record after the PDS confirms deletion.
+        self.assertTrue((await self.service.feed()).posts[0].unavailable)
+        self.assertTrue((await self.service.thread(URI)).posts[0].unavailable)
+        cached = await self.service.cached_post(URI)
+        self.assertEqual(cached.text, "")
+        self.assertTrue(cached.unavailable)
+
+    async def test_delete_post_errors_are_not_retried_or_hidden(self):
+        await self.login()
+        post = (await self.service.feed()).posts[0]
+        self.fail_response = ("com.atproto.repo.deleteRecord", 409)
+        count = len(self.requests)
+        with self.assertRaises(AtProtocolError):
+            await self.service.delete_post(post)
+        self.assertEqual(len(self.requests), count + 2)
+        self.assertFalse((await self.service.cached_post(URI)).unavailable)
+        self.fail_response = ("com.atproto.repo.getRecord", 404)
+        self.assertTrue((await self.service.delete_post(post)).unavailable)
+
     async def test_unknown_mutation_cannot_fall_through_to_repost(self):
         await self.login()
         post = (await self.service.feed()).posts[0]

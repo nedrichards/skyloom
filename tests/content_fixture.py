@@ -43,12 +43,16 @@ class ContentFixture:
             ),
             worker=SimpleNamespace(submit=submit),
             read_only=False,
+            service=SimpleNamespace(
+                account=Author("did:example:viewer", "viewer.invalid", "Invented viewer")
+            ),
             mutations=set(),
             profile=lambda *_: None,
             open_uri=lambda *_: None,
             thread=lambda *_: None,
             compose=lambda **_: None,
             mutate=lambda *_: None,
+            bookmark=lambda *_: None,
             copy=lambda *_: None,
             toast=lambda *_: None,
             preferences=lambda: None,

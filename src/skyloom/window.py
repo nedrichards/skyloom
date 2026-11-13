@@ -8,11 +8,12 @@ from weakref import WeakSet
 from gi.repository import Adw, GLib, Gtk, Pango
 
 from . import APP_ID, VERSION
+from .bookmark_view import change_bookmark, open_bookmarks
 from .composer import Composer
 from .content import LabelledContent
 from .conversation import Continuation, Conversation
 from .conversation_view import ConversationView
-from .domain import Pager, Post, find_post, safe_url
+from .domain import Pager, Post, find_post, reconcile_deleted, safe_url
 from .errors import POST_UNAVAILABLE, UserError
 from .feed_coordination import FeedCoordination
 from .feed_state import FeedGap
@@ -50,6 +51,7 @@ class Window(Adw.ApplicationWindow):
         self.worker, self.service, self.images = app.worker, app.service, app.images
         self.demo, self.settings = app.demo, app.settings
         self.views, self.mutations, self.pagers, self.feed_views = [], set(), {}, {}
+        self.deleted_posts = set()
         self.content_gates = WeakSet()
         self.online_controls = WeakSet()
         self.revealed_labels = {}
@@ -497,6 +499,7 @@ class Window(Adw.ApplicationWindow):
             ("user-home-symbolic", "Home"),
             ("edit-find-symbolic", "Search"),
             ("document-edit-symbolic", "Drafts"),
+            ("user-bookmarks-symbolic", "Bookmarks"),
             ("preferences-system-notifications-symbolic", "Notifications"),
         ]:
             destination = title.lower()
@@ -1243,8 +1246,69 @@ class Window(Adw.ApplicationWindow):
                 self, page, self.service.cached_post(uri), cached_ready, cache_failed, page=page
             )
 
+    def delete_post(self, post):
+        if (
+            self.read_only
+            or post.unavailable == "This post was deleted."
+            or not self.service.account
+        ):
+            return
+        if post.author.did != self.service.account.did:
+            return
+        generation = self.generation
+        account = self.service.account
+        alert = Adw.AlertDialog(
+            heading="Delete this post?",
+            body="This permanently deletes your post from Bluesky. It cannot be undone.",
+        )
+        alert.add_response("cancel", "Cancel")
+        alert.add_response("delete", "Delete")
+        alert.set_default_response("cancel")
+        alert.set_close_response("cancel")
+        alert.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+
+        def response(_alert, value):
+            if value != "delete" or self.read_only or generation != self.generation:
+                return
+            if any(uri == post.uri for uri, _kind in self.mutations):
+                return
+            key = (post.uri, "delete")
+            self.mutations.add(key)
+
+            def done(result):
+                self.mutations.discard(key)
+                if generation != self.generation:
+                    return
+                self.deleted_posts.add(post.uri)
+                self.thread_cache.delete_post(post.uri)
+                for pager in self.pagers.values():
+                    pager.posts = [reconcile_deleted(p, self.deleted_posts) for p in pager.posts]
+                for view in self.views:
+                    for index in range(view.model.get_n_items()):
+                        current = view.model.get_item(index).post
+                        updated = reconcile_deleted(current, self.deleted_posts)
+                        if updated != current:
+                            view.update_post(updated)
+                self.toast("Post deleted.")
+
+            def failed(msg):
+                self.mutations.discard(key)
+                if generation == self.generation:
+                    self.toast(msg + " Check your profile before trying again.")
+
+            self.worker.submit(
+                self.service.delete_post(post, expected_account=account), done, failed
+            )
+
+        alert.connect("response", response)
+        alert.present(self)
+
     def mutate(self, post, kind, remember=True):
-        if self.read_only or any(p == post.uri for p, _kind in self.mutations):
+        if (
+            self.read_only
+            or post.unavailable == "This post was deleted."
+            or any(p == post.uri for p, _kind in self.mutations)
+        ):
             return
         speculative = self.page_requests.pop("thread-prefetch", None)
         if speculative:
@@ -1313,6 +1377,13 @@ class Window(Adw.ApplicationWindow):
             view.update_post(post)
 
     def compose(self, reply=None, quote=None, draft_key=None):
+        if (reply and reply.reply_disabled) or (quote and quote.embedding_disabled):
+            self.toast("The author has restricted this interaction.")
+            return
+        if (reply and reply.unavailable == "This post was deleted.") or (
+            quote and quote.unavailable == "This post was deleted."
+        ):
+            return
         if not self.service.account:
             return
         if self.composer:
@@ -1369,7 +1440,6 @@ class Window(Adw.ApplicationWindow):
 
     def follow_people(self, author, kind):
         return open_people(self, author, kind)
-
 
     def profile(self, actor):
         page, toolbar, header = self.new_page("Profile")
@@ -1622,6 +1692,12 @@ class Window(Adw.ApplicationWindow):
             alert.present(self)
 
         load()
+
+    def bookmarks(self):
+        return open_bookmarks(self)
+
+    def bookmark(self, post):
+        change_bookmark(self, post)
 
     def search(self):
         self.go_home()
@@ -1935,6 +2011,9 @@ class Window(Adw.ApplicationWindow):
 
     def signed_out(self, _value):
         self.thread_cache.clear()
+        self.deleted_posts.clear()
+        self.bookmark_revision = 0
+        self.bookmark_overrides = {}
         self.post_positions = None
         self.images.use_account(None)
         for view in self.views:

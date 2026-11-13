@@ -5,8 +5,8 @@ A personal project by Nick Richards, independent of Bluesky.
 
 ![Skyloom with invented demo posts](screenshots/showcase/home-1280-light.png)
 
-The bits of Bluesky I use work fine. DMs, video upload, multiple accounts and post
-deletion are not included.
+The bits of Bluesky I use work fine. DMs, video upload and multiple accounts
+are not included.
 
 ## Install and launch
 
@@ -47,6 +47,13 @@ revoke the app password in Bluesky.
 - New-post notifications keep your reading position. Go to top jumps to the
   newest posts; Undo restores your position. Double-click Home or use Ctrl+Home
   to fetch the newest page.
+- Delete your own posts from their post menu. Deletion asks for confirmation and
+  cannot be undone; a placeholder preserves the conversation and reading position.
+- Save posts from their menu and find them in Bookmarks. Bookmarks are private
+  and synchronise with Bluesky.
+- Your post menu also opens reply and quote controls. On replies to your thread,
+  hide a reply; on quotes of your posts, detach the quote. Restore these from the
+  original post's controls. Hidden replies can still be opened directly.
 - Preferences controls appearance, downloads and labelled-content warnings.
   Labelled content is visible by default; explicit mutes and blocks remain separate.
 - Open your profile to edit its name, description and images. Select follower or

@@ -10,8 +10,9 @@ from weakref import WeakSet
 
 from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
 
+from .bookmark_service import reconcile_bookmarks
 from .content import LabelledContent
-from .domain import Author, Notice, Post, relative_time, safe_url
+from .domain import Author, Notice, Post, reconcile_deleted, relative_time, safe_url
 from .feed_state import FeedGap
 from .list_feedback import TopPeek, UpdateNotice
 from .list_interaction import ListInteraction
@@ -944,6 +945,13 @@ class FeedView(Gtk.Box):
         )
 
     def set_items(self, items, key, reset=False, *, rebind=(), preserve=True):
+        items = [
+            reconcile_bookmarks(
+                reconcile_deleted(p, getattr(self.window, "deleted_posts", ())),
+                getattr(self.window, "bookmark_overrides", {}),
+            )
+            for p in items
+        ]
         # Capture at completion, never at request start. Native anchoring is enough
         # for appends and layout-stable updates; a scroll_to here would fight fling.
         place = (
@@ -1536,7 +1544,9 @@ class PostRow(Gtk.Box):
             content.append(label(post.unavailable, "dim-label"))
         content.set_visible(any(child.get_visible() for child in list_children(content)))
         self.content.set_visible(True)
-        if compact:
+        if actions is not None:
+            actions.set_visible(post.unavailable != "This post was deleted.")
+        if compact or post.unavailable == "This post was deleted.":
             return self.content
         if actions is None:
             self.create_actions(post, window)
@@ -1594,17 +1604,37 @@ class PostRow(Gtk.Box):
         post = self.post
         pop = Gtk.Popover()
         choices = box(spacing=4, margin=6)
-        for title, callback in [
-            ("Quote post", lambda: window.compose(quote=self.post)),
+        from .thread_controls import menu_options
+
+        options = [
+            (
+                "Quoting disabled" if post.embedding_disabled else "Quote post",
+                None if post.embedding_disabled else lambda: window.compose(quote=self.post),
+            ),
             ("Copy link", lambda: window.copy(post.link)),
             ("Open in Bluesky / report", lambda: window.open_uri(post.link)),
-        ]:
+        ]
+        if (
+            window.service.account
+            and post.author.did == window.service.account.did
+            and post.unavailable != "This post was deleted."
+        ):
+            options.append(("Delete post…", lambda: window.delete_post(post)))
+        options.append(
+            (
+                "Remove bookmark" if post.bookmarked else "Bookmark post",
+                lambda: window.bookmark(post),
+            )
+        )
+        options.extend(menu_options(window, post))
+        for title, callback in options:
 
             def clicked(cb=callback):
                 pop.popdown()
                 cb()
 
             b = Gtk.Button(label=title)
+            b.set_sensitive(callback is not None)
             b.add_css_class("flat")
             b.add_css_class("post-menu-item")
             b.connect("clicked", lambda _b, cb=clicked: cb())
@@ -1712,10 +1742,11 @@ class PostRow(Gtk.Box):
         if not buttons:
             return
         values = [
-            f"Reply · {post.replies} replies",
+            "Replies disabled" if post.reply_disabled else f"Reply · {post.replies} replies",
             f"{'Undo repost' if post.repost_uri else 'Repost'} · {post.reposts} reposts",
             f"{'Unlike' if post.like_uri else 'Like'} · {post.likes} likes",
         ]
+        buttons[0].set_sensitive(not post.reply_disabled)
         busy = any(key[0] == post.uri for key in self.window.mutations)
         for index, (control, tooltip) in enumerate(zip(buttons, values, strict=True)):
             selected = (
@@ -1751,7 +1782,10 @@ class PostRow(Gtk.Box):
             if index and hasattr(self.window, "online_control"):
                 self.window.online_control(control, busy=busy)
             else:
-                control.set_sensitive(not busy and (not index or not self.window.read_only))
+                control.set_sensitive(
+                    not busy
+                    and (not post.reply_disabled if not index else not self.window.read_only)
+                )
 
     def cancel(self):
         self.binding_serial += 1

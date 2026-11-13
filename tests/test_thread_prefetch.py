@@ -13,6 +13,20 @@ from skyloom.thread_prefetch import HomeThreadPrefetch, ThreadCache
 
 
 class ThreadCacheTests(unittest.TestCase):
+    def test_deleted_post_stays_deleted_in_stale_threads_and_quotes(self):
+        cache = ThreadCache()
+        post = post_from(node("root")["post"])
+        quote = replace(post, uri=post.uri + "-quote", quote=post)
+        page = ThreadPage((post, quote))
+        cache.put(post.uri, page)
+        cache.delete_post(post.uri)
+        for reconciled in (cache.get(post.uri), cache.reconcile(page), cache.put(post.uri, page)):
+            self.assertTrue(reconciled.posts[0].unavailable)
+            self.assertEqual(reconciled.posts[0].text, "")
+            self.assertTrue(reconciled.posts[1].quote.unavailable)
+        cache.clear()
+        self.assertFalse(cache.reconcile(page).posts[0].unavailable)
+
     def test_budget_deduplication_expiry_and_bounded_retention(self):
         clock = Mock()
         cache = ThreadCache(clock=clock)

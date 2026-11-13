@@ -712,7 +712,14 @@ class Smoke:
         self.own_card_verified = False
         self.w.set_default_size(800, 820)
         assert self.w.destination_buttons["profile"] is self.w.profile_button
-        assert len(self.w.destination_buttons) == 5
+        assert set(self.w.destination_buttons) == {
+            "home",
+            "search",
+            "drafts",
+            "bookmarks",
+            "notifications",
+            "profile",
+        }
         self.w.profile_button.emit("clicked")
         return True
 

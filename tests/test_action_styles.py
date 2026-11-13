@@ -21,7 +21,10 @@ class ActionStyleTests(unittest.TestCase):
         row = PostRow(replace(fixture.post, labels=(), images=()), fixture.window)
         row.create_post_menu(row.menu)
         choices = tuple(list_children(row.menu.get_popover().get_child()))
-        self.assertEqual(len(choices), 3)
+        self.assertEqual(
+            [choice.get_label() for choice in choices],
+            ["Quote post", "Copy link", "Open in Bluesky / report", "Bookmark post"],
+        )
         self.assertTrue(all(button.has_css_class("post-action") for button in row.action_buttons))
         self.assertTrue(row.menu.has_css_class("post-action"))
         self.assertTrue(all(button.has_css_class("post-menu-item") for button in choices))

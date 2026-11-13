@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from gi.repository import GLib
 
 from .conversation import ThreadPage
-from .domain import Post
+from .domain import Post, reconcile_deleted
 from .request_scope import submit
 from .widgets import post_positions
 
@@ -46,12 +46,14 @@ class ThreadCache:
         self.requests = []
         self.reactions = OrderedDict()
         self.revision = 0
+        self.deleted = set()
 
     def clear(self):
         self.pages.clear()
         self.attempts.clear()
         self.requests.clear()
         self.reactions.clear()
+        self.deleted.clear()
         self.revision += 1
 
     def get_snapshot(self, uri):
@@ -70,17 +72,23 @@ class ThreadCache:
         return snapshot.page if snapshot is not None else None
 
     def reconcile(self, page, *, started=None):
-        if not self.reactions:
+        if not self.reactions and not self.deleted:
             return page
 
         def latest(post):
+            if post.uri in self.deleted:
+                return reconcile_deleted(post, self.deleted)
             known = self.reactions.get(post.uri)
             changes = {}
             if known:
                 revision, values = known
                 if started is None or revision > started or "pending" in values[2:]:
                     changes = dict(
-                        zip(("likes", "reposts", "like_uri", "repost_uri"), values, strict=True)
+                        zip(
+                            ("likes", "reposts", "like_uri", "repost_uri", "bookmarked"),
+                            values,
+                            strict=True,
+                        )
                     )
             if post.quote:
                 quote = latest(post.quote)
@@ -97,11 +105,17 @@ class ThreadCache:
             else page
         )
 
+    def delete_post(self, uri):
+        self.deleted.add(uri)
+        self.revision += 1
+        for anchor, snapshot in self.pages.items():
+            self.pages[anchor] = replace(snapshot, page=self.reconcile(snapshot.page))
+
     def update_post(self, post):
         self.revision += 1
         self.reactions[post.uri] = (
             self.revision,
-            (post.likes, post.reposts, post.like_uri, post.repost_uri),
+            (post.likes, post.reposts, post.like_uri, post.repost_uri, post.bookmarked),
         )
         self.reactions.move_to_end(post.uri)
         while len(self.reactions) > 2000:

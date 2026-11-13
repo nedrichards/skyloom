@@ -64,7 +64,10 @@ def thread_from(node: dict, include_replies=True) -> ThreadPage:
     ancestors, current, visited = [], node, set()
     unavailable = False
     edges, gaps = [], []
+    hidden = set()
     while current and "post" in current and len(ancestors) < 21:
+        gate = current["post"].get("threadgate") or {}
+        hidden.update((gate.get("record") or {}).get("hiddenReplies", []))
         post = post_from(current["post"])
         if post.uri in visited:
             break
@@ -119,6 +122,9 @@ def thread_from(node: dict, include_replies=True) -> ThreadPage:
                     )
                 continue
             post = post_from(child["post"])
+            if post.uri in hidden:
+                gaps.append(ThreadGap(post.uri, item["post"]["uri"], "hidden"))
+                continue
             if post.uri in visited:
                 continue
             if len(posts) >= 250 or level >= 8:
@@ -196,6 +202,16 @@ class Conversation:
         self.posts = [
             replace(updates[p.uri], context=p.context) if p.uri in updates else p
             for p in self.posts
+        ]
+        hidden = {gap.uri for gap in page.gaps if gap.kind == "hidden"}
+        # Previously loaded descendants must not bypass a newly hidden branch.
+        changed = True
+        while changed:
+            descendants = {uri for uri, parent in self.parents.items() if parent in hidden}
+            changed = not descendants.issubset(hidden)
+            hidden.update(descendants)
+        self.posts = [
+            post for post in self.posts if post.uri not in hidden or post.uri == self.anchor
         ]
         present = {post.uri for post in self.posts}
         for gap in page.gaps:

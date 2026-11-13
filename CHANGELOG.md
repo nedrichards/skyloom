@@ -4,7 +4,13 @@
 
 - Update atproto to 0.0.74 with verified wheel hashes. Use typed page-item access for feeds, search, people, bookmarks and notifications, and share the SDK's public serializer to preserve unknown records and extension fields.
 
+- Save and remove private server bookmarks, including unavailable posts, and browse them in a native paged list.
+
+- Control reply and quote permissions, hide and restore replies, and detach and reattach quotes with ownership and record-version checks.
+
 - Edit your display name, description, profile picture and banner with conflict checks and preserved profile metadata. Browse paged followers and following from profile counts.
+
+- Delete your own posts with confirmation, ownership and record-version checks. Keep deleted placeholders across feeds, conversations, quoted posts and account-local caches, including stale responses.
 
 - Share native test fixtures, make Meson reject skipped coverage, reject missing displays before native setup and report undelivered X11 input before keyboard assertions.
 

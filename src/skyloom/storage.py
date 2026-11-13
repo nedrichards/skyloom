@@ -12,7 +12,17 @@ from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
 
-from .domain import Author, CachedFeed, Media, Page, Pager, Post, find_post
+from .bookmark_service import reconcile_bookmarks, with_bookmark
+from .domain import (
+    Author,
+    CachedFeed,
+    Media,
+    Page,
+    Pager,
+    Post,
+    find_post,
+    reconcile_deleted,
+)
 from .feed_state import Bookmark
 from .image_cache import ImageCache
 
@@ -54,6 +64,7 @@ class Storage:
         self._epochs = {}
         self._initialized = set()
         self._windows = OrderedDict()
+        self._bookmark_changes = OrderedDict()
 
     def _io_lock(self, account):
         with self._state_lock:
@@ -102,6 +113,7 @@ class Storage:
                 os.chmod(path, 0o600)
                 if initialize:
                     db.executescript("""
+                        CREATE TABLE IF NOT EXISTS deleted_posts (uri TEXT PRIMARY KEY);
                         CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
                         CREATE TABLE IF NOT EXISTS feed_posts (
                             feed TEXT NOT NULL, uri TEXT NOT NULL, value TEXT NOT NULL,
@@ -149,11 +161,95 @@ class Storage:
         db.execute("""DELETE FROM state WHERE key LIKE 'feed:%' AND rowid NOT IN
             (SELECT rowid FROM state WHERE key LIKE 'feed:%' ORDER BY rowid DESC LIMIT 12)""")
 
+    def reconcile_page(self, account, page):
+        with self.connect(account) as db:
+            deleted = {row[0] for row in db.execute("SELECT uri FROM deleted_posts")}
+        changes = self._bookmark_overrides(account)
+        posts = tuple(
+            reconcile_bookmarks(reconcile_deleted(p, deleted), changes) for p in page.posts
+        )
+        from dataclasses import replace
+
+        return replace(page, posts=posts)
+
+    def delete_post(self, account, uri):
+        with self.connect(account) as db:
+            db.execute("INSERT OR IGNORE INTO deleted_posts VALUES (?)", (uri,))
+            for rowid, raw in db.execute("SELECT rowid,value FROM feed_posts").fetchall():
+                post = post_restore(json.loads(raw))
+                updated = reconcile_deleted(post, {uri})
+                if updated != post:
+                    db.execute(
+                        "UPDATE feed_posts SET value=? WHERE rowid=?",
+                        (json.dumps(asdict(updated)), rowid),
+                    )
+            for key, raw in db.execute(
+                "SELECT key,value FROM state WHERE key LIKE 'feed:%'"
+            ).fetchall():
+                value = json.loads(raw)
+                posts = value.get("posts") if isinstance(value, dict) else value
+                if isinstance(posts, list):
+                    updated = [asdict(reconcile_deleted(post_restore(p), {uri})) for p in posts]
+                    if isinstance(value, dict):
+                        value["posts"] = updated
+                    else:
+                        value = updated
+                    db.execute("UPDATE state SET value=? WHERE key=?", (json.dumps(value), key))
+        self._forget_windows(account)
+
+    def _bookmark_overrides(self, account):
+        now = time.monotonic()
+        return {
+            uri: value
+            for (did, uri), value in self._bookmark_changes.items()
+            if did == account and now < value[2]
+        }
+
+    def bookmark_post(self, account, uri, saved):
+        self._bookmark_changes[(account, uri)] = (0, saved, time.monotonic() + 120)
+        self._bookmark_changes.move_to_end((account, uri))
+        while len(self._bookmark_changes) > 2000:
+            self._bookmark_changes.popitem(last=False)
+        with self.connect(account) as db:
+            for rowid, raw in db.execute("SELECT rowid,value FROM feed_posts").fetchall():
+                post = post_restore(json.loads(raw))
+                updated = with_bookmark(post, uri, saved)
+                if updated != post:
+                    db.execute(
+                        "UPDATE feed_posts SET value=? WHERE rowid=?",
+                        (json.dumps(asdict(updated)), rowid),
+                    )
+            for table, query in (
+                ("state", "SELECT rowid,value FROM state WHERE key LIKE 'feed:%'"),
+                ("feed_pages", "SELECT rowid,value FROM feed_pages"),
+            ):
+                for rowid, raw in db.execute(query).fetchall():
+                    value = json.loads(raw)
+                    posts = value.get("posts") if isinstance(value, dict) else value
+                    if not isinstance(posts, list):
+                        continue
+                    updated = [asdict(with_bookmark(post_restore(p), uri, saved)) for p in posts]
+                    if isinstance(value, dict):
+                        value["posts"] = updated
+                    else:
+                        value = updated
+                    if table == "state":
+                        db.execute(
+                            "UPDATE state SET value=? WHERE rowid=?", (json.dumps(value), rowid)
+                        )
+                    else:
+                        db.execute(
+                            "UPDATE feed_pages SET value=? WHERE rowid=?",
+                            (json.dumps(value), rowid),
+                        )
+        self._forget_windows(account)
+
     def _archive(self, db, feed, posts, *, checkpoint=False, overwrite=True):
         now = time.time()
         values = {}
+        deleted = {row[0] for row in db.execute("SELECT uri FROM deleted_posts")}
         for post in posts:
-            current = post
+            current = reconcile_deleted(post, deleted)
             visited = set()
             while current is not None and current.uri not in visited:
                 visited.add(current.uri)
@@ -260,6 +356,7 @@ class Storage:
         value["version"] = 3
 
     def cache(self, account, feed, page, cursor=None):
+        page = self.reconcile_page(account, page)
         with self.connect(account) as db:
             self._archive(db, feed, page.posts)
             db.execute(
@@ -287,7 +384,8 @@ class Storage:
     def checkpoint(self, account, feed, pager, bookmark):
         if len(pager.posts) > 250:
             raise ValueError("Reading windows must contain at most 250 posts")
-        posts = tuple(pager.posts)
+        changes = self._bookmark_overrides(account)
+        posts = tuple(reconcile_bookmarks(p, changes) for p in pager.posts)
         with self.connect(account) as db:
             value = self._feed_value(db, feed)
             original = value.copy()
@@ -411,7 +509,11 @@ class Storage:
                     db.execute("DELETE FROM feed_pages")
                     db.execute("DELETE FROM feed_protected")
                     db.execute("DELETE FROM feed_bookmarks")
+                    db.execute("DELETE FROM deleted_posts")
                 path.unlink(missing_ok=True)
+            for key in tuple(self._bookmark_changes):
+                if key[0] == account:
+                    self._bookmark_changes.pop(key)
             self._initialized.discard(account)
             self._last_cleanup.pop(account, None)
             shutil.rmtree(

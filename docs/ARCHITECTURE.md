@@ -11,8 +11,10 @@ Start in `src/skyloom/`. The application uses native GTK 4/libadwaita widgets;
 | Feed loading and reading position | `pagination.py`, `feed_coordination.py`, `reading.py` |
 | Keyboard and gestures | `keyboard.py`, `interactions.py` |
 | Immutable records and text | `domain.py`, `richtext.py` |
-| AT Protocol and authentication | `service.py`, `network.py`, `credentials.py` |
+| AT Protocol and authentication | `service.py`, `sdk.py`, `network.py`, `credentials.py` |
 | Profile editing and people lists | `profile_service.py`, `profile_editor.py`, `people_view.py` |
+| Private bookmarks | `bookmark_service.py`, `bookmark_view.py` |
+| Reply and quote controls | `thread_service.py`, `thread_controls.py` |
 | Background work | `worker.py`, `request_scope.py` |
 | Drafts and local data | `composer.py`, `storage.py` |
 | Images | `media.py` |
@@ -21,6 +23,12 @@ Start in `src/skyloom/`. The application uses native GTK 4/libadwaita widgets;
 GTK runs on the main thread. The worker owns the asyncio loop and sends
 completions back through GLib. When tracing a stale result, follow its request
 scope, page lifetime and account generation from submission to completion.
+
+`sdk.py` uses atproto's public model serializer, including its unknown-record
+fallback, and the 0.0.74 typed page-item interface. Adapters convert one fetched
+page into immutable app records; native pagers retain responsibility for bounded
+windows, reading positions, repeated cursors and request cancellation. Notification
+mapping reads typed fields directly and avoids serialising unused post records.
 
 For scrolling issues, start with the shared list and reading-position code;
 conversations also have their own projection and loader handling. Use the
@@ -32,6 +40,12 @@ Account databases and prepared uploads live in `$XDG_DATA_HOME/skyloom`;
 encoded images live in `$XDG_CACHE_HOME/skyloom`. Under Flatpak these normally
 resolve beneath `~/.var/app/com.nedrichards.Skyloom/data/` and `cache/`.
 Tokens live in the login keyring; preferences use GSettings.
+
+Deleted-post tombstones are account-local and prevent stale cached/network
+responses restoring deleted content. Bookmarks use Bluesky's private service,
+separate from the local feed reading-position bookmarks. Thread/post gate writes
+preserve unrelated fields and compare record versions; separate reply and quote
+saves make partial failures explicit.
 
 See `storage.py` and `media.py` for retention limits and cleanup. These are local
 application files, not separately encrypted backups. Use temporary demo storage

@@ -42,7 +42,7 @@ Implement complete network, model, UI and recovery paths for any chosen feature:
 - Direct messages with supported permissions and service routing.
 - Native video playback and upload.
 - Multiple accounts and safe switching.
-- Post deletion, bookmarks, server drafts and feed management.
+- Server drafts and feed management.
 - Full moderation preferences, labeller attribution and in-app reporting.
 
 This list does not authorise publishing, tagging or account mutations.

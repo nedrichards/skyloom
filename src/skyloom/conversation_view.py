@@ -378,12 +378,23 @@ class ConversationView(FeedView):
         if isinstance(item, ThreadGap):
             row.append(
                 label(
-                    "A blocked message is unavailable."
+                    "This reply was hidden by the thread author."
+                    if item.kind == "hidden"
+                    else "A blocked message is unavailable."
                     if item.kind == "blocked"
                     else "A message is deleted or unavailable.",
                     "dim-label",
                 )
             )
+            if item.kind == "hidden":
+                row.append(
+                    button(
+                        "",
+                        "Open hidden reply",
+                        lambda: self.window.thread(item.uri),
+                        "Open hidden reply",
+                    )
+                )
             return row
         earlier = isinstance(item, EarlierMessages)
         parent = None if earlier else item.parent

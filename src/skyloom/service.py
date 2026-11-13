@@ -11,14 +11,18 @@ from pathlib import Path
 from atproto import models
 from atproto_client.exceptions import AtProtocolError
 
+from .bookmark_service import BookmarkService
 from .conversation import thread_from
 from .credentials import KeyringError, SecretStore
-from .domain import Notice, Page, author_from, feed_from, post_from
+from .domain import Notice, Page, author_from, deleted_post, feed_from, post_from
 from .errors import POST_UNAVAILABLE, UserError
 from .network import new_client
 from .profile_service import ProfileService
 from .richtext import facets_for, validate
+from .sdk import model_data as data
+from .sdk import page_items
 from .storage import Storage
+from .thread_service import ThreadService
 
 # Never let third-party diagnostics print HTTP headers, response bodies or session material.
 for _name in ("atproto", "atproto_client", "httpx", "httpcore"):
@@ -26,14 +30,6 @@ for _name in ("atproto", "atproto_client", "httpx", "httpcore"):
     logger.handlers = [logging.NullHandler()]
     logger.propagate = False
     logger.disabled = True
-
-
-def data(model):
-    return (
-        model.model_dump(by_alias=True, exclude_none=True)
-        if hasattr(model, "model_dump")
-        else model
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +41,7 @@ class Attachment:
 _CURRENT_ACCOUNT = object()
 
 
-class Service(ProfileService):
+class Service(BookmarkService, ProfileService, ThreadService):
     def __init__(self, client=None, secrets=None, storage=None, client_factory=new_client):
         self.client_factory = client_factory
         self.client = client or self.client_factory()
@@ -225,6 +221,7 @@ class Service(ProfileService):
                 )
                 await asyncio.to_thread(self.storage.clear, account.did, token)
             self.account = None
+            getattr(self, "_gate_overrides", {}).clear()
             await self.client.request.close()
             self.client = self.client_factory()
             self.client.on_session_change(self._session_changed)
@@ -247,7 +244,9 @@ class Service(ProfileService):
                 result = await self.client.app.bsky.feed.get_feed(
                     {"feed": feed, "cursor": cursor, "limit": 30}
                 )
-            page = feed_from(data(result))
+            page = await self._io(
+                "reconcile_page", feed_from({"feed": page_items(result), "cursor": result.cursor})
+            )
             if self.account:
                 await self._io("cache", feed, page, cursor)
             return page
@@ -304,9 +303,11 @@ class Service(ProfileService):
                     uri, depth=0 if earlier else 2, parent_height=0 if replies_only else 20
                 )
             )["thread"]
-        if "post" not in node:
-            raise UserError(POST_UNAVAILABLE)
-        return thread_from(node, include_replies=not earlier)
+            if "post" not in node:
+                raise UserError(POST_UNAVAILABLE)
+            return self.apply_gate_controls(
+                await self._io("reconcile_page", thread_from(node, include_replies=not earlier))
+            )
 
     async def profile(self, actor):
         async with self.authenticated():
@@ -314,17 +315,15 @@ class Service(ProfileService):
 
     async def author_feed(self, actor, cursor=None, feed_filter="posts_no_replies"):
         async with self.authenticated():
-            return feed_from(
-                data(
-                    await self.client.get_author_feed(
-                        actor, cursor=cursor, filter=feed_filter, limit=30
-                    )
-                )
+            result = await self.client.get_author_feed(
+                actor, cursor=cursor, filter=feed_filter, limit=30
             )
+            page = feed_from({"feed": page_items(result), "cursor": result.cursor})
+            return await self._io("reconcile_page", page)
 
     async def mutate(self, post, kind):
         async with self.authenticated():
-            if kind not in ("like", "repost"):
+            if post.unavailable == "This post was deleted." or kind not in ("like", "repost"):
                 raise UserError("This post action is not supported.")
             if kind == "like":
                 if post.like_uri:
@@ -337,6 +336,37 @@ class Service(ProfileService):
                 return replace(post, repost_uri="", reposts=max(0, post.reposts - 1))
             result = await self.client.repost(post.uri, post.cid)
             return replace(post, repost_uri=result.uri, reposts=post.reposts + 1)
+
+    async def delete_post(self, post, *, expected_account=None):
+        async with self.authenticated():
+            if expected_account is not None and self.account is not expected_account:
+                raise UserError("The signed-in account changed. Reopen the post.")
+            prefix = f"at://{self.account.did}/app.bsky.feed.post/"
+            rkey = post.uri.removeprefix(prefix)
+            if (
+                post.author.did != self.account.did
+                or not post.uri.startswith(prefix)
+                or not re.fullmatch(r"[A-Za-z0-9._:~-]{1,512}", rkey)
+                or rkey in (".", "..")
+                or not post.cid
+            ):
+                raise UserError("Only your own posts can be deleted.")
+            params = {"repo": self.account.did, "collection": "app.bsky.feed.post", "rkey": rkey}
+            try:
+                record = data(await self.client.com.atproto.repo.get_record(params))
+            except AtProtocolError as exc:
+                if getattr(getattr(exc, "response", None), "status_code", None) != 404:
+                    raise
+            else:
+                if (
+                    record.get("uri") != post.uri
+                    or record.get("cid") != post.cid
+                    or record.get("value", {}).get("$type") != "app.bsky.feed.post"
+                ):
+                    raise UserError("This post has changed. Refresh it before deleting.")
+                await self.client.com.atproto.repo.delete_record({**params, "swapRecord": post.cid})
+            await self._io("delete_post", post.uri)
+            return deleted_post(post)
 
     async def _delete_record(self, value, collection, subject):
         # Viewer fields are untrusted AppView data. Never let them select a
@@ -404,38 +434,35 @@ class Service(ProfileService):
     async def search(self, query, people=False, cursor=None):
         async with self.authenticated():
             if people:
-                result = data(
-                    await self.client.app.bsky.actor.search_actors(
-                        {"q": query, "limit": 30, "cursor": cursor}
-                    )
-                )
-                return tuple(author_from(x) for x in result.get("actors", [])), result.get("cursor")
-            result = data(
-                await self.client.app.bsky.feed.search_posts(
+                result = await self.client.app.bsky.actor.search_actors(
                     {"q": query, "limit": 30, "cursor": cursor}
                 )
+                return page_items(result, author_from), result.cursor
+            result = await self.client.app.bsky.feed.search_posts(
+                {"q": query, "limit": 30, "cursor": cursor}
             )
-            return Page(tuple(post_from(x) for x in result.get("posts", [])), result.get("cursor"))
+            return await self._io(
+                "reconcile_page",
+                Page(page_items(result, post_from), result.cursor),
+            )
 
     async def notifications(self, cursor=None):
         async with self.authenticated():
-            d = data(
-                await self.client.app.bsky.notification.list_notifications(
-                    {"limit": 40, "cursor": cursor}
-                )
+            result = await self.client.app.bsky.notification.list_notifications(
+                {"limit": 40, "cursor": cursor}
             )
             items = tuple(
                 Notice(
-                    author_from(x["author"]),
-                    x["reason"],
-                    x["uri"],
-                    x.get("reasonSubject", ""),
-                    x.get("isRead", False),
-                    x["indexedAt"],
+                    author_from(data(item.author)),
+                    item.reason,
+                    item.uri,
+                    item.reason_subject or "",
+                    item.is_read,
+                    item.indexed_at,
                 )
-                for x in d.get("notifications", [])
+                for item in result.get_page_items()
             )
-            return items, d.get("cursor"), self.client.get_current_time_iso()
+            return items, result.cursor, self.client.get_current_time_iso()
 
     async def mark_seen(self, timestamp):
         async with self.authenticated():

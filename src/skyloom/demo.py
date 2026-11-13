@@ -8,15 +8,26 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
+from .bookmark_service import BookmarkPage, UnavailableBookmark
 from .conversation import ThreadPage
-from .domain import Media, Notice, Page, Post, author_from, find_post
+from .domain import (
+    Media,
+    Notice,
+    Page,
+    Post,
+    author_from,
+    deleted_post,
+    find_post,
+    reconcile_deleted,
+)
 from .errors import UserError
 from .profile_service import COLLECTION, EditableProfile, validate_profile
 from .richtext import facets_for, validate
 from .storage import Storage
+from .thread_service import DemoThreadService
 
 
-class DemoService:
+class DemoService(DemoThreadService):
     def __init__(self, fixture):
         self.fixture = json.loads(Path(fixture).read_text(encoding="utf-8"))
         self.account = author_from(self.fixture["demo_account"])
@@ -130,7 +141,7 @@ class DemoService:
             parent=(p.uri, p.cid),
             context="Reply",
         )
-        return ThreadPage((replace(p, context="Selected post"), reply))
+        return self.apply_gate_controls(ThreadPage((replace(p, context="Selected post"), reply)))
 
     async def editable_profile(self):
         await self.pause()
@@ -146,7 +157,6 @@ class DemoService:
             json.dumps(record),
             self.account,
         )
-
 
     async def update_profile(self, original, name, description, avatar=None, banner=None):
         await self.pause()
@@ -181,14 +191,12 @@ class DemoService:
         ]
         return self.profile_override
 
-
     async def follow_people(self, actor, kind, cursor=None):
         await self.pause()
         if kind not in ("followers", "following"):
             raise UserError("This people list is not supported.")
         authors = {post.author.did: post.author for post in self.posts if post.author.did != actor}
         return tuple(authors.values()) if cursor is None else (), None
-
 
     async def profile(self, actor):
         await self.pause()
@@ -206,6 +214,30 @@ class DemoService:
     async def author_feed(self, actor, cursor=None, feed_filter="posts_no_replies"):
         await self.pause()
         return Page(tuple(p for p in self.posts if p.author.did == actor))
+
+    async def delete_post(self, post, *, expected_account=None):
+        await self.pause()
+        if expected_account is not None and self.account is not expected_account:
+            raise UserError("The signed-in account changed. Reopen the post.")
+        if post.author.did != self.account.did:
+            raise UserError("Only your own posts can be deleted.")
+        self.posts = [reconcile_deleted(p, {post.uri}) for p in self.posts]
+        await asyncio.to_thread(self.storage.delete_post, self.account.did, post.uri)
+        return deleted_post(post)
+
+    async def bookmarks(self, cursor=None):
+        await self.pause()
+        return BookmarkPage(tuple(p for p in self.posts if p.bookmarked))
+
+    async def bookmark(self, post, saved, *, expected_account=None):
+        await self.pause()
+        if expected_account is not None and self.account is not expected_account:
+            raise UserError("The signed-in account changed. Reopen bookmarks.")
+        if isinstance(post, UnavailableBookmark):
+            return post
+        updated = replace(post, bookmarked=saved)
+        self.posts = [updated if p.uri == post.uri else p for p in self.posts]
+        return updated
 
     async def mutate(self, post, kind):
         await self.pause()

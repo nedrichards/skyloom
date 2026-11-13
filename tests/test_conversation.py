@@ -84,6 +84,17 @@ class ConversationTests(unittest.TestCase):
         self.assertEqual(state.merge(repeated, root["post"]["uri"], earlier=True), 0)
         self.assertFalse(state.earlier)
 
+    def test_threadgate_hidden_reply_is_a_gap_but_direct_open_remains_readable(self):
+        root = node("root", reply_count=1)
+        child = node("child", root)
+        root["replies"] = [child]
+        child_uri = child["post"]["uri"]
+        root["post"]["threadgate"] = {"record": {"hiddenReplies": [child_uri]}}
+        page = thread_from(root)
+        self.assertNotIn(child_uri, [post.uri for post in page.posts])
+        self.assertEqual(page.gaps[0].kind, "hidden")
+        self.assertEqual(thread_from(child).posts[-1].uri, child_uri)
+
     def test_deleted_blocked_and_cyclic_nodes_do_not_break_context_or_spin(self):
         root = node("root", reply_count=2)
         root["replies"] = [{"uri": "at://invented/deleted", "notFound": True}, root]

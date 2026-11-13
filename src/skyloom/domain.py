@@ -53,6 +53,9 @@ class Post:
     root: tuple[str, str] | None = None
     unavailable: str = ""
     parent: tuple[str, str] | None = None
+    bookmarked: bool = False
+    reply_disabled: bool = False
+    embedding_disabled: bool = False
 
     @property
     def link(self):
@@ -258,6 +261,39 @@ class CachedFeed:
     bookmark: Bookmark | None = None
 
 
+def deleted_post(post):
+    """Retain identity and thread edges, never the deleted record's content."""
+    return replace(
+        post,
+        text="",
+        facets=(),
+        images=(),
+        quote=None,
+        external=None,
+        labels=(),
+        likes=0,
+        reposts=0,
+        replies=0,
+        like_uri="",
+        repost_uri="",
+        unavailable="This post was deleted.",
+        reply_disabled=True,
+        embedding_disabled=True,
+    )
+
+
+def reconcile_deleted(post, deleted):
+    if not isinstance(post, Post):
+        return post
+    if post.uri in deleted:
+        return deleted_post(post)
+    if post.quote:
+        quote = reconcile_deleted(post.quote, deleted)
+        if quote != post.quote:
+            return replace(post, quote=quote)
+    return post
+
+
 def find_post(posts, uri):
     """Find a retained post or quoted record without revisiting quote cycles."""
     visited = set()
@@ -280,6 +316,11 @@ def safe_url(value: str) -> str:
         )
     except ValueError:
         return ""
+
+
+def safe_https_url(value: str) -> str:
+    value = safe_url(value)
+    return value if value.startswith("https://") else ""
 
 
 def author_from(d: dict) -> Author:
@@ -339,6 +380,9 @@ def post_from(d: dict, depth=0) -> Post:
         replies=d.get("replyCount", 0),
         like_uri=viewer.get("like", ""),
         repost_uri=viewer.get("repost", ""),
+        bookmarked=viewer.get("bookmarked", False),
+        reply_disabled=viewer.get("replyDisabled", False),
+        embedding_disabled=viewer.get("embeddingDisabled", False),
         facets=tuple(rec.get("facets") or []),
         images=tuple(images),
         quote=quoted,
