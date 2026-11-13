@@ -7,7 +7,7 @@ authors = [{name = "Nick Richards"}]
 license = "GPL-3.0-or-later"
 license-files = ["COPYING", "LICENSE.md"]
 requires-python = ">=3.14"
-dependencies = ["atproto==0.0.73", "regex==2026.9.29"]
+dependencies = ["atproto==0.0.74", "regex==2026.9.29"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

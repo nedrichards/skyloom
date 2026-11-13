@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Update atproto to 0.0.74 with verified wheel hashes. Use typed page-item access for feeds, search, people, bookmarks and notifications, and share the SDK's public serializer to preserve unknown records and extension fields.
+
 - Share native test fixtures, make Meson reject skipped coverage, reject missing displays before native setup and report undelivered X11 input before keyboard assertions.
 
 - Keep two fresh showcase screenshots and generate other captures locally; remove icon preview artefacts and the historical model benchmark, and shorten the README.

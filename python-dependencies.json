@@ -19,8 +19,8 @@
     },
     {
       "type": "file",
-      "url": "https://files.pythonhosted.org/packages/98/0f/f2289686a9e0cbadfe268116c9d81886e76354c7d748bb94aa9669a40ed1/atproto-0.0.73-py3-none-any.whl",
-      "sha256": "772dbef364788385724b1724434a42c56b9aeeec0e480c70f6b7edd7f65f1e77",
+      "url": "https://files.pythonhosted.org/packages/1b/62/2e0c01a5ff58bf7e2c183bd70f94bd47ee7078227bdcbfab19be975b91a5/atproto-0.0.74-py3-none-any.whl",
+      "sha256": "b9aca52958542c8f3fc597265c49719ae11735274136c7008090bd0ee8ce8618",
       "dest": "wheels"
     },
     {

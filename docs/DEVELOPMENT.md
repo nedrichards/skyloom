@@ -4,6 +4,12 @@ Use Python 3.14 and GNOME 51. Native dependencies and build requirements are in
 `meson.build` and `com.nedrichards.Skyloom.json`; Python versions and hashes are
 in the lockfiles and `python-dependencies.json`.
 
+The current atproto pin is 0.0.74. Review upstream release notes and generated
+model contracts before upgrading. Keep `pyproject.toml`, runtime/development
+locks and the generated wheel hashes consistent; `pip check` verifies the
+resolved environment. SDK boundary tests cover unknown records, extension-field
+round trips and typed single-page access.
+
 ## Native build
 
 Install the native GI libraries, Meson and Ninja, then run:
