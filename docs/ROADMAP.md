@@ -1,54 +1,48 @@
 # Future work
 
-The original bootstrap specification has been retired. [FEATURES.md](FEATURES.md) describes implemented behaviour; this file is the single home for outstanding product and release work. No item below implies a working feature or a published release.
+## Before public release
 
-## Required before public release
+- Test a real account using a dedicated app password entered only in the app:
+  login/session restore, feed paging, conversations/Back, reactions, replies,
+  text/quote/image posts with descriptions, profiles/follow/mute/block, search,
+  notification read state and sign-out.
+- Check Orca, physical keyboard/pointer/touch input, file portals, network and
+  power changes, and suspend/resume. Include selection, focus return and branch
+  loading. Review light/dark/high contrast/large text and widths above 1280 pixels.
+- Supply public project metadata, screenshot URLs and hosted CI; resolve strict
+  AppStream validation's missing-homepage warning. Review privacy, moderation,
+  dependency licensing and sandbox permissions for distribution.
+- Build and test architecture-specific dependencies before supporting more than
+  x86_64. Review Flathub requirements before submission.
 
-- Perform human acceptance with a dedicated app password entered only into the app: login, relaunch/refresh persistence, Following/pinned-feed paging, conversation/back position, like/repost/undo, nested replies, text/quote/image publication with descriptions, profile/follow/mute/block, search, notification read state and sign-out/relaunch. Mock HTTP tests do not establish live service interoperability.
-- Check Orca, keyboard-only use with actual input, physical touch/pull gestures, file chooser portals, real network/cost/power transitions and laptop suspend/resume. Include compact profile/label hit areas, text selection and the pointer-to-keyboard card/control focus handoff. Native controller tests and injected clocks cover implementation contracts but not these hardware journeys. Current Xwayland synthetic input delivery is blocked; see the delivery report.
-- Review at 1600 logical pixels and wider. Current captures cover 480, 800 and 1280 pixels; this desktop is only 1503 logical pixels wide. Retain light/dark/high-contrast/large-text checks.
-- Configure the real public repository/homepage, then resolve AppStream's missing-homepage warning, add hosted CI, public screenshot URLs and release metadata. Review privacy/moderation messaging and bundled dependency licensing for distribution; original project work is GPLv3-or-later (see [the source sharing review](REPOSITORY_REVIEW.md)). The identity and Open Loom artwork have been selected by the maintainer; no project URL is invented. A private source upload does not complete these public-release gates.
-- Build/test architecture-specific dependency sources before offering architectures beyond x86_64. Review the manifest, runtime availability and sandbox permissions before any Flathub submission. No submission, upload, tag or release is authorised by this roadmap.
+## Scrolling and reliability
 
-## Code quality follow-up
+- Resolve visual disturbance when replies or ancestors arrive during momentum
+  scrolling in long conversations. Reproduce with physical input and trace the
+  normal renderer; do not attribute ghosting to a renderer without evidence.
+- Measure cold native-list construction, viewport geometry scans, reading
+  checkpoints during sustained scrolling, item-specific widgets and notification
+  completion work. Obtain matched, adequately sampled baselines before claiming
+  overall performance gains. Include photo-heavy feeds and additional hardware.
+- Investigate Wayland frame-wait timeouts, unreliable Xwayland input injection,
+  narrow-width reflow delays and the AdwGizmo snapshot-allocation warning during
+  rapid resize reversal.
+- Review very wide live conversations and server-omitted replies; the endpoint
+  has no cursor for enumerating arbitrary missing siblings.
+- Reclaim abandoned prepared uploads without removing images used by drafts or
+  an open composer.
+- Add translations. Review GI asyncio-policy and HTTPX upload deprecations when
+  updating dependencies.
 
-The refactoring in [CODE_QUALITY_REVIEW.md](CODE_QUALITY_REVIEW.md#resolution) implements the review findings, including cancellation-safe storage, row/index and request ownership, Undo tokens, pager uniqueness, efficient checkpoints, media residency and strict test gates. Keep its new invariant tests in the required native gate. Obtain a clean, adequately sampled same-environment scrolling baseline before treating relative timing checks as acceptance on this shared compositor. Physical activation/keyboard/touch and live-service gates above remain outstanding.
+## Optional features
 
-## Rendering performance
+Implement complete network, model, UI and recovery paths for any chosen feature:
 
-- Follow [the scrolling architecture review](SCROLLING_REVIEW.md): measure shared viewport geometry and remaining external/disclosure construction after the verified body-request, avatar/media, CSS and allocation changes. Obtain adequately sampled matched default-renderer scrolling captures before claiming overall speed improvement; initial candidate comparisons remain rejected. Verify physical momentum and image/paging behaviour under the default renderer.
-
-The 60 fps target is not met for every workload. [PERFORMANCE.md](PERFORMANCE.md) records installed measurements and the safe optimisations already made. Core post cells, avatars and media slots are now reused across binding; the one-character body measurement path and eager warning controls have been removed. Prioritise remaining item-specific allocation and cold native-buffer construction. Historical 250-post measurements constructed roughly 200 full widget trees; repeat dense scrolling measurements before claiming that budget is met. Preserve all retained messages, exact reading anchors, keyboard access, screen-reader semantics and one native scrolling surface. Do not conceal this by lowering the history limit, disabling animations globally or reporting only median timings. Reduce initial notification construction (86.5 ms sampled main-thread completion) and the remaining Mark seen completion work (17.3 ms). Static asynchronous presentation gaps are not a measure of blocked rendering. Recheck viewport-width transitions and idle animation activity with GTK/GSK tracing, then repeat on photo-heavy live feeds and additional hardware.
-
-## Reliability and maintainability
-
-- Restore reliable Xwayland injected-input delivery and obtain adequately sampled default-renderer timing runs on this shared compositor. Keep the explicit X11/Cairo functional gate separate from Wayland full-suite frame-wait failures and compositor timing limitations. Neither functional tests nor sidebar frame samples establish physical input acceptance or a frame-rate guarantee. Reduce the initial narrow-width reflow cost: the 250-post sidebar probe still takes hundreds of milliseconds before the slide can start.
-
-- Investigate the native AdwGizmo snapshot-allocation warning emitted by the rapid resize-reversal fixture. Keep this finding visible alongside passing runs; do not weaken its assertions. Conversation loader/profile focus regressions now pass after the allocation-aware focus recovery changes; physical keyboard and Orca acceptance remain below.
-
-- Persist more conversation/profile/notification state if a fuller offline experience is wanted. Feed pages/reading windows now have an automatically cleaned archive; conversation/profile/notification snapshots are not separately archived. There is no offline mutation queue.
-- Reclaim abandoned prepared attachment copies safely, without deleting images referenced by drafts or an open composer. Current copies are retained until sign-out.
-- Add translation catalogues and localise user-facing strings. British English is delivered today.
-- Review upstream GI asyncio-policy and HTTPX upload deprecations as runtime/dependency updates arrive. Static typing and ShellCheck are possible additions, not currently claimed checks.
-- Broader service/moderation interoperability and accessibility review may identify further changes; keep their findings here with reproducible evidence.
-
-## Conversation follow-up acceptance
-
-The conversation ordering redesign is implemented; see [ARCHITECTURE.md](ARCHITECTURE.md#conversation-context-and-tile-activation) and [FEATURES.md](FEATURES.md). Keep these remaining acceptance gates separate from implemented behaviour:
-
-- Human Orca and physical keyboard/touch checks for parent/reply navigation, branch loading focus return and concise completion/error announcements.
-- Resolve the remaining visual disturbance when new items are inserted during momentum scrolling in long conversations. The maintainer reports a substantial improvement after the loading/positioning fixes, including threads of authors not followed, but insertion during motion still needs work. Capture a focused normal-renderer trace and verify delayed reply/ancestor insertion with physical input; native regressions do not establish seamless live Wayland presentation.
-- Wider-than-1280-pixel desktop review, alongside installed 480/800-pixel light/dark/high-contrast/large-text checks.
-- Live-service review of very wide threads and server-omitted replies; the supported endpoint provides no cursor for enumerating arbitrary missing siblings. Do not promise complete conversation archives.
-
-## Optional product work
-
-Prioritise only when there is a complete network/model/view/error-handling slice:
-
-- Direct messages with explicit supported app-password permissions and service routing.
-- Native video playback/upload, with real codec/upload/job handling and accessible controls.
-- Multiple accounts and safe account switching.
+- More offline conversation/profile/notification storage.
+- Direct messages with supported permissions and service routing.
+- Native video playback and upload.
+- Multiple accounts and safe switching.
 - Post deletion, bookmarks, server drafts and feed management.
-- More complete moderation preferences/labeler support, including source attribution and labeller-specific definitions/preferences, and in-app reporting.
+- Full moderation preferences, labeller attribution and in-app reporting.
 
-None of these optional items blocks the local preview. Revisit scope deliberately rather than retaining the old build phases as an active plan.
+This list does not authorise publishing, tagging or account mutations.

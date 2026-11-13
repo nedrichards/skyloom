@@ -1,6 +1,6 @@
 # AGENTS.md — maintenance instructions
 
-Skyloom is an implemented native GNOME Bluesky client, not a bootstrap specification. Start with [README.md](README.md), [docs/FEATURES.md](docs/FEATURES.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/ROADMAP.md](docs/ROADMAP.md). Preserve useful existing work. The original build prompt and phase plans have been retired.
+Skyloom is an implemented native GNOME Bluesky client, not a bootstrap specification. Start with [README.md](README.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/ROADMAP.md](docs/ROADMAP.md). Preserve useful existing work. The original build prompt and phase plans have been retired.
 
 ## Working rules
 

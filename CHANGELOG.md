@@ -4,6 +4,10 @@
 
 - Share native test fixtures, make Meson reject skipped coverage, reject missing displays before native setup and report undelivered X11 input before keyboard assertions.
 
+- Keep two fresh showcase screenshots and generate other captures locally; remove icon preview artefacts and the historical model benchmark, and shorten the README.
+
+- Reduce contributor documentation to practical guides and unresolved work; remove completed reviews, duplicated test descriptions and historical benchmark output.
+
 - Keep a single tap on the active Home destination still throughout the focus handoff. Select a visible row and transfer logical list focus without scrolling it into view and snapping back; keep double-tap refresh and position Undo.
 
 - Make every explicit feed-top action request the newest page, including Home double-click/double-tap and Ctrl+Home when an older head page is still loaded. Keep the same refresh, error recovery and position Undo path for arrival notifications.

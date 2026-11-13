@@ -46,14 +46,11 @@ htmlcov/
 /token.*
 /tokens.*
 
-# Only reviewed invented-data captures belong in the repository.
+# Generated captures stay local; showcase images are reviewed invented data.
 /screenshots/*
-!/screenshots/demo/
-!/screenshots/high-contrast-large-text/
-/screenshots/demo/*
-!/screenshots/demo/*.png
-/screenshots/high-contrast-large-text/*
-!/screenshots/high-contrast-large-text/*.png
+!/screenshots/showcase/
+/design/icon-concepts/*.png
+/design/icon-concepts/previews/
 
 # Editor state and private local notes
 .idea/

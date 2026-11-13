@@ -5,7 +5,7 @@
   <project_license>GPL-3.0-or-later</project_license>
   <name>Skyloom</name>
   <summary>Read and join conversations on Bluesky</summary>
-  <description><p>A native GNOME client for Bluesky with a calm reading experience, conversations, profiles and an accessible composer. Sign in with a dedicated app password, or explore the offline demo without an account.</p><p>Skyloom is independent and is not affiliated with Bluesky.</p></description>
+  <description><p>A native GNOME client for Bluesky with a calm reading and writing experience. Sign in with a dedicated app password, or explore the offline demo without an account.</p><p>Skyloom is independent and is not affiliated with Bluesky.</p></description>
   <launchable type="desktop-id">com.nedrichards.Skyloom.desktop</launchable>
   <developer id="com.nedrichards"><name>Nick Richards</name></developer>
   <content_rating type="oars-1.1"><content_attribute id="social-chat">intense</content_attribute><content_attribute id="social-info">mild</content_attribute></content_rating>

@@ -10,8 +10,8 @@ of changes cannot be guaranteed. For a substantial change, discussing the idea
 first can help establish whether it fits the project's direction. A fork is
 always a welcome home for a different approach.
 
-For contributions, start with the [development guide](docs/DEVELOPMENT.md),
-[implemented features](docs/FEATURES.md) and [roadmap](docs/ROADMAP.md). Keep
+For contributions, start with the [development guide](docs/DEVELOPMENT.md) and
+[roadmap](docs/ROADMAP.md). Keep
 changes focused, follow the existing native GNOME design, and describe the
 behaviour changed and the checks performed. Run `./scripts/check.sh` and the
 checks appropriate to your change; run native tests and GUI smokes sequentially.
