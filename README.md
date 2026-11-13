@@ -9,13 +9,14 @@ The bits of Bluesky I use work fine. DMs and multiple accounts are not included.
 
 ## Install and launch
 
-The app targets flatpak as a build and execution environment. There is no hosted download yet.
-[Build a local Flatpak bundle](docs/DEVELOPMENT.md#flatpak), then install it:
+Download the x86_64 Flatpak bundle from the [0.1.1 release](https://github.com/nedrichards/skyloom/releases/tag/v0.1.1), then install it:
 
 ```sh
-flatpak install --user dist/com.nedrichards.Skyloom-0.1.0-x86_64.flatpak
+flatpak install --user ~/Downloads/com.nedrichards.Skyloom-0.1.1-x86_64.flatpak
 flatpak run com.nedrichards.Skyloom
 ```
+
+For local builds, see [development](docs/DEVELOPMENT.md#flatpak).
 
 Explore invented data without an account or network:
 

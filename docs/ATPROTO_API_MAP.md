@@ -2,6 +2,10 @@
 
 This maps implemented routes in `service.py` using the pinned atproto SDK. Verify installed generated types and current official docs when changing an endpoint. Future features live in [ROADMAP.md](ROADMAP.md).
 
+Feature adapters also live in `profile_service.py`, `bookmark_service.py`,
+`thread_service.py` and `video_upload.py`. The shared SDK boundary uses public
+serialization and typed page-item access from atproto 0.0.74.
+
 | User feature | Relevant lexicon / SDK surface | Requirements and pitfalls |
 | --- | --- | --- |
 | Session creation | `com.atproto.server.createSession` through `AsyncClient.login` | Login with dedicated app password; never use main password. SDK follows PDS discovery. Rate-limited: store and restore sessions. |
@@ -11,13 +15,20 @@ This maps implemented routes in `service.py` using the pinned atproto SDK. Verif
 | User-selected feeds | `app.bsky.actor.getPreferences` | Parse feed-view preferences, pinned/saved feed URIs; preserve server preference semantics. |
 | Single post/thread | `app.bsky.feed.getPostThread` | Thread union models include blocked/unavailable/deleted, not only full post views. Stable getPostThread has depth/parentHeight but no cursor: fetch ancestor and terminal-reply anchors incrementally; bound and deduplicate the merged view. |
 | Author profile | `app.bsky.actor.getProfile` | Accept handles/DIDs; custom handles; viewer state (following/muted/blocked). |
+| Profile editing | `com.atproto.repo.getRecord`, `putRecord`, `createRecord`, `uploadBlob` | Own literal `app.bsky.actor.profile/self`; preserve unknown fields, compare CID and bind to the current session. Strip image metadata. |
+| Followers/following | `app.bsky.graph.getFollowers`, `getFollows` | One cursor page per request, bounded native people list and stale-page/account guards. |
 | Author posts/replies | `app.bsky.feed.getAuthorFeed` | Cursor + author feed filter; gracefully hide unsupported content. |
 | Like / unlike | `app.bsky.feed.like` record creation / high-level `client.like`; `com.atproto.repo.deleteRecord` or high-level unlike | Need post `(uri,cid)` for like. Deleting a like requires own created like record URI, not target post URI. |
 | Repost / undo | `app.bsky.feed.repost` record / SDK repost helpers | Undo deletes own repost URI from `viewer.repost`. |
 | Create post | `app.bsky.feed.post` and SDK `send_post` | Correct facets, language, embeds, client-side 300 graphemes and 3000 bytes; submit once; created result URI/CID. |
+| Delete post | `com.atproto.repo.getRecord`, `deleteRecord` | Confirm; validate ownership, collection and displayed CID; delete with `swapRecord`. Persistent tombstones reconcile stale caches and responses. |
+| Private bookmarks | `app.bsky.bookmark.createBookmark`, `deleteBookmark`, `getBookmarks` | Save URI/CID; removal needs URI. Preserve removable unavailable entries and reconcile indexing lag. |
+| Reply and quote controls | `app.bsky.feed.threadgate`, `postgate` repository records | Own matching post key; guard existing writes by CID and use fixed-key creation when absent. Preserve unknown rules, hidden replies and detached quotes. |
 | Reply | `app.bsky.feed.post` with reply ref | Need `root` AND immediate `parent` strong references; don't treat every reply as top-level. |
 | Quote | `app.bsky.embed.record` in post embed | Quoted URI/CID plus text; not equivalent to repost record. |
 | Image upload | `com.atproto.repo.uploadBlob` / `client.upload_blob` | Use valid MIME, size cap and image thumbnails; insert `app.bsky.embed.images`, each alt text; verify current upload limits. |
+| Video playback | `app.bsky.embed.video#view` playlist | Explicit native HLS playback via GStreamer and GTK controls; no session tokens sent to media URLs and no feed autoplay. |
+| Video upload | `com.atproto.server.getServiceAuth`, `app.bsky.video.getUploadLimits`, `uploadVideo`, `getJobStatus` | Use scoped, short-lived service auth; stream once, bound processing polls, verify job owner/blob and preserve failed drafts. Prepare described MP4/H.264/AAC copies within 10 minutes/300 MB. |
 | Rich text | `app.bsky.richtext.facet` + SDK text builder/rich text utilities | Byte offsets measured in UTF-8 bytes, not Python Unicode indexes; mentions require DID resolution. |
 | Link preview | `app.bsky.embed.external` rendering | Render incoming records safely; no arbitrary URL metadata fetch or outgoing link-card creation. |
 | Search posts | `app.bsky.feed.searchPosts` | Search results not same shape as chronological feed; guard unauth and rate limits. |

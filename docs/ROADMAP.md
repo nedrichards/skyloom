@@ -1,6 +1,6 @@
 # Future work
 
-## Before public release
+## Acceptance and distribution follow-up
 
 - Test a real account using a dedicated app password entered only in the app:
   login/session restore, feed paging, conversations/Back, reactions, replies,
@@ -13,9 +13,8 @@
 - Check Orca, physical keyboard/pointer/touch input, file portals, network and
   power changes, and suspend/resume. Include selection, focus return and branch
   loading. Review light/dark/high contrast/large text and widths above 1280 pixels.
-- Supply public project metadata, screenshot URLs and hosted CI; resolve strict
-  AppStream validation's missing-homepage warning. Review privacy, moderation,
-  dependency licensing and sandbox permissions for distribution.
+- Add published screenshots and hosted CI. Review privacy, moderation, dependency
+  licensing and sandbox permissions for wider distribution.
 - Build and test architecture-specific dependencies before supporting more than
   x86_64. Review Flathub requirements before submission.
 

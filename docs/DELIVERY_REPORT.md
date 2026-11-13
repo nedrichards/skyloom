@@ -2,7 +2,27 @@
 
 Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
-matched performance baseline. Public homepage metadata remains a release gate.
+matched performance baseline. Distribution follow-up is tracked in the roadmap.
+
+## Skyloom 0.1.1 — 13 November 2026
+
+Recorded the SDK, profile, post-management and video work as four semantic commits
+and pushed them to `main`. Prepared 0.1.1 across Meson, Python package metadata,
+the application version and AppStream. Updated release wording, added project
+URLs and release notes, and changed the README to
+the hosted release bundle instructions. The repository retains its private visibility.
+
+The canonical host-launched `./scripts/check.sh` passed all stages, including
+355 native tests with zero skips. The independently staged profile slice passed
+17 focused tests and the post-management slice passed 72. The pinned offline
+Flatpak build/export passed, and the exact exported x86_64 bundle installed as
+0.1.1 with atproto 0.0.74. All 55 installed Python modules matched source; its
+complete installed suite also passed 355 tests with zero skips. AppStream
+validation passed; its pedantic note concerns uppercase characters in the
+established application ID. The release bundle is accompanied by `SHA256SUMS`.
+The full installed 0.1.1 demo GUI smoke passed with the normal desktop renderer;
+frame-timing warnings remain visible. Live-account and human acceptance limits
+remain documented below and in the roadmap.
 
 ## atproto 0.0.74 — 13 November 2026
 

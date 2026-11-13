@@ -1,6 +1,6 @@
 [project]
 name = "skyloom"
-version = "0.1.0"
+version = "0.1.1"
 description = "A native GNOME client for Bluesky"
 readme = "README.md"
 authors = [{name = "Nick Richards"}]

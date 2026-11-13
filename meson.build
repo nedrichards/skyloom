@@ -1,4 +1,4 @@
-project('skyloom', version: '0.1.0', meson_version: '>=1.0.0')
+project('skyloom', version: '0.1.1', meson_version: '>=1.0.0')
 gnome = import('gnome')
 python = import('python').find_installation('python3')
 assert(python.language_version().version_compare('>=3.14'), 'Skyloom requires Python 3.14 or newer')

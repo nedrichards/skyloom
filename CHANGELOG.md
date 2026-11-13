@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.1 — 13 November 2026
+
 - Update atproto to 0.0.74 with verified wheel hashes. Use typed page-item access for feeds, search, people, bookmarks and notifications, and share the SDK's public serializer to preserve unknown records and extension fields.
 
 - Save and remove private server bookmarks, including unavailable posts, and browse them in a native paged list.
@@ -43,7 +45,7 @@
 - Apply shared momentum-aware, delta-based reading-anchor handling across Home/pinned feeds, profiles, Search and notifications. Avoid competing scroll corrections for appends and stable updates; preserve static anchors and focus when rows are removed. Keep conversation-specific loader handling independent.
 - Reuse Search post cells and people/notification row/avatar shells, retain gap controls during busy/error changes, and keep reader anchors plus real continuation cursors when bounded profile/Search/notification windows fill. Add passive native touch activity tracking without claiming scrolling gestures.
 
-- Keep Home feed selection inside the existing header: show a visible strip when space permits, scroll it horizontally as space tightens, and crossfade back to the dropdown at narrow widths. Preserve feed selection and reading state, with automatic adaptation and scroll controls. Remove the development prototype and captures.
+- Keep Home feed selection inside the existing header: show a visible strip when space permits, scroll it horizontally as space tightens, and crossfade back to the dropdown at narrow widths. Preserve feed selection and reading state, with automatic adaptation and scroll controls. Remove superseded design experiments and captures.
 
 - Animate narrow-window collapse on one 340 ms timeline: slide live content beneath a temporary in-memory render of the departing sidebar, avoiding the native sidebar spring finishing too quickly. Preserve reduced motion, resize reversals and native overlay controls.
 
@@ -78,7 +80,7 @@
 
 - Shorten position Undo toasts to two seconds and dismiss them when leaving the window, keeping keyboard Undo available. Use “Moved to top” for an explicit top jump, avoiding stale “Back at the top” feedback on resume. Reaction Undo retains its five-second timeout.
 
-- Establish private GitHub source hosting, including the implemented preview and latest thread-context/input improvements; retain the separate public-release and human-acceptance gates.
+- Establish private GitHub source hosting for the client and thread-context/input improvements; retain documented human acceptance checks.
 
 - Share thread position pills across feed, profile, search and quoted cards. Keep bounded relationship knowledge across views, update mounted pills in place and mark incomplete context with + without fetching threads in the background.
 - Let a normal card-text click tolerate small pointer movements. Deliberate drags, double-click word selection, Shift-click selection, existing selections and links retain their native behaviour.
@@ -164,7 +166,7 @@
 - Rename the application identity and packaging to com.nedrichards.Skyloom. Remove the obsolete installation, sandbox data, settings and app-specific keyring entries.
 - Show labelled posts, quotes, media and profile biographies by default, retaining label notices. Add an optional warning-first preference with in-app reveal controls.
 
-## 0.1.0 — 27 October 2026 (local development preview)
+## 0.1.0 — 27 October 2026
 
 - Add a native adaptive GNOME application, original icons and GNOME 51 Flatpak packaging.
 - Wire dedicated app-password authentication, refresh persistence in libsecret, offline restore and sign-out.
