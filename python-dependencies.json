@@ -31,9 +31,21 @@
     },
     {
       "type": "file",
+      "url": "https://files.pythonhosted.org/packages/67/b8/b42132ca113dc567d37684437b46ca1dafc885902b02a110a02d5b511857/cffi-2.1.1-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl",
+      "sha256": "58acb8ab8e295e6c5ea12f888cbb13cf21511ef2a3303a23f4325c29d17fe5c1",
+      "dest": "wheels",
+      "only-arches": [
+        "aarch64"
+      ]
+    },
+    {
+      "type": "file",
       "url": "https://files.pythonhosted.org/packages/e9/02/4e7d553a7ac4b4238b38b3c1b80d486e9d4436f8d2acbf87a0997fe3f402/cffi-2.1.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
       "sha256": "b0431303acaea1089ad4b3e9ce4e6518193def1118d4073ca848635ee4ea2e96",
-      "dest": "wheels"
+      "dest": "wheels",
+      "only-arches": [
+        "x86_64"
+      ]
     },
     {
       "type": "file",
@@ -43,9 +55,21 @@
     },
     {
       "type": "file",
+      "url": "https://files.pythonhosted.org/packages/71/37/6202e488cc1eb625ea110c292c6bda92823176e023f427d8d5660ce8d632/cryptography-50.0.2-cp311-abi3-manylinux_2_34_aarch64.whl",
+      "sha256": "87e9ce85beb6b328ba370cc6e6aea483c92617b4c95b1d33a49297eb662bfb04",
+      "dest": "wheels",
+      "only-arches": [
+        "aarch64"
+      ]
+    },
+    {
+      "type": "file",
       "url": "https://files.pythonhosted.org/packages/d3/69/2c833a049475e0a3444e94c7d0aca0aa51d166374a449b09e92ac98138de/cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl",
       "sha256": "9dab55f57c74c3cad24c323bacbbd04be4705ba6eb0d92e920b1fc4837ed5079",
-      "dest": "wheels"
+      "dest": "wheels",
+      "only-arches": [
+        "x86_64"
+      ]
     },
     {
       "type": "file",
@@ -79,9 +103,21 @@
     },
     {
       "type": "file",
+      "url": "https://files.pythonhosted.org/packages/2b/f6/fcee6bafd98e9e71b27f49399f704e63cf67bb01dc0f0a2346b6209b4517/libipld-3.5.0-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+      "sha256": "536f0554d10b7219d5ec09e4dc31f88121f6c31853669d9825bde3a1dd304fba",
+      "dest": "wheels",
+      "only-arches": [
+        "aarch64"
+      ]
+    },
+    {
+      "type": "file",
       "url": "https://files.pythonhosted.org/packages/b2/e8/c5ca44694420b1085e4a2614ac099da3967ea65a7d3fdd075c8b0b773f0c/libipld-3.5.0-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
       "sha256": "d119258801803ca59c83e69bcaa4ca537c90eeb454413898cf7fcec4c007c2ef",
-      "dest": "wheels"
+      "dest": "wheels",
+      "only-arches": [
+        "x86_64"
+      ]
     },
     {
       "type": "file",
@@ -97,15 +133,39 @@
     },
     {
       "type": "file",
+      "url": "https://files.pythonhosted.org/packages/a1/4e/5eb629f6efc2a27e421d789dd4bfacbb5f6d09c80c28b13d1e87d73163d5/pydantic_core-2.50.1-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+      "sha256": "0036473f5583e6a60e50b8b21651511564277a3f05cc5dab8cf579f552cd5f6c",
+      "dest": "wheels",
+      "only-arches": [
+        "aarch64"
+      ]
+    },
+    {
+      "type": "file",
       "url": "https://files.pythonhosted.org/packages/45/35/38f6d6564fae57d9b12e5676dfa947e0e7d5c46dbeaa7eb3352261d6d299/pydantic_core-2.50.1-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
       "sha256": "42b54c2c90ad348b5e3a85e03e715d572c1fde357ef104cdfe3b03b697a404ea",
-      "dest": "wheels"
+      "dest": "wheels",
+      "only-arches": [
+        "x86_64"
+      ]
+    },
+    {
+      "type": "file",
+      "url": "https://files.pythonhosted.org/packages/dc/fc/cf50671215ee0057046980b4571ef8646a005819bb67f0957e779ed107a5/regex-2026.9.29-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl",
+      "sha256": "b97a38fb4c732b6832db6bf108963adbcd82ef1268ba2025dce390f45af75efa",
+      "dest": "wheels",
+      "only-arches": [
+        "aarch64"
+      ]
     },
     {
       "type": "file",
       "url": "https://files.pythonhosted.org/packages/a9/4d/041d9458a645fee4fce4d642a89d27271a3cfcd91095104f6dde44da70bf/regex-2026.9.29-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
       "sha256": "2f7f7aa47b229f2b39a2ae2596d2ad5625d77b5eb9856fac2dab3eb506cdd0a0",
-      "dest": "wheels"
+      "dest": "wheels",
+      "only-arches": [
+        "x86_64"
+      ]
     },
     {
       "type": "file",
@@ -129,13 +189,37 @@
       "type": "file",
       "url": "https://files.pythonhosted.org/packages/eb/8f/46e4030947f5590cb61832901f44a3edb07ef8d1e27f6c06b42c5f1c4d33/websockets-17.3-cp314-cp314-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
       "sha256": "8dbb3862aa649de95660b6337d97101977f160b5b354d07b82fe309874d2c8bc",
-      "dest": "wheels"
+      "dest": "wheels",
+      "only-arches": [
+        "x86_64"
+      ]
+    },
+    {
+      "type": "file",
+      "url": "https://files.pythonhosted.org/packages/f0/1b/3db30fdf4fbefa4ac463060d3f87e2d444f960aa1234028468c09b88bffc/websockets-17.3-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl",
+      "sha256": "af37a1e6b6bd506b597d5fb4cf111fb527d1b2223608a5d441d4738827cfd166",
+      "dest": "wheels",
+      "only-arches": [
+        "aarch64"
+      ]
+    },
+    {
+      "type": "file",
+      "url": "https://files.pythonhosted.org/packages/a4/86/a48e56320d0a17189ab7a42645387334fba2200e904ee47fc5a26c1fd8ca/zstandard-0.25.0-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl",
+      "sha256": "223415140608d0f0da010499eaa8ccdb9af210a543fac54bce15babbcfc78439",
+      "dest": "wheels",
+      "only-arches": [
+        "aarch64"
+      ]
     },
     {
       "type": "file",
       "url": "https://files.pythonhosted.org/packages/31/dc/cc50210e11e465c975462439a492516a73300ab8caa8f5e0902544fd748b/zstandard-0.25.0-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
       "sha256": "e09bb6252b6476d8d56100e8147b803befa9a12cea144bbe629dd508800d1ad0",
-      "dest": "wheels"
+      "dest": "wheels",
+      "only-arches": [
+        "x86_64"
+      ]
     }
   ]
 }

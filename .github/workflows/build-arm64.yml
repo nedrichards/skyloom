@@ -1,0 +1,108 @@
+name: Build ARM64 Flatpak
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Existing release tag to build
+        required: true
+        default: v0.1.2
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - name: Check out pinned build tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check out release application source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.source_ref }}
+          path: release-source
+          persist-credentials: false
+      - name: Verify source and apply architecture wheel pins
+        id: source
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          python3 - <<'PY'
+          import ast
+          import os
+          import re
+          from pathlib import Path
+          tag = os.environ["SOURCE_REF"]
+          if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag):
+              raise SystemExit("A versioned release tag is required")
+          module = ast.parse(Path("release-source/src/skyloom/__init__.py").read_text())
+          version = next(ast.literal_eval(node.value) for node in module.body
+                         if isinstance(node, ast.Assign)
+                         and any(isinstance(target, ast.Name) and target.id == "VERSION"
+                                 for target in node.targets))
+          if tag != "v" + version:
+              raise SystemExit("Tag and application version differ")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"version={version}\n")
+          PY
+          cmp requirements.lock release-source/requirements.lock
+          cp python-dependencies.json requirements-hashed.lock release-source/
+          git -C release-source diff --exit-code -- src data fixtures meson.build pyproject.toml requirements.lock
+          mkdir -p dist
+          {
+            echo "Application source: $(git -C release-source rev-parse HEAD)"
+            echo "Packaging tooling: $GITHUB_SHA"
+            echo "Architecture: aarch64 (native GitHub-hosted runner)"
+            echo "Runtime: org.gnome.Platform//51"
+          } > dist/BUILD_INFO.txt
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder xvfb dbus-x11 openbox
+          if test -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - name: Install GNOME 51 runtime and SDK
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          dbus-run-session -- flatpak install --user --noninteractive flathub org.gnome.Platform/aarch64/51 org.gnome.Sdk/aarch64/51
+      - name: Validate dependency tooling
+        run: |
+          dbus-run-session -- flatpak run --user --filesystem="$PWD:ro" --command=python3 org.gnome.Sdk//51 -m unittest discover -s "$PWD/tests" -p test_maintenance.py -v
+      - name: Build pinned ARM64 application
+        run: |
+          dbus-run-session -- flatpak-builder --arch=aarch64 --user --disable-rofiles-fuse --force-clean --repo=flatpak-repo build-flatpak release-source/com.nedrichards.Skyloom.json
+          flatpak build-bundle --arch=aarch64 --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo flatpak-repo "dist/com.nedrichards.Skyloom-${{ steps.source.outputs.version }}-aarch64.flatpak" com.nedrichards.Skyloom master
+      - name: Install bundle and run native tests and GUI smoke
+        env:
+          RELEASE_VERSION: ${{ steps.source.outputs.version }}
+        run: |
+          dbus-run-session -- xvfb-run -a bash <<'NATIVE'
+          set -euo pipefail
+          openbox --sm-disable >/tmp/skyloom-window-manager.log 2>&1 &
+          sleep 1
+          flatpak install --user --reinstall --noninteractive "$PWD/dist/com.nedrichards.Skyloom-$RELEASE_VERSION-aarch64.flatpak"
+          flatpak run --user --command=python3 --filesystem="$PWD/release-source:ro" --env=PYTHONPATH=/app/share/skyloom com.nedrichards.Skyloom -c 'import platform, sys; from pathlib import Path; from skyloom import VERSION; print("Native installed app:", platform.machine(), VERSION); assert platform.machine() == "aarch64" and VERSION == sys.argv[1]; root = Path(sys.argv[2]); assert all(p.read_bytes() == (Path("/app/share/skyloom/skyloom") / p.name).read_bytes() for p in root.glob("*.py"))' "$RELEASE_VERSION" "$PWD/release-source/src/skyloom"
+          flatpak run --user --socket=x11 --nosocket=wayland --env=GDK_BACKEND=x11 --env=GSK_RENDERER=cairo --command=python3 --filesystem="$PWD/release-source:ro" --env=PYTHONPATH=/app/share/skyloom com.nedrichards.Skyloom "$PWD/release-source/scripts/runtime-tests.py" --tests "$PWD/release-source/tests"
+          mkdir -p "$PWD/release-source/build-validation"
+          flatpak run --user --socket=x11 --nosocket=wayland --env=GDK_BACKEND=x11 --env=GSK_RENDERER=cairo --filesystem="$PWD/release-source/build-validation" com.nedrichards.Skyloom --demo --smoke-test "$PWD/release-source/build-validation" --smoke-scenario navigation
+          NATIVE
+      - name: Checksum validated bundle
+        run: |
+          cd dist
+          sha256sum *.flatpak > SHA256SUMS
+          cat BUILD_INFO.txt SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload validated ARM64 bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: skyloom-${{ steps.source.outputs.version }}-aarch64
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

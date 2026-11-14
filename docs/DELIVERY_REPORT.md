@@ -4,6 +4,16 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Native ARM64 packaging — 14 November 2026
+
+A native GitHub-hosted ARM64 builder is being validated for the same 0.1.2
+application source. All seven compiled dependencies have aarch64 wheels at the
+existing pinned versions. Downloaded wheels were verified against PyPI metadata;
+architecture filters preserve every prior x86_64 URL/hash and select one complete
+22-package set per architecture. The builder uses read-only repository permission,
+SHA-pinned GitHub actions, a fixed version tag and a checked packaging overlay.
+Local generator checks passed; remote build and runtime evidence follows when available.
+
 ## Release 0.1.2 — 14 November 2026
 
 The user confirmed both sustained feed scrolling and remote video thumbnails

@@ -85,6 +85,45 @@ class DependencyTests(unittest.TestCase):
                 (root / "requirements-hashed.lock").read_text(encoding="utf-8"),
             )
 
+    def test_native_wheels_are_filtered_and_incomplete_platforms_preserve_locks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "wheels").mkdir()
+            (root / "requirements.lock").write_text("invented==1.0\n")
+            metadata = {"urls": []}
+            paths = []
+            for architecture in ("x86_64", "aarch64"):
+                wheel = (
+                    root / "wheels" / f"invented-1.0-cp314-cp314-manylinux_2_17_{architecture}.whl"
+                )
+                wheel.write_bytes(architecture.encode())
+                paths.append(wheel)
+                metadata["urls"].append(
+                    {
+                        "filename": wheel.name,
+                        "url": "https://example.invalid/" + wheel.name,
+                        "digests": {"sha256": hashlib.sha256(wheel.read_bytes()).hexdigest()},
+                    }
+                )
+            with patch("urllib.request.urlopen"), patch("json.load", return_value=metadata):
+                TOOLS["main"](root)
+                manifest = json.loads((root / "python-dependencies.json").read_text())
+                self.assertEqual(
+                    {tuple(source["only-arches"]) for source in manifest["sources"]},
+                    {("x86_64",), ("aarch64",)},
+                )
+                lock = (root / "requirements-hashed.lock").read_text()
+                self.assertEqual(lock.count("invented==1.0"), 1)
+                self.assertEqual(lock.count("--hash=sha256:"), 2)
+                paths[1].unlink()
+                with self.assertRaisesRegex(ValueError, "Missing invented wheels"):
+                    TOOLS["main"](root)
+                self.assertEqual((root / "requirements-hashed.lock").read_text(), lock)
+
+    def test_unknown_wheel_platform_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Unsupported wheel platform"):
+            TOOLS["wheel_architectures"]("invented-1.0-cp314-cp314-win_amd64.whl")
+
 
 class PerformanceMetricsTests(unittest.TestCase):
     def test_missing_samples_and_tail_latency_remain_visible(self):

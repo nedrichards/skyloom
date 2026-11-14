@@ -45,7 +45,7 @@ flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakr
 
 Keep `flatpak-repo/`: local installations use it for updates. After caching
 sources, repeat the Builder command with `--disable-download` to check the
-offline build. The wheel set currently targets x86_64/cp314.
+offline build. Wheel sources are pinned for x86_64 and aarch64/cp314; `only-arches` filters native wheels.
 
 In an agent sandbox that cannot create nested Flatpak namespaces, execute these
 commands through `flatpak-spawn --host` if permitted. A regular host terminal
@@ -69,3 +69,22 @@ The generator verifies wheel digests against PyPI and updates
 `python-dependencies.json` and `requirements-hashed.lock`. Review the dependency
 delta and rebuild. Keep downloaded wheels out of Git. Lint settings belong in
 `pyproject.toml`; development tools are pinned in `requirements-dev.lock`.
+
+## Native ARM64 release builder
+
+The manual `Build ARM64 Flatpak` GitHub Actions workflow uses an
+`ubuntu-24.04-arm` runner and GNOME 51. Dispatch it with an existing version tag.
+It checks out that immutable application source, verifies the dependency versions
+match the builder's pins, and supplies the checked multi-architecture wheel
+manifest. This permits building 0.1.2 without moving its existing tag.
+
+The job builds and installs an aarch64 bundle, verifies the native architecture,
+version and installed Python source parity, runs the strict native test gate on
+X11/Cairo and an installed navigation smoke, then uploads the bundle, checksums
+and application/tooling commit provenance as a short-lived Actions artifact.
+Release-asset publication stays a separate reviewed maintainer action.
+
+For dependency updates, download the exact requirements for both CPython 3.14
+architectures into `wheels/` or architecture subdirectories before regenerating.
+The generator checks PyPI digests, rejects incomplete architecture sets, ignores
+superseded versions and emits the shared source manifest and multi-hash lock.
