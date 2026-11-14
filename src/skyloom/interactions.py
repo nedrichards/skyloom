@@ -147,6 +147,7 @@ class Interactions:
             "preferences": self.window.get_visible_dialog() is None,
             "about": self.window.get_visible_dialog() is None,
             "compose": ready and not modal,
+            "manage-feeds": ready and self.window.get_visible_dialog() is None,
             "refresh": bool(view and view.refresh and not view.paging.busy and not modal),
             "top": bool(view and view.model.get_n_items() and not modal),
             "show-new": bool(view and view.pending_update and not self.window.get_visible_dialog()),
@@ -415,6 +416,12 @@ class Interactions:
         if command == "shortcuts":
             window.get_application().shortcuts()
             return True
+        if command == "manage-feeds":
+            if window.get_visible_dialog() or window.service.account is None:
+                return False
+            self.dismiss_main_menu()
+            window.open_uri("https://bsky.app/settings/saved-feeds")
+            return True
         context = self.context()
         if context == "dialog" or (context == "popup" and not self.dismiss_main_menu()):
             return False
@@ -528,6 +535,7 @@ class Interactions:
         menu.append_section(None, reading)
         application = Gio.Menu()
         for title, action in [
+            ("Manage feeds in Bluesky…", "manage-feeds"),
             ("Preferences", "preferences"),
             ("Keyboard shortcuts", "shortcuts"),
             ("About Skyloom", "about"),

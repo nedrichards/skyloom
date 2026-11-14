@@ -4,6 +4,42 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Feed-management menu focus — 14 November 2026
+
+The installed demo's actual menu row reached Gtk.UriLauncher, and the user
+confirmed that the browser opened the saved-feeds page. The original tap failure
+was not reproduced. Removed a possible rejection path: feed management now
+accepts main-menu/closing-popup focus and remains enabled while a menu is open;
+account and visible-dialog guards remain. A regression covers list, popup and
+chrome contexts with an already-dismissed menu, plus visible-dialog rejection.
+Local lint passed. The updated Flatpak was built offline, exported and installed
+(commit `80ee2dd8cc6dc1abeb92bc1967ca9c342babaa88ee202223589ca2ac128c4abe`);
+all 56 installed Python modules matched source. All 378 installed native tests
+passed with zero skips. The user confirmed the updated action works in manual
+testing. No further GUI smoke was needed after that confirmation.
+
+## Saved-feed preference handling — 14 November 2026
+
+Feed loading now uses the latest V2 preference when present, including an empty
+one; legacy pinned feeds are a fallback only. Generator responses are mapped back
+to saved URI order, with duplicate URIs removed. Distinct feeds with the same name
+remain distinct. Following remains fixed first; list feeds are not supported.
+The main menu links explicitly to Bluesky’s saved-feed editor; native editing
+remains roadmap work. Restart to reload website changes.
+Upstream agent preference migration and the saved-feeds route were verified.
+Local lint, compilation, desktop/schema validation and the host Flatpak source
+suite passed: 377 tests, zero skips. The combined check script could not run
+wholly in one environment (sandbox Flatpak namespace restriction; host venv lacks
+Ruff), so its lint and native portions ran separately.
+The pinned offline Flatpak build/export and local installation then passed
+(commit `ecf066bf697a06e8b3250938672e02dabbdd1936f2fff78cb3b314d6f17ccd25`).
+All 56 installed Python modules matched source, and all 377 installed tests passed
+with zero skips. The installed default-renderer navigation demo smoke passed at
+1280/light and 480/dark; captures were visually inspected. A temporary installed
+app check verified the feed-management label, registered action and exact browser
+destination, intercepting the opener without opening the browser. Live-account
+comparison and human acceptance remain unperformed.
+
 ## Shared profile identity/actions row — 14 November 2026
 
 Corrected the remaining layout issue: the controls are now children of the same

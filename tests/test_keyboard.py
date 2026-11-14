@@ -76,6 +76,24 @@ class KeyboardTests(unittest.TestCase):
         self.view.store.set_selected(Gtk.INVALID_LIST_POSITION)
         self.pump()
 
+    def test_manage_feeds_opens_while_menu_focus_is_closing(self):
+        from unittest.mock import patch
+
+        interaction = self.window.interactions
+        links = []
+        self.window.open_uri = links.append
+        for context in ("list", "popup", "chrome"):
+            with (
+                self.subTest(context=context),
+                patch.object(interaction, "context", return_value=context),
+                patch.object(interaction, "dismiss_main_menu", return_value=False),
+            ):
+                self.assertTrue(interaction.command("manage-feeds"))
+        self.assertEqual(links, ["https://bsky.app/settings/saved-feeds"] * 3)
+        with patch.object(self.window, "get_visible_dialog", return_value=object()):
+            self.assertFalse(interaction.command("manage-feeds"))
+        self.assertEqual(len(links), 3)
+
     def key(self, key, modifiers=0):
         return self.window.interactions.key_pressed(None, key, key, modifiers)
 

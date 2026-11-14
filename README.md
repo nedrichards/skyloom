@@ -39,7 +39,9 @@ revoke the app password in Bluesky.
 
 ## Using Skyloom
 
-- Choose a feed from the Home header. Open a post to read its conversation;
+- Choose a feed from the Home header. Use “Manage feeds in Bluesky…” in the
+  main menu to reorder or remove saved feeds on the website; restart Skyloom
+  afterwards to reload those preferences. Native feed editing is not yet available. Open a post to read its conversation;
   Alt+Left returns to your reading position.
 - Ctrl+N composes, Ctrl+Enter publishes and Ctrl+R refreshes. Attach up to four
   JPEG/PNG images or one MP4 video, with descriptions. Videos must use H.264

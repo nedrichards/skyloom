@@ -313,23 +313,40 @@ class Service(BookmarkService, ProfileService, ThreadService):
     async def feeds(self):
         async with self.authenticated():
             prefs = data(await self.client.app.bsky.actor.get_preferences()).get("preferences", [])
-            uris = []
-            for pref in prefs:
-                if pref.get("$type", "").endswith("#savedFeedsPrefV2"):
-                    uris.extend(
-                        x["value"]
-                        for x in pref.get("items", [])
-                        if x.get("pinned") and x.get("type") == "feed"
-                    )
-                elif pref.get("$type", "").endswith("#savedFeedsPref"):
-                    uris.extend(pref.get("pinned", []))
+            current = next(
+                (
+                    p
+                    for p in reversed(prefs)
+                    if p.get("$type") == "app.bsky.actor.defs#savedFeedsPrefV2"
+                ),
+                None,
+            )
+            if current is not None:
+                uris = [
+                    x["value"]
+                    for x in current.get("items", [])
+                    if x.get("pinned") and x.get("type") == "feed"
+                ]
+            else:
+                legacy = next(
+                    (
+                        p
+                        for p in reversed(prefs)
+                        if p.get("$type") == "app.bsky.actor.defs#savedFeedsPref"
+                    ),
+                    {},
+                )
+                uris = legacy.get("pinned", [])
             uris = list(dict.fromkeys(uris))[:24]
             if not uris:
                 await self._io("put", "feed-options", [("following", "Following")])
                 return [("following", "Following")]
             response = data(await self.client.app.bsky.feed.get_feed_generators({"feeds": uris}))
+            names = {
+                x["uri"]: x.get("displayName", "Custom feed") for x in response.get("feeds", [])
+            }
             options = [("following", "Following")] + [
-                (x["uri"], x.get("displayName", "Custom feed")) for x in response.get("feeds", [])
+                (uri, names[uri]) for uri in uris if uri in names
             ]
             await self._io("put", "feed-options", options)
             return options

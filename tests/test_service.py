@@ -187,7 +187,8 @@ class Contract(unittest.IsolatedAsyncioTestCase):
             }
         elif method.endswith("getPreferences"):
             value = {
-                "preferences": [
+                "preferences": getattr(self, "feed_preferences", None)
+                or [
                     {
                         "$type": "app.bsky.actor.defs#savedFeedsPrefV2",
                         "items": [
@@ -202,6 +203,7 @@ class Contract(unittest.IsolatedAsyncioTestCase):
                 ]
             }
         elif method.endswith("getFeedGenerators"):
+            self.feed_generator_uris = req.url.params.get_list("feeds")
             value = {"feeds": []}
         elif method.endswith("resolveHandle"):
             value = {"did": DID}
@@ -243,6 +245,37 @@ class Contract(unittest.IsolatedAsyncioTestCase):
         return await self.service.sign_in(
             "alice.invalid", "test-only-never-valid", "https://pds.invalid"
         )
+
+    async def test_current_feed_preferences_replace_legacy_even_when_empty(self):
+        await self.login()
+        self.feed_preferences = [
+            {
+                "$type": "app.bsky.actor.defs#savedFeedsPref",
+                "pinned": [f"at://{DID}/app.bsky.feed.generator/old"],
+                "saved": [],
+            },
+            {"$type": "app.bsky.actor.defs#savedFeedsPrefV2", "items": []},
+        ]
+        self.assertEqual(await self.service.feeds(), [("following", "Following")])
+        self.assertFalse(any(r[0].endswith("getFeedGenerators") for r in self.requests))
+
+    async def test_current_feed_order_excludes_legacy_and_unpinned(self):
+        await self.login()
+        base = f"at://{DID}/app.bsky.feed.generator/"
+        self.feed_preferences = [
+            {
+                "$type": "app.bsky.actor.defs#savedFeedsPrefV2",
+                "items": [
+                    {"id": str(i), "type": "feed", "value": base + name, "pinned": pinned}
+                    for i, (name, pinned) in enumerate(
+                        [("second", True), ("first", True), ("second", True), ("hidden", False)]
+                    )
+                ],
+            },
+            {"$type": "app.bsky.actor.defs#savedFeedsPref", "pinned": [base + "old"], "saved": []},
+        ]
+        await self.service.feeds()
+        self.assertEqual(self.feed_generator_uris, [base + "second", base + "first"])
 
     async def test_login_restore_refresh_and_signout(self):
         a = await self.login()

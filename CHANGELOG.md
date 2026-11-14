@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep the feed-management browser action available while the main menu has focus or is closing.
+
+- Prefer current saved-feed preferences over legacy entries, preventing removed feeds reappearing; preserve pinned custom-feed order. Add a main-menu link to Bluesky’s saved-feed editor.
+
 - Preserve confirmed profile, follow, mute/block and reaction changes across briefly stale service reads. Keep new posts, replies and quotes visible while indexing catches up, and refresh the active profile or thread after publishing.
 - Query unread notifications with the confirmed seen cutoff, retaining read markers without hiding newer arrivals. Report draft cleanup failures separately from a successful publish.
 

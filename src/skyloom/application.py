@@ -52,7 +52,8 @@ class Application(Adw.Application):
                 Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
         for name in dict.fromkeys(
-            [binding.command for binding in BINDINGS if binding.scope != "composer"] + ["about"]
+            [binding.command for binding in BINDINGS if binding.scope != "composer"]
+            + ["about", "manage-feeds"]
         ):
             action = Gio.SimpleAction.new(name, None)
             action.connect(
