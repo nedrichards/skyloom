@@ -4,6 +4,28 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## dnspython security update — 14 November 2026
+
+Updated only dnspython from 2.9.0 to 2.9.2 across runtime/development locks and
+the generated hashed lock and wheel manifest. The universal wheel was downloaded
+and verified against PyPI SHA-256 metadata; it serves both x86_64 and aarch64.
+The existing generator preserved every other package version, URL and hash.
+Upstream's patch addresses excessive resource use when parsing malicious
+zone-file WKS records (GHSA-vvf4-9x63-8xvv). An installed check confirmed version
+2.9.2 and rejected the small, out-of-range service-number example with SyntaxError.
+
+Dependency parity, lint and all nine maintenance checks passed. The live PyPI
+health report verified all wheel digests and reported no remaining advisories.
+Build/export/install passed (Flatpak commit
+`032a75fb0e841d1bf8a156b404e5f109e795d2dd4e9732d30dfa1ea2aec38613`).
+All 402 source and all 402 installed tests passed with zero skips on an isolated
+composited X11/Cairo display. Earlier runs on the user's desktop encountered
+popover mapping and keyboard-window rendering/positioning failures; these were
+retained in ignored logs and no assertions were suppressed. Isolated display
+validation avoids desktop occlusion and does not establish physical-input or
+live-service acceptance. Hosted ARM64 validation is tracked separately.
+The installed navigation smoke also passed at wide/light and narrow/dark sizes.
+
 ## Dual-architecture workflow implementation — 14 November 2026
 
 Added PR/main validation, dependency health, extended generated cases, latest-SDK

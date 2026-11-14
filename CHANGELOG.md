@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Update dnspython to 2.9.2 for GHSA-vvf4-9x63-8xvv, keeping runtime,
+  development and hashed locks and the two-architecture wheel manifest aligned.
+
 - Handle separate container checkouts with exact per-command Git ownership
   trust, qualify release asset paths for ShellCheck and refresh legacy display
   helper build configuration for ARM64.

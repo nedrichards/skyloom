@@ -18,10 +18,6 @@
   wider distribution.
 - Validate the new dual-architecture PR, dependency-health, SDK/Wayland and release
   workflows on GitHub, including failure artifacts and attestation verification.
-- Update dnspython's coordinated runtime/development/wheel pins to a patched
-  version for [GHSA-vvf4-9x63-8xvv](https://github.com/advisories/GHSA-vvf4-9x63-8xvv).
-  The first live dependency-health check identified the existing 2.9.0 pin;
-  the advisory concerns parsing attacker-controlled zone-file WKS records.
 - Perform physical ARM64 desktop acceptance alongside the validated native CI
   build. Review Flathub requirements before submission.
 
