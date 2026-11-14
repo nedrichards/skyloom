@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Load video thumbnails from Bluesky’s video service and follow checked redirects to its video CDN, keeping existing cache, download-policy and image-size limits.
+
 - Keep active reading windows below GTK’s row-tracker capacity to stop mixed-height feeds repeatedly rebuilding rows during long scrolling. Preserve differently sized media, archived history, reading anchors and real pagination cursors when opening older saved windows.
 
 - Avoid feed relayout when image/video thumbnail pixels arrive or are evicted, and create inline video controls only on Play. Keep aspect-aware previews, centred cropping, descriptions and playback.

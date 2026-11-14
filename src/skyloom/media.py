@@ -20,6 +20,59 @@ from .errors import UserError  # noqa: E402
 from .image_cache import digest  # noqa: E402
 
 
+def image_origin(url):
+    """Only the photo CDN and the two exact video-thumbnail routes are fetched."""
+    try:
+        parsed = urlparse(url)
+        if (
+            parsed.scheme != "https"
+            or parsed.port not in (None, 443)
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            return None
+        if parsed.hostname == "cdn.bsky.app":
+            return "photo"
+        prefix = {"video.bsky.app": "/watch/", "video.cdn.bsky.app": "/hls/"}.get(parsed.hostname)
+        if (
+            prefix
+            and parsed.path.startswith(prefix)
+            and parsed.path.endswith("/thumbnail.jpg")
+            and len(parsed.path.split("/")) == 5
+        ):
+            return "video"
+    except ValueError:
+        return None
+    return None
+
+
+async def image_bytes(url):
+    origin = image_origin(url)
+    if origin is None:
+        raise UserError("Open this image externally to view it.")
+    async with httpx.AsyncClient(timeout=15, follow_redirects=False) as client:
+        for hop in range(3):
+            async with client.stream("GET", url) as response:
+                if origin == "video" and response.is_redirect:
+                    location = response.headers.get("location")
+                    if not location or hop == 2:
+                        raise UserError("The video preview redirected too many times.")
+                    target = str(response.url.join(location))
+                    if image_origin(target) != "video":
+                        raise UserError("The video preview redirected to an unsupported address.")
+                    url = target
+                    continue
+                response.raise_for_status()
+                parts, size = [], 0
+                async for part in response.aiter_bytes():
+                    size += len(part)
+                    if size > 8_000_000:
+                        raise UserError("Image download is too large.")
+                    parts.append(part)
+                return b"".join(parts)
+    raise UserError("The video preview is unavailable.")
+
+
 def prepare(path, directory):
     """Re-encode to strip metadata and make a durable, bounded upload copy."""
     path, directory = Path(path), Path(directory).resolve()
@@ -297,32 +350,17 @@ class Images:
                     payload = await asyncio.to_thread(path.read_bytes)
                     pix = await asyncio.to_thread(decode_texture, payload)
             else:
-                u = urlparse(url)
-                # No arbitrary remote fetches from untrusted embedded URLs or private network hosts.
-                if u.scheme != "https" or u.hostname != "cdn.bsky.app" or u.port not in (None, 443):
-                    raise UserError("Open this image externally to view it.")
-                async with (
-                    httpx.AsyncClient(timeout=15, follow_redirects=False) as client,
-                    client.stream("GET", url) as response,
-                ):
-                    response.raise_for_status()
-                    parts, size = [], 0
-                    async for part in response.aiter_bytes():
-                        size += len(part)
-                        if size > 8_000_000:
-                            raise UserError("Image download is too large.")
-                        parts.append(part)
-                    payload = b"".join(parts)
-                    pix = await asyncio.to_thread(decode_texture, payload)
-                    if self.disk and account:
-                        try:
-                            entries = await asyncio.to_thread(
-                                self.disk.write, account, token, url, payload
-                            )
-                        except OSError:
-                            self.disk_error = True
-                        else:
-                            if entries is not None and generation == self.generation:
-                                self.disk_entries = entries
+                payload = await image_bytes(url)
+                pix = await asyncio.to_thread(decode_texture, payload)
+                if self.disk and account:
+                    try:
+                        entries = await asyncio.to_thread(
+                            self.disk.write, account, token, url, payload
+                        )
+                    except OSError:
+                        self.disk_error = True
+                    else:
+                        if entries is not None and generation == self.generation:
+                            self.disk_entries = entries
             self._remember(generation, key, pix)
             return pix

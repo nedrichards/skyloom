@@ -89,7 +89,13 @@ saves make partial failures explicit.
 Video playback uses GStreamer URI decoding through a `Gtk.MediaStream` and
 `Gtk.Video` controls. Feed rows show the supplied thumbnail using the shared
 image download policy and bounded cache. Missing or failed thumbnails keep a
-playable fallback card. An explicit play action replaces the
+playable fallback card. Thumbnail downloads accept the exact HTTPS
+`video.bsky.app/watch/…/thumbnail.jpg` and
+`video.cdn.bsky.app/hls/…/thumbnail.jpg` routes. At most two redirect hops are
+followed, validating each target before fetching; unrelated hosts, credentials,
+nonstandard ports, HTTP and video playlists are rejected. Photo-CDN redirects
+remain disabled. The original thumbnail URL remains the memory/disk cache key.
+An explicit play action replaces the
 preview with inline controls, retaining its aspect-aware rectangle. Only one
 player owns a pipeline; row unmap/recycling, another play action or account
 replacement releases it. Errors offer an explicit retry. The dialog player remains

@@ -4,6 +4,34 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Video thumbnail transport follow-up — 14 November 2026
+
+Approved inline playback and scrolling work was committed and pushed as
+`45d9eaa` on `main`, with origin/local parity and a clean worktree before this
+follow-up. The user then reported no video previews despite working playback.
+The model retained the supplied thumbnail URL, but the image loader accepted
+only `cdn.bsky.app`. A HEAD request to Bluesky's own public announcement-video
+thumbnail confirmed a 302 from `video.bsky.app/watch/…/thumbnail.jpg` to
+`video.cdn.bsky.app/hls/…/thumbnail.jpg`; the old loader also disabled redirects.
+No signed-in feed, credentials, cookies or personal records were inspected.
+
+The follow-up accepts those exact HTTPS thumbnail routes and up to two checked
+redirect hops, with no wildcard domains or playlist downloads. Photo-CDN
+redirects remain disabled. The image byte/pixel bounds, worker semaphore,
+account cache keys and automatic-download policy remain. Six native regression
+tests use invented requests and generated PNG bytes for redirect/decode/cache
+round trips, unsafe initial/redirect targets, redirect loops, the photo policy
+and the response byte cap. All 394 source native tests passed with zero skips;
+lint and desktop/schema validation passed. Offline build/export/install passed
+(Flatpak commit `13f9af4b019a0be6247e0adff41306efcdae90fe0a4993ccd143dfdecf086111`).
+All 34 installed worker/image/cache/residency/thumbnail/player/playback checks
+passed with zero skips. The installed image loader also followed the actual
+public Bluesky thumbnail redirect and decoded a 1600-by-920 texture, in memory
+only, without an account or saved image. This establishes service transport and
+decoder interoperability, not acceptance on the user's signed-in feed. The
+user confirmed the follow-up works well. It is committed separately from the
+earlier media and scrolling changes.
+
 ## Sustained mixed-height feed scrolling — 14 November 2026
 
 The user reported that pixel-only redraw improved scrolling but did not resolve
