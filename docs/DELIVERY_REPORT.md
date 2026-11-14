@@ -4,6 +4,27 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Release 0.1.2 — 14 November 2026
+
+The user confirmed both sustained feed scrolling and remote video thumbnails
+work well and requested a new release. Version 0.1.2 collects the changes since
+0.1.1: inline playback and thumbnails, larger aspect-aware media, bounded active
+reading windows, profile header/banner improvements, confirmed-write consistency
+and saved-feed management fixes. Runtime and dependency pins remain unchanged.
+The x86_64 release bundle was built/exported/installed from the pinned GNOME 51
+manifest (Flatpak commit
+`bd7af7312cc8973b832ae2b817b8143678ee1cb91baffba63d973d47c51d3d36`).
+All 394 installed native tests passed with zero skips, and the complete installed
+demo GUI smoke passed on the default renderer. Wide/light and narrow/dark feeds
+and the profile header captures were visually inspected. All 56 installed Python
+modules matched source; application version 0.1.2 and SDK 0.0.74 were verified.
+AppStream offline validation passed, sandbox permissions were unchanged, and an
+installed-data audit found no environments, databases, logs or credential files.
+The bundle includes Flathub runtime discovery for fresh installations. It is
+accompanied by `SHA256SUMS`; the bundle SHA-256 is
+`f0b3330c99620fdca6c6e389122d99f9f75cfe183e5820ab5a9f574730b2f9f9`.
+Broader live-service, physical-input and accessibility limits remain in the roadmap.
+
 ## Video thumbnail transport follow-up — 14 November 2026
 
 Approved inline playback and scrolling work was committed and pushed as

@@ -25,6 +25,14 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.2" date="2026-11-14">
+      <url>https://github.com/nedrichards/skyloom/releases/tag/v0.1.2</url>
+      <description>
+        <p>Watch videos inline with thumbnail previews and native controls. Enjoy larger, aspect-aware images and steadier scrolling through mixed-media feeds.</p>
+        <p>Improved profile headers, immediate profile image updates and protection against briefly stale server reads after edits and publishing.</p>
+        <p>Respect current saved-feed preferences and open Bluesky's feed manager from the main menu. Includes stronger media, cache and reading-position regression coverage.</p>
+      </description>
+    </release>
     <release version="0.1.1" date="2026-11-13">
       <url>https://github.com/nedrichards/skyloom/releases/tag/v0.1.1</url>
       <description>

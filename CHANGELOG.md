@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.2 — 14 November 2026
+
 - Load video thumbnails from Bluesky’s video service and follow checked redirects to its video CDN, keeping existing cache, download-policy and image-size limits.
 
 - Keep active reading windows below GTK’s row-tracker capacity to stop mixed-height feeds repeatedly rebuilding rows during long scrolling. Preserve differently sized media, archived history, reading anchors and real pagination cursors when opening older saved windows.

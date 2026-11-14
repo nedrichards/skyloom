@@ -39,7 +39,8 @@ flatpak run --filesystem="$PWD" org.flatpak.Builder \
 flatpak install --user --reinstall "$PWD/flatpak-repo" com.nedrichards.Skyloom
 flatpak run com.nedrichards.Skyloom --demo
 mkdir -p dist
-flatpak build-bundle flatpak-repo dist/com.nedrichards.Skyloom-0.1.1-x86_64.flatpak com.nedrichards.Skyloom master
+flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+  flatpak-repo dist/com.nedrichards.Skyloom-0.1.2-x86_64.flatpak com.nedrichards.Skyloom master
 ```
 
 Keep `flatpak-repo/`: local installations use it for updates. After caching
