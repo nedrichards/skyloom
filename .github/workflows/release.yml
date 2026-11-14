@@ -107,6 +107,6 @@ jobs:
             echo 'An existing release is never overwritten. Download the build artifacts for review.' >&2
             exit 1
           fi
-          gh release create "$RELEASE_TAG" *.flatpak SHA256SUMS BUILD_INFO-*.txt \
+          gh release create "$RELEASE_TAG" ./*.flatpak ./SHA256SUMS ./BUILD_INFO-*.txt \
             --repo "$GITHUB_REPOSITORY" --verify-tag --draft --generate-notes --title "Skyloom $RELEASE_TAG"
           echo "Draft prepared for $RELEASE_TAG. Publication requires maintainer review." >> "$GITHUB_STEP_SUMMARY"

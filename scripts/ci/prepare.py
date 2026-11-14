@@ -16,7 +16,11 @@ def commit(directory):
     git = shutil.which("git")
     if not git:
         raise RuntimeError("Git is required")
-    return subprocess.check_output([git, "rev-parse", "HEAD"], cwd=directory, text=True).strip()  # noqa: S603 — fixed Git command, local checkout.
+    return subprocess.check_output(  # noqa: S603 — fixed Git command and exact trusted checkout directory.
+        [git, "-c", f"safe.directory={directory.resolve()}", "rev-parse", "HEAD"],
+        cwd=directory,
+        text=True,
+    ).strip()
 
 
 def prepare(root, source, architecture, reference, release):

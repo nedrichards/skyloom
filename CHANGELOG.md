@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Handle separate container checkouts with exact per-command Git ownership
+  trust and qualify release asset paths for ShellCheck.
+
 - Add native x86_64 and aarch64 CI with installed Flatpak tests, downloadable
   preview bundles, failure diagnostics and demo screenshot contact sheets, using
   the official Flathub build container and Flatpak Builder action.

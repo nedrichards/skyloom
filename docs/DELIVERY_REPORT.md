@@ -54,6 +54,13 @@ verification still require GitHub execution.
 No workflows have been dispatched and no commits, releases or tags published
 as part of this implementation.
 
+The implementation was subsequently committed and pushed as `6104451`. Its
+first hosted CI run started both native container architectures and exposed two
+CI-specific setup failures: ShellCheck SC2035 on release asset globs, and Git's
+ownership check after the second checkout replaced the first checkout's temporary
+safe-directory configuration. The follow-up qualifies asset paths and supplies
+exact per-command checkout trust without changing global Git configuration.
+
 ## Native ARM64 packaging — 14 November 2026
 
 A native GitHub-hosted ARM64 builder validated the same 0.1.2
