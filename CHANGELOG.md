@@ -3,7 +3,8 @@
 ## Unreleased
 
 - Handle separate container checkouts with exact per-command Git ownership
-  trust and qualify release asset paths for ShellCheck.
+  trust, qualify release asset paths for ShellCheck and refresh legacy display
+  helper build configuration for ARM64.
 
 - Add native x86_64 and aarch64 CI with installed Flatpak tests, downloadable
   preview bundles, failure diagnostics and demo screenshot contact sheets, using

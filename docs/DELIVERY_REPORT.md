@@ -60,6 +60,10 @@ CI-specific setup failures: ShellCheck SC2035 on release asset globs, and Git's
 ownership check after the second checkout replaced the first checkout's temporary
 safe-directory configuration. The follow-up qualifies asset paths and supplies
 exact per-command checkout trust without changing global Git configuration.
+Both hosted source jobs subsequently passed. The ARM64 helper build exposed
+Openbox's bundled 2008 `config.guess`, which predates aarch64. CI now refreshes
+both GNU config scripts from Automake in the pinned image before configuring
+the helpers, and streams the saved setup log into the job log.
 
 ## Native ARM64 packaging — 14 November 2026
 

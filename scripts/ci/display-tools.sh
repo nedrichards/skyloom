@@ -15,6 +15,13 @@ build_tool() {
     printf '%s  %s\n' "$digest" "$archive" | sha256sum --check --status
     mkdir "$directory/$name"
     tar -xf "$archive" --strip-components=1 -C "$directory/$name"
+    # Openbox's bundled 2008 GNU config scripts predate aarch64. Use the
+    # config scripts supplied by the pinned build image's Automake toolchain.
+    local config_dir
+    config_dir=$(automake --print-libdir)
+    for config in config.guess config.sub; do
+        install -m 755 "$config_dir/$config" "$directory/$name/$config"
+    done
     (
         cd "$directory/$name"
         ./configure --prefix="$prefix" "$@"
