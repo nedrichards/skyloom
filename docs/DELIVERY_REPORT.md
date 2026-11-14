@@ -100,6 +100,10 @@ activation in the minimal build container; the display session now starts that
 portal explicitly and preflights sandboxed PNG encoding before the suite. The
 container also provides the conventional D-Bus daemon path expected by its
 accessibility launcher. Decoder sandboxing remains enabled.
+The minimal container's D-Bus build uses `/app/var/lib/dbus`, which is absent
+from the image. Session preparation creates that directory and shares its
+generated machine ID with the conventional container paths before starting the
+portal, keeping the portal alive for the full sequential test session.
 
 ## Native ARM64 packaging — 14 November 2026
 

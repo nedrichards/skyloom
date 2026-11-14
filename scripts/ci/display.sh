@@ -6,7 +6,7 @@ cleanup() {
     for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done
 }
 trap cleanup EXIT
-/app/libexec/flatpak-portal --replace --verbose >build-ci/flatpak-portal.log 2>&1 &
+/app/libexec/flatpak-portal --replace --no-idle-exit --verbose >build-ci/flatpak-portal.log 2>&1 &
 pids+=("$!")
 gdbus wait --session --timeout 10 org.freedesktop.portal.Flatpak
 if [[ ${BUILD_BACKEND:-x11} == x11 ]]; then

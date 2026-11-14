@@ -76,7 +76,10 @@ jobs:
           if [[ ! -e /usr/bin/dbus-daemon ]]; then
             ln -s "$(command -v dbus-daemon)" /usr/bin/dbus-daemon
           fi
-          dbus-uuidgen --ensure
+          mkdir -p /app/var/lib/dbus /var/lib/dbus
+          dbus-uuidgen --ensure=/app/var/lib/dbus/machine-id
+          cp /app/var/lib/dbus/machine-id /var/lib/dbus/machine-id
+          cp /app/var/lib/dbus/machine-id /etc/machine-id
           bash scripts/ci/display-tools.sh 2>&1 | tee source/build-ci/display-tools.log
           flatpak info --show-commit org.gnome.Platform//51
           flatpak info --show-commit org.gnome.Sdk//51
