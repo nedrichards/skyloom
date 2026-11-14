@@ -104,6 +104,8 @@ Review build-container digest updates manually with both native builds. The
 container supplies Xvfb and Weston; two checksum-pinned Openbox/xcompmgr source
 archives supply the composited X11 test session. They are built only in the
 disposable CI container and are not bundled with Skyloom.
+An anonymous Docker volume holds the container's preinstalled Flatpak state and
+runtime updates, avoiding OSTree cross-filesystem updates through image layers.
 
 `Extended compatibility` runs weekly or manually on both architectures. It runs
 1,000 generated cases per boundary test, probes the newest atproto with other

@@ -7,6 +7,8 @@ cleanup() {
 }
 trap cleanup EXIT
 if [[ ${BUILD_BACKEND:-x11} == x11 ]]; then
+    export XDG_DATA_DIRS="$tooling/build-ci/display-tools/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+    export XDG_CONFIG_DIRS="$tooling/build-ci/display-tools/etc/xdg:${XDG_CONFIG_DIRS:-/etc/xdg}"
     openbox --sm-disable >build-ci/window-manager.log 2>&1 &
     pids+=("$!")
     xcompmgr >build-ci/compositor.log 2>&1 &

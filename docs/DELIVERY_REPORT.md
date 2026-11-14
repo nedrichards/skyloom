@@ -64,6 +64,12 @@ Both hosted source jobs subsequently passed. The ARM64 helper build exposed
 Openbox's bundled 2008 `config.guess`, which predates aarch64. CI now refreshes
 both GNU config scripts from Automake in the pinned image before configuring
 the helpers, and streams the saved setup log into the job log.
+The first x86_64 build then exposed OSTree's `Invalid cross-device link` while
+updating preinstalled runtimes in Docker image layers. The native container now
+uses an anonymous `/var/lib/flatpak` volume, initialised from the image, so runtime
+updates stay on one filesystem. Build information records the validated runtime
+and SDK commits after Builder has finished. The custom Openbox prefix is also
+included in its XDG data/config paths so its installed themes can be found.
 
 ## Native ARM64 packaging — 14 November 2026
 

@@ -37,7 +37,8 @@ jobs:
     container:
       # GNOME 51 index verified for linux/amd64 and linux/arm64.
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51@sha256:78d969b18225ae107ca29497bf09c4a3f791e5f1838a9a912a529d0024fb6210
-      options: --privileged
+      # OSTree updates must stay on one filesystem, outside image overlay layers.
+      options: --privileged --volume /var/lib/flatpak
     defaults:
       run:
         shell: bash
@@ -79,7 +80,6 @@ jobs:
           desktop-file-validate data/com.nedrichards.Skyloom.desktop
           glib-compile-schemas --strict --dry-run data
           appstreamcli validate --pedantic --no-net data/com.nedrichards.Skyloom.metainfo.xml
-          flatpak info --show-commit org.gnome.Platform//51 >> "dist/BUILD_INFO-$BUILD_ARCH.txt"
       - name: Build and export pinned application
         id: build
         uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6.8
@@ -107,7 +107,14 @@ jobs:
           dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1200x24' bash ../scripts/ci/display.sh 2>&1 | tee build-ci/native.log
       - name: Checksum validated bundle
         working-directory: source/dist
-        run: sha256sum -- *.flatpak > "SHA256SUMS-$BUILD_ARCH"
+        run: |
+          sha256sum -- *.flatpak > "SHA256SUMS-$BUILD_ARCH"
+          {
+            echo 'Validated Platform commit:'
+            flatpak info --show-commit org.gnome.Platform//51
+            echo 'Validated SDK commit:'
+            flatpak info --show-commit org.gnome.Sdk//51
+          } >> "BUILD_INFO-$BUILD_ARCH.txt"
       - name: Upload validated bundle
         id: upload
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
