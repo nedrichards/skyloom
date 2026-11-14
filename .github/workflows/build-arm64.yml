@@ -65,7 +65,7 @@ jobs:
       - name: Install native build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder xvfb dbus-x11 openbox
+          sudo apt-get install -y flatpak flatpak-builder xvfb dbus-x11 openbox xcompmgr
           if test -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
@@ -87,9 +87,14 @@ jobs:
           dbus-run-session -- xvfb-run -a bash <<'NATIVE'
           set -euo pipefail
           openbox --sm-disable >/tmp/skyloom-window-manager.log 2>&1 &
+          xcompmgr >/tmp/skyloom-compositor.log 2>&1 &
+          compositor_pid=$!
           sleep 1
+          kill -0 "$compositor_pid"
           flatpak install --user --reinstall --noninteractive "$PWD/dist/com.nedrichards.Skyloom-$RELEASE_VERSION-aarch64.flatpak"
           flatpak run --user --command=python3 --filesystem="$PWD/release-source:ro" --env=PYTHONPATH=/app/share/skyloom com.nedrichards.Skyloom -c 'import platform, sys; from pathlib import Path; from skyloom import VERSION; print("Native installed app:", platform.machine(), VERSION); assert platform.machine() == "aarch64" and VERSION == sys.argv[1]; root = Path(sys.argv[2]); assert all(p.read_bytes() == (Path("/app/share/skyloom/skyloom") / p.name).read_bytes() for p in root.glob("*.py"))' "$RELEASE_VERSION" "$PWD/release-source/src/skyloom"
+          # A compositing manager avoids solid-CSD borders changing exact resize geometry.
+          flatpak run --user --socket=x11 --nosocket=wayland --env=GDK_BACKEND=x11 --env=GSK_RENDERER=cairo --command=python3 --filesystem="$PWD/release-source:ro" --env=PYTHONPATH=/app/share/skyloom com.nedrichards.Skyloom -c 'import runpy, sys, unittest; root = sys.argv[1]; runpy.run_path(root + "/scripts/runtime-tests.py")["require_runtime"](); sys.path.insert(0, root + "/tests"); suite = unittest.defaultTestLoader.loadTestsFromName("test_feed_switcher"); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and not result.skipped else 1)' "$PWD/release-source"
           flatpak run --user --socket=x11 --nosocket=wayland --env=GDK_BACKEND=x11 --env=GSK_RENDERER=cairo --command=python3 --filesystem="$PWD/release-source:ro" --env=PYTHONPATH=/app/share/skyloom com.nedrichards.Skyloom "$PWD/release-source/scripts/runtime-tests.py" --tests "$PWD/release-source/tests"
           mkdir -p "$PWD/release-source/build-validation"
           flatpak run --user --socket=x11 --nosocket=wayland --env=GDK_BACKEND=x11 --env=GSK_RENDERER=cairo --filesystem="$PWD/release-source/build-validation" com.nedrichards.Skyloom --demo --smoke-test "$PWD/release-source/build-validation" --smoke-scenario navigation

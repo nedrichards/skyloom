@@ -12,7 +12,11 @@ existing pinned versions. Downloaded wheels were verified against PyPI metadata;
 architecture filters preserve every prior x86_64 URL/hash and select one complete
 22-package set per architecture. The builder uses read-only repository permission,
 SHA-pinned GitHub actions, a fixed version tag and a checked packaging overlay.
-Local generator checks passed; remote build and runtime evidence follows when available.
+Local generator checks and the offline x86_64 build passed. The initial native
+ARM64 build/install/source-parity check succeeded; 393 of 394 tests passed, with
+one exact header-resize expectation failing under the non-composited Xvfb setup.
+The builder now supplies an X11 compositing manager and runs that unchanged test
+as a preflight before the full suite. Final runtime evidence follows when available.
 
 ## Release 0.1.2 — 14 November 2026
 
