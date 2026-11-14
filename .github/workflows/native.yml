@@ -48,6 +48,7 @@ jobs:
       BUILD_BACKEND: ${{ inputs.backend }}
       SDK_PROBE: ${{ inputs.sdk_probe }}
       SKYLOOM_PROPERTY_CASES: ${{ inputs.property_cases }}
+      XDG_RUNTIME_DIR: /run/user/0
     steps:
       - name: Check out build tooling
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -70,6 +71,8 @@ jobs:
         id: setup
         run: |
           test "$(uname -m)" = "$BUILD_ARCH"
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
           for tool in Xvfb xvfb-run weston dbus-run-session; do command -v "$tool"; done
           # The Builder image installs D-Bus under /app; accessibility launchers
           # in the SDK use the conventional absolute daemon path.

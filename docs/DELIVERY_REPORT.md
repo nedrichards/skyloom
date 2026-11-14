@@ -104,6 +104,9 @@ The minimal container's D-Bus build uses `/app/var/lib/dbus`, which is absent
 from the image. Session preparation creates that directory and shares its
 generated machine ID with the conventional container paths before starting the
 portal, keeping the portal alive for the full sequential test session.
+The container exports one explicit runtime directory before Builder and portal
+startup so installed apps, the session bus and decoder subsandboxes share the
+same Flatpak instance registry.
 
 ## Native ARM64 packaging — 14 November 2026
 
