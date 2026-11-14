@@ -9,12 +9,14 @@ The bits of Bluesky I use work fine. DMs and multiple accounts are not included.
 
 ## Install and launch
 
-Download the x86_64 Flatpak bundle from the [0.1.2 release](https://github.com/nedrichards/skyloom/releases/tag/v0.1.2), then install it:
+Download the Flatpak bundle for your architecture (x86_64 or aarch64) from the [0.1.2 release](https://github.com/nedrichards/skyloom/releases/tag/v0.1.2), then install it:
 
 ```sh
 flatpak install --user ~/Downloads/com.nedrichards.Skyloom-0.1.2-x86_64.flatpak
 flatpak run com.nedrichards.Skyloom
 ```
+
+On ARM64, use `aarch64` in place of `x86_64` in the bundle filename.
 
 For local builds, see [development](docs/DEVELOPMENT.md#flatpak).
 

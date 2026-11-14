@@ -6,7 +6,7 @@ matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
 ## Native ARM64 packaging — 14 November 2026
 
-A native GitHub-hosted ARM64 builder is being validated for the same 0.1.2
+A native GitHub-hosted ARM64 builder validated the same 0.1.2
 application source. All seven compiled dependencies have aarch64 wheels at the
 existing pinned versions. Downloaded wheels were verified against PyPI metadata;
 architecture filters preserve every prior x86_64 URL/hash and select one complete
@@ -16,7 +16,13 @@ Local generator checks and the offline x86_64 build passed. The initial native
 ARM64 build/install/source-parity check succeeded; 393 of 394 tests passed, with
 one exact header-resize expectation failing under the non-composited Xvfb setup.
 The builder now supplies an X11 compositing manager and runs that unchanged test
-as a preflight before the full suite. Final runtime evidence follows when available.
+as a preflight before the full suite. The unchanged preflight and all 394 installed
+tests passed with zero skips, followed by the installed navigation GUI smoke at
+wide and narrow widths. All 56 installed modules matched the fixed release source.
+[Successful native run](https://github.com/nedrichards/skyloom/actions/runs/43617280851)
+records application commit `fe3fa3e` and packaging commit `5e4f26b`. The downloaded
+ARM64 bundle passed its published CI checksum. Physical ARM64 desktop acceptance
+remains outstanding.
 
 ## Release 0.1.2 — 14 November 2026
 

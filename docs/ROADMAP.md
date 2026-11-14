@@ -16,8 +16,8 @@
   loading. Review light/dark/high contrast/large text and widths above 1280 pixels.
 - Add published screenshots and hosted CI. Review privacy, moderation, dependency
   licensing and sandbox permissions for wider distribution.
-- Build and test architecture-specific dependencies before supporting more than
-  x86_64. Review Flathub requirements before submission.
+- Perform physical ARM64 desktop acceptance alongside the validated native CI
+  build. Review Flathub requirements before submission.
 
 ## Scrolling and reliability
 
