@@ -429,7 +429,7 @@ class StartupTests(StartupFixture, unittest.TestCase):
     def test_deep_cached_restart_restores_reading_then_accepts_fresh_order(self):
         from dataclasses import replace
 
-        from skyloom.domain import Page, Pager
+        from skyloom.domain import POST_WINDOW, Page, Pager
         from skyloom.feed_state import Bookmark
 
         service = self.app.service
@@ -455,7 +455,7 @@ class StartupTests(StartupFixture, unittest.TestCase):
         view = self.window.feed_views["following"]
         self.assertTrue(settle(self.window, 500, lambda: view.position_tick is None))
         restored = self.window.pagers["following"]
-        self.assertEqual(restored.posts, invented)
+        self.assertEqual(restored.posts, invented[-POST_WINDOW:])
         self.assertEqual(restored.cursor, "real-tail")
         self.assertEqual(view.interaction.capture().key, bookmark.uri)
         self.assertAlmostEqual(view.interaction.capture().offset, bookmark.offset, delta=3)
@@ -472,10 +472,10 @@ class StartupTests(StartupFixture, unittest.TestCase):
         self.assertAlmostEqual(view.interaction.capture().offset, bookmark.offset, delta=3)
         # A subsequent live reorder is ignored, while metadata still updates.
         before = list(self.window.pagers["following"].posts)
-        changed = replace(invented[4], likes=23)
+        changed = replace(invented[100], likes=23)
         with patch.object(view, "offer_update", wraps=view.offer_update) as offer:
             self.window.show_feed_update(
-                "following", Page((changed, invented[3]), "later"), automatic=True
+                "following", Page((changed, invented[99]), "later"), automatic=True
             )
             offer.assert_not_called()
         self.assertTrue(settle(self.window, 250, lambda: view.position_tick is None))

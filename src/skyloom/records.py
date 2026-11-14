@@ -1,8 +1,10 @@
 """Bounded cursor bookkeeping for record lists without feed ordering semantics."""
 
+from .domain import POST_WINDOW
+
 
 class RecordPager:
-    def __init__(self, key, limit=200):
+    def __init__(self, key, limit=POST_WINDOW):
         self.key, self.limit = key, limit
         self.items = []
         self.cursor = None

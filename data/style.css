@@ -93,3 +93,13 @@ button.post-action, menubutton.post-action > button, button.post-menu-item {
   border-radius: 999px;
   background: var(--window-bg-color);
 }
+
+.video-play-badge {
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.video-preview {
+  padding: 0;
+  border: 0;
+}

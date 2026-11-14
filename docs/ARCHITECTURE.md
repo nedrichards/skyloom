@@ -31,6 +31,16 @@ page into immutable app records; native pagers retain responsibility for bounded
 windows, reading positions, repeated cursors and request cancellation. Notification
 mapping reads typed fields directly and avoids serialising unused post records.
 
+Live post and record pagers keep 150 items, leaving space for gap/footer rows
+below the supported GTK runtime's 200-widget list tracker budget. This avoids
+repeated median-height estimation and large batches of rebinding in mixed-height
+feeds. Photo/video shape and preview sizes are unchanged. Archived history and
+real-cursor paging remain separate from this active widget window. Older saved
+250-post windows are narrowed around their bookmark on the worker; archived page
+starts recover the exact tail continuation. If a legacy window has no safe real
+boundary, its readable data is preserved until normal feed reconciliation can
+supply one.
+
 For scrolling issues, start with the shared list and reading-position code;
 conversations also have their own projection and loader handling. Use the
 [profiling guide](PERFORMANCE.md) for measurements.
@@ -77,8 +87,13 @@ preserve unrelated fields and compare record versions; separate reply and quote
 saves make partial failures explicit.
 
 Video playback uses GStreamer URI decoding through a `Gtk.MediaStream` and
-`Gtk.Video` controls. Only an explicit play action creates a player; closing it
-or changing accounts releases the pipeline. The Flatpak audio socket enables sound.
+`Gtk.Video` controls. Feed rows show the supplied thumbnail using the shared
+image download policy and bounded cache. Missing or failed thumbnails keep a
+playable fallback card. An explicit play action replaces the
+preview with inline controls, retaining its aspect-aware rectangle. Only one
+player owns a pipeline; row unmap/recycling, another play action or account
+replacement releases it. Errors offer an explicit retry. The dialog player remains
+available to other callers. The Flatpak audio socket enables sound.
 Video preparation runs under the account storage lease on a worker, validates
 MP4/H.264/AAC, strips metadata without re-encoding, and retains private copies
 until sign-out. Upload streams to the fixed Bluesky video service using scoped,
@@ -91,8 +106,13 @@ when debugging or sharing a reproduction.
 
 Feed image previews reserve height from immutable `Media` dimensions supplied by
 the image embed's optional `aspectRatio`. Native height-for-width measurement is
-bounded to 160–560 logical pixels, with a 4:3 fallback for older records. GTK
-centres any remaining crop using `ContentFit.COVER`; image arrival/eviction and
+bounded to 160–560 logical pixels, with a 4:3 fallback for older records. The preview
+draws immutable textures with a centred cover crop; image arrival/eviction and
 download-policy placeholders do not change the reserved rectangle. This uses
 constant arithmetic during layout, with no pixel/subject analysis, decode or
 network work added to scrolling. Dimension fields survive cached post round trips.
+`PreviewTexture` queues drawing only when decoded pixels arrive or are released;
+it does not inherit a picture's pixel-dependent natural size or propagate a resize
+to the list. Alt text remains an accessible image label. Inline `Gtk.Video`
+controls are created on the first explicit play action, not while binding a feed
+thumbnail. Thumbnail badge changes use opacity rather than changing layout.

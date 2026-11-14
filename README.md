@@ -57,8 +57,9 @@ revoke the app password in Bluesky.
 - Your post menu also opens reply and quote controls. On replies to your thread,
   hide a reply; on quotes of your posts, detach the quote. Restore these from the
   original post's controls. Hidden replies can still be opened directly.
-- Select Play video to open native playback with sound and playback controls.
-  Videos play only after you choose them; there is no feed autoplay.
+- Videos show a preview in the feed. Select Play video for inline native playback
+  with sound and playback controls. Only one video plays at a time; leaving its
+  row stops playback. There is no feed autoplay.
 - Preferences controls appearance, downloads and labelled-content warnings.
   Labelled content is visible by default; explicit mutes and blocks remain separate.
 - Open your profile to edit its name, description and images. Select follower or

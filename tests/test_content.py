@@ -11,6 +11,8 @@ from gtk_support import DISPLAY, settle
 if DISPLAY:
     from gi.repository import Adw, Gio, Gtk
 
+    from skyloom.widgets import PreviewTexture
+
 
 @unittest.skipUnless(DISPLAY, "GNOME GTK display required")
 class ContentTests(unittest.TestCase):
@@ -195,7 +197,7 @@ class ContentTests(unittest.TestCase):
         self.assertGreater(images.residency()["bound_consumers"], 0)
         self.assertLess(images.residency()["bound_consumers"], 8)
         first = next(row for row in view.rows if row._value == posts[0])
-        picture = next(w for w in self.walk(first) if isinstance(w, Gtk.Picture))
+        picture = next(w for w in self.walk(first) if isinstance(w, PreviewTexture))
         self.assertIsNotNone(picture.get_paintable())
         calls = []
         late = image_callback(picture, calls.append)
@@ -974,7 +976,7 @@ class ContentTests(unittest.TestCase):
         self.window.worker.submit = submit
         row = PostRow(self.post, self.window)
         self.addCleanup(row.cancel)
-        picture = next(w for w in self.walk(row) if isinstance(w, Gtk.Picture))
+        picture = next(w for w in self.walk(row) if isinstance(w, PreviewTexture))
         loaded, failed = callbacks[-1]
         binds = []
         self.window.images.bind = lambda *args: binds.append(args)
@@ -991,7 +993,7 @@ class ContentTests(unittest.TestCase):
         from skyloom.domain import Media
         from skyloom.widgets import ImagePreview
 
-        picture = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.COVER)
+        picture = PreviewTexture()
         preview = ImagePreview(picture)
         for width, height, expected in [
             (800, 400, 240),
@@ -1026,7 +1028,7 @@ class ContentTests(unittest.TestCase):
 
         self.window.worker.submit = submit
         row = PostRow(self.post, self.window)
-        picture = next(widget for widget in self.walk(row) if isinstance(widget, Gtk.Picture))
+        picture = next(widget for widget in self.walk(row) if isinstance(widget, PreviewTexture))
         preview = picture.get_parent()
         viewer = preview.get_parent()
         reserved = preview.measure(Gtk.Orientation.VERTICAL, 480)[:2]
@@ -1059,6 +1061,121 @@ class ContentTests(unittest.TestCase):
         row = PostRow(replace(self.post, images=images), self.window)
         texts = self.labels(row)
         self.assertFalse(any(text.startswith("ALT") or "No description" in text for text in texts))
+
+    def test_decoded_preview_arrival_and_eviction_only_redraw_without_relayout(self):
+        from gi.repository import Gdk, GLib
+
+        from skyloom.widgets import ImagePreview
+
+        class MeasuredPreview(ImagePreview):
+            measures = 0
+            allocations = 0
+
+            def do_measure(self, orientation, for_size):
+                self.measures += 1
+                return super().do_measure(orientation, for_size)
+
+            def do_size_allocate(self, *args):
+                self.allocations += 1
+                return super().do_size_allocate(*args)
+
+        picture = PreviewTexture()
+        picture.set_alternative_text("Invented preview description")
+        self.assertEqual(picture.get_alternative_text(), "Invented preview description")
+        self.assertEqual(picture.get_accessible_role(), Gtk.AccessibleRole.IMG)
+        preview = MeasuredPreview(picture)
+        window = Adw.Window(content=preview, default_width=480, default_height=360)
+        self.addCleanup(window.destroy)
+        self.assertTrue(settle(window))
+        geometry = (preview.get_width(), preview.get_height())
+        preview.measures = preview.allocations = 0
+        for width, height in ((8, 16), (16, 8), (12, 12)):
+            texture = Gdk.MemoryTexture.new(
+                width,
+                height,
+                Gdk.MemoryFormat.R8G8B8A8,
+                GLib.Bytes.new(bytes([64, 128, 192, 255]) * width * height),
+                width * 4,
+            )
+            picture.set_paintable(texture)
+            self.assertTrue(settle(window))
+            self.assertIs(picture.get_paintable(), texture)
+            picture.set_paintable(None)
+            self.assertTrue(settle(window))
+            self.assertEqual((preview.get_width(), preview.get_height()), geometry)
+        self.assertEqual(preview.measures, 0)
+        self.assertEqual(preview.allocations, 0)
+
+    def test_active_mixed_media_window_does_not_recycle_during_long_scroll(self):
+        from unittest.mock import patch
+
+        from gi.repository import GLib
+
+        from skyloom.domain import POST_WINDOW, Media, Page, Pager, Video
+        from skyloom.widgets import FeedView, PostRow
+
+        self.window.generation = 1
+        self.window.settings.set_boolean("load-images", False)
+        posts = [
+            replace(
+                self.post,
+                uri=self.post.uri + f"/mixed-{i}",
+                labels=(),
+                quote=None,
+                text=f"Invented mixed-media post {i}. " * 3,
+                images=(Media("invented", "Portrait photo", width=800, height=1200),)
+                if i % 2
+                else (),
+                video=Video(
+                    "https://video.invalid/invented.m3u8", "Landscape video", width=1600, height=900
+                )
+                if not i % 2
+                else None,
+            )
+            for i in range(250)
+        ]
+        pager = Pager()
+        for start in range(0, len(posts), 25):
+            pager.merge(Page(tuple(posts[start : start + 25]), str(start + 25)))
+        self.assertEqual(len(pager.posts), POST_WINDOW)
+        view = FeedView(self.window)
+        window = Gtk.Window(child=view, default_width=800, default_height=600)
+        bindings = []
+        original = PostRow.bind_post
+
+        def bound(row, post):
+            bindings.append(post.uri)
+            original(row, post)
+
+        try:
+            with patch.object(PostRow, "bind_post", bound):
+                view.set_posts(pager.posts)
+                view.paging.complete(None, len(pager.posts))
+                self.assertTrue(settle(window, ready=lambda: not view.check_pending))
+                self.assertLess(view.flat.get_n_items(), 200)
+                initial = len(bindings)
+                loop = GLib.MainLoop()
+                steps = 0
+
+                def scroll(*_args):
+                    nonlocal steps
+                    adjustment = view.scroll.get_vadjustment()
+                    adjustment.set_value(adjustment.get_value() + (420 if steps < 70 else -420))
+                    steps += 1
+                    if steps == 140:
+                        loop.quit()
+                        return False
+                    return True
+
+                window.add_tick_callback(scroll)
+                loop.run()
+                self.assertEqual(
+                    len(bindings), initial, "Mixed heights caused native row recycling"
+                )
+                self.assertEqual(len(view.rows), initial + 1)  # includes the pager footer
+        finally:
+            view.close()
+            window.destroy()
 
 
 @unittest.skipUnless(DISPLAY, "GNOME GTK display required")

@@ -8,11 +8,11 @@ from time import monotonic
 from typing import ClassVar
 from weakref import WeakSet
 
-from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Graphene, Gtk, Pango
 
 from .bookmark_service import reconcile_bookmarks
 from .content import LabelledContent
-from .domain import Author, Notice, Post, reconcile_deleted, relative_time, safe_url
+from .domain import Author, Media, Notice, Post, reconcile_deleted, relative_time, safe_url
 from .feed_state import FeedGap
 from .list_feedback import TopPeek, UpdateNotice
 from .list_interaction import ListInteraction
@@ -20,6 +20,50 @@ from .motion import allowed as motion_allowed
 from .pagination import AutoPager
 from .richtext import markup
 from .thread_context import ThreadContext
+
+
+class PreviewTexture(Gtk.Widget):
+    """Draw immutable decoded pixels without invalidating the reserved row size."""
+
+    def __init__(self):
+        super().__init__(accessible_role=Gtk.AccessibleRole.IMG)
+        self.paintable = None
+        self.alternative_text = ""
+
+    def set_paintable(self, paintable):
+        if self.paintable is not paintable:
+            self.paintable = paintable
+            # Pixel arrival/eviction changes drawing, never the media rectangle.
+            self.queue_draw()
+
+    def get_paintable(self):
+        return self.paintable
+
+    def set_alternative_text(self, text):
+        self.alternative_text = text
+        self.update_property([Gtk.AccessibleProperty.LABEL], [text])
+
+    def get_alternative_text(self):
+        return self.alternative_text
+
+    def do_snapshot(self, snapshot):
+        texture = self.paintable
+        width, height = self.get_width(), self.get_height()
+        if texture is None or width <= 0 or height <= 0:
+            return
+        scale = max(width / texture.get_width(), height / texture.get_height())
+        drawn_width, drawn_height = texture.get_width() * scale, texture.get_height() * scale
+        snapshot.push_clip(Graphene.Rect().init(0, 0, width, height))
+        snapshot.append_texture(
+            texture,
+            Graphene.Rect().init(
+                (width - drawn_width) / 2,
+                (height - drawn_height) / 2,
+                drawn_width,
+                drawn_height,
+            ),
+        )
+        snapshot.pop()
 
 
 class ImagePreview(Gtk.Box):
@@ -1558,23 +1602,62 @@ class PostRow(Gtk.Box):
         for media in post.images:
             self.add_image(media, content)
         if post.video:
-            from .video_player import open_video
+            from .video_player import InlineVideo
 
-            play_content = box(False, 12, margin=12)
-            play_content.append(Gtk.Image(icon_name="media-playback-start-symbolic", pixel_size=32))
-            video_description = box(spacing=4)
-            video_description.append(label("Play video", "heading"))
-            video_description.append(label("Streams when played", "dim-label"))
-            play_content.append(video_description)
-            play = Gtk.Button(child=play_content)
-            play.set_tooltip_text("Play video; downloads begin when opened")
-            play.update_property([Gtk.AccessibleProperty.LABEL], ["Play video"])
-            play.connect("clicked", lambda _button, video=post.video: open_video(window, video))
-            if not post.video.local:
-                window.online_control(play)
-            content.append(play)
-            if post.video.alt.strip():
-                content.append(label(post.video.alt, "dim-label", selectable=True))
+            source = post.video
+            poster = Gtk.Overlay()
+            picture = PreviewTexture()
+            picture.set_alternative_text(source.alt or "Video preview")
+            poster.set_child(picture)
+            badge = box(spacing=6)
+            badge.set_halign(Gtk.Align.CENTER)
+            badge.set_valign(Gtk.Align.CENTER)
+            badge.add_css_class("osd")
+            badge.add_css_class("video-play-badge")
+            badge.append(Gtk.Image(icon_name="media-playback-start-symbolic", pixel_size=48))
+            fallback = label("Play video")
+            badge.append(fallback)
+            poster.add_overlay(badge)
+            preview = ImagePreview(poster)
+            preview.set_media(
+                Media(source.thumbnail, source.alt, width=source.width, height=source.height)
+            )
+            player = InlineVideo(window, source, preview)
+            content.append(player)
+            if source.thumbnail and should_load_image(window, source.thumbnail):
+                serial = self.binding_serial
+
+                def loaded(pix):
+                    if self.alive and serial == self.binding_serial:
+                        window.images.bind(picture, pix)
+                        picture.set_paintable(pix)
+                        fallback.set_opacity(1 if pix is None else 0)
+
+                def failed(_message):
+                    if self.alive and serial == self.binding_serial:
+                        fallback.set_label("Preview unavailable · Play video")
+                        fallback.set_opacity(1)
+
+                def release():
+                    picture.set_paintable(None)
+                    fallback.set_label("Play video")
+                    fallback.set_opacity(1)
+                    window.images.unbind(picture)
+
+                self.image_releases.append((picture, release))
+
+                def load():
+                    future = window.worker.submit(
+                        window.images.get(source.thumbnail),
+                        image_callback(picture, loaded),
+                        image_callback(picture, failed),
+                    )
+                    remember_request(self.pending, future)
+                    return future
+
+                start_image(picture, load, self, release)
+            if source.alt.strip():
+                content.append(label(source.alt, "dim-label", selectable=True))
         if post.quote and not compact:
             if self.quote_cell is None:
                 self.quote_cell = PostRow(post.quote, window, compact=True)
@@ -1705,7 +1788,7 @@ class PostRow(Gtk.Box):
         if index == len(self.media_cells):
             group = box(spacing=4)
             group.add_css_class("card")
-            group.pic = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.COVER)
+            group.pic = PreviewTexture()
             group.preview = ImagePreview(group.pic)
             group.viewer = Gtk.Button(child=group.preview)
             group.viewer.add_css_class("flat")
@@ -1869,6 +1952,8 @@ class PostRow(Gtk.Box):
         if self.content is not None:
             for child in tuple(list_children(self.attachments)):
                 if child not in self.media_cells:
+                    if hasattr(child, "finished"):
+                        child.finished()
                     self.attachments.remove(child)
             for group in self.media_cells:
                 group.media = None

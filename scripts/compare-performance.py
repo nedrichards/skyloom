@@ -8,6 +8,10 @@ from pathlib import Path
 CONFIGURATION = (
     "report_version",
     "workload_version",
+    "mixed_media",
+    "scroll_seconds",
+    "scroll_speed",
+    "trace_layout",
     "posts",
     "width",
     "backend",

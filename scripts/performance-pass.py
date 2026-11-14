@@ -40,6 +40,20 @@ def main():
     parser.add_argument(
         "--baseline", type=Path, help="Fail if a matching baseline exceeds comparison budgets"
     )
+    parser.add_argument(
+        "--mixed-media",
+        action="store_true",
+        help="Alternate portrait/landscape images and video thumbnails",
+    )
+    parser.add_argument(
+        "--scroll-seconds", type=float, default=4, help="Seconds per scroll direction"
+    )
+    parser.add_argument(
+        "--scroll-speed", type=float, default=1800, help="Logical pixels per second"
+    )
+    parser.add_argument(
+        "--trace-layout", action="store_true", help="Diagnose row churn and preview layout counts"
+    )
     parser.add_argument("--profile", action="store_true", help="Separate main-thread cProfile run")
     parser.add_argument("--reduced-motion", action="store_true")
     parser.add_argument(
@@ -48,7 +62,7 @@ def main():
         help="Quiet mapped and unmapped CPU/context-switch samples",
     )
     parser.add_argument("--width", type=int, default=1100)
-    parser.add_argument("--posts", type=int, choices=(30, 100, 250), default=250)
+    parser.add_argument("--posts", type=int, choices=(30, 100, 150, 190, 250), default=250)
     parser.add_argument(
         "--interactions-only",
         action="store_true",
@@ -66,6 +80,10 @@ def main():
         "--control", action="store_true", help="Short plain-label list control; not the app score"
     )
     args = parser.parse_args()
+    if not all(
+        math.isfinite(value) and value > 0 for value in (args.scroll_seconds, args.scroll_speed)
+    ):
+        parser.error("Scroll duration and speed must be finite and positive")
     os.environ["GSETTINGS_BACKEND"] = "memory"
     import gi
 
@@ -74,9 +92,10 @@ def main():
     gi.require_version("Adw", "1")
     from gi.repository import Adw, GLib, Gtk
 
+    from skyloom import widgets
     from skyloom.application import Application
     from skyloom.conversation import ThreadPage
-    from skyloom.domain import Media, Notice, Page, Pager
+    from skyloom.domain import Media, Notice, Page, Pager, Video
     from skyloom.refresh import Connection
     from skyloom.service import Attachment
     from skyloom.widgets import FeedView, PostRow
@@ -89,6 +108,21 @@ def main():
     output.parent.mkdir(parents=True, exist_ok=True)
     profiler = cProfile.Profile() if args.profile else None
     records, counters = [], {"row_binds": 0, "row_unbinds": 0, "image_calls": 0}
+    layout_events = []
+    if args.trace_layout:
+        original_preview = widgets.ImagePreview
+
+        class TracedPreview(original_preview):
+            def do_measure(self, orientation, for_size):
+                counters["preview_measures"] += 1
+                return super().do_measure(orientation, for_size)
+
+            def do_size_allocate(self, width, height, baseline):
+                counters["preview_allocations"] += 1
+                return super().do_size_allocate(width, height, baseline)
+
+        widgets.ImagePreview = TracedPreview
+    counters.update(preview_measures=0, preview_allocations=0)
     bind, unbind, image_get = FeedView.bind, FeedView.unbind, application.images.get
 
     def counted_bind(*params):
@@ -101,6 +135,12 @@ def main():
 
     async def counted_image(*params, **kwargs):
         counters["image_calls"] += 1
+        if (
+            args.mixed_media
+            and params
+            and params[0].startswith("https://cdn.bsky.app/skyloom-invented-preview/")
+        ):
+            return await image_get("demo-landscape", local=True)
         return await image_get(*params, **kwargs)
 
     FeedView.bind, FeedView.unbind = counted_bind, counted_unbind
@@ -164,10 +204,24 @@ def main():
 
         def before(_clock):
             state["paint_start"] = time.perf_counter()
+            if args.trace_layout:
+                state["frame_counts"] = counters.copy()
 
         def after(frame_clock):
             now = time.perf_counter()
-            state["spans"].append((now - state.get("paint_start", now)) * 1000)
+            span = (now - state.get("paint_start", now)) * 1000
+            state["spans"].append(span)
+            if args.trace_layout and span > 20:
+                layout_events.append(
+                    {
+                        "phase": state["name"],
+                        "span_ms": round(span, 3),
+                        **{
+                            key: value - state.get("frame_counts", counters)[key]
+                            for key, value in counters.items()
+                        },
+                    }
+                )
             state["frames"].append((now, frame_clock.get_current_timings()))
             state.setdefault("first_frame_ms", (now - launch) * 1000)
             state.setdefault(
@@ -191,6 +245,35 @@ def main():
             )
             for i in range(args.posts)
         ]
+        if args.mixed_media:
+            shapes = ((1600, 900), (800, 1200), (1200, 1200), (1600, 400))
+            posts = [
+                replace(
+                    post,
+                    images=(
+                        Media(
+                            "demo-landscape",
+                            "Invented mixed-shape photo",
+                            local=True,
+                            width=shapes[i % 4][0],
+                            height=shapes[i % 4][1],
+                        ),
+                    )
+                    if i % 3
+                    else (),
+                    video=Video(
+                        "https://video.invalid/invented.m3u8",
+                        "Invented video",
+                        f"https://cdn.bsky.app/skyloom-invented-preview/{i}",
+                        *shapes[i % 4],
+                    )
+                    if i % 3 == 0
+                    else None,
+                    quote=None,
+                    labels=(),
+                )
+                for i, post in enumerate(posts)
+            ]
         home = window.feed_views["following"]
         if args.control:
             home.render = lambda post: Gtk.Label(
@@ -239,8 +322,8 @@ def main():
                 adjustment = view.scroll.get_vadjustment()
                 # Apply relative input so GTK's variable-row anchor corrections
                 # do not become repeated jumps back to an absolute pixel target.
-                elapsed = min(progress, 4)
-                delta = max(0, elapsed - state.get("scroll_progress", 0)) * 1800
+                elapsed = min(progress, args.scroll_seconds)
+                delta = max(0, elapsed - state.get("scroll_progress", 0)) * args.scroll_speed
                 state["scroll_progress"] = elapsed
                 previous = adjustment.get_value()
                 adjustment.set_value(previous + direction * delta)
@@ -400,20 +483,20 @@ def main():
         scenarios = [
             ("startup", lambda: None, None, 1),
             (f"feed-create-{args.posts}", feed, None, 1),
-            ("feed-scroll-cold", lambda: None, scroll, 4),
-            ("feed-scroll-warm", lambda: None, scroll_back, 4),
+            ("feed-scroll-cold", lambda: None, scroll, args.scroll_seconds),
+            ("feed-scroll-warm", lambda: None, scroll_back, args.scroll_seconds),
             (f"counter-update-{args.posts}", counters_update, None, 0.8),
             ("show-arrivals", staged, None, 1),
             ("refresh-undo", lambda: window.interactions.undo(), None, 1),
             ("labels-hide", labels, None, 0.8),
             ("labels-reveal", labels_back, None, 0.8),
             (f"conversation-open-{args.posts}", lambda: window.thread(posts[0].uri), None, 1.5),
-            ("conversation-scroll", lambda: None, scroll, 4),
+            ("conversation-scroll", lambda: None, scroll, args.scroll_seconds),
             ("back", lambda: window.interactions.back(), None, 0.8),
             ("profile-open", lambda: window.profile(base.author.did), None, 1.5),
-            ("profile-scroll", lambda: None, scroll, 4),
+            ("profile-scroll", lambda: None, scroll, args.scroll_seconds),
             ("search-open-results", search, None, 1.5),
-            ("search-scroll", lambda: None, scroll, 4),
+            ("search-scroll", lambda: None, scroll, args.scroll_seconds),
             ("sidebar-transition", navigate, None, 0.8),
             ("sidebar-restore", navigate, None, 0.8),
             ("idle", lambda: None, None, 2),
@@ -527,7 +610,12 @@ def main():
     window = application.window
     report = {
         "report_version": 1,
-        "workload_version": 4,
+        "workload_version": 6,
+        "scroll_seconds": args.scroll_seconds,
+        "scroll_speed": args.scroll_speed,
+        "layout_events": layout_events,
+        "trace_layout": args.trace_layout,
+        "mixed_media": args.mixed_media,
         "runtime": {
             "python": list(sys.version_info[:3]),
             "gtk": [Gtk.get_major_version(), Gtk.get_minor_version(), Gtk.get_micro_version()],

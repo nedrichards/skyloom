@@ -5,7 +5,7 @@ import time
 import unittest
 from dataclasses import replace
 
-from skyloom.domain import Author, Page, Pager, Post
+from skyloom.domain import POST_WINDOW, Author, Page, Pager, Post
 from skyloom.feed_state import Bookmark, FeedGap
 from skyloom.storage import Storage
 
@@ -60,11 +60,11 @@ class FeedStateTests(unittest.TestCase):
         self.assertEqual(result.cursor, "tail")
 
     def test_full_window_protects_anchors_and_real_continuations(self):
-        old = posts(0, 250)
-        for index in (0, 25, 125, 230, 249):
+        old = posts(0, POST_WINDOW)
+        for index in (0, 25, POST_WINDOW // 2, POST_WINDOW - 20, POST_WINDOW - 1):
             pager = Pager(list(old), "tail")
             result = pager.reconciled(Page(posts(300, 330), "head-cursor"), anchor=old[index].uri)
-            self.assertLessEqual(len(result.posts), 250)
+            self.assertLessEqual(len(result.posts), POST_WINDOW)
             self.assertIn(old[index], result.posts)
             self.assertEqual(result.posts[:30], list(posts(300, 330)))
             self.assertIn(result.cursor, {"tail", "head-cursor"})
@@ -74,12 +74,14 @@ class FeedStateTests(unittest.TestCase):
         )
 
     def test_pagination_retains_current_anchor_when_arrival_would_trim_it(self):
-        old = posts(0, 250)
+        old = posts(0, POST_WINDOW)
         pager = Pager(list(old), "real-older")
-        for index in (0, 5, 240):
-            result = pager.appended(Page(posts(250, 280), "real-next"), anchor=old[index].uri)
+        for index in (0, 5, POST_WINDOW - 10):
+            result = pager.appended(
+                Page(posts(POST_WINDOW, POST_WINDOW + 30), "real-next"), anchor=old[index].uri
+            )
             self.assertIn(old[index], result.posts)
-            self.assertEqual(len(result.posts), 250)
+            self.assertEqual(len(result.posts), POST_WINDOW)
             self.assertEqual(result.cursor, "real-next" if index >= 30 else "real-older")
 
     def test_thousands_archived_all_pages_restorable_without_large_render_window(self):
@@ -104,7 +106,7 @@ class FeedStateTests(unittest.TestCase):
             # A later head fetch must not overwrite the older reading window.
             storage.cache("invented", "following", Page(posts(4000, 4030), "new-head"))
             restored = Storage(directory).cached_state("invented", "following")
-            self.assertEqual(restored.pager.posts, saved.posts)
+            self.assertEqual(restored.pager.posts, saved.posts[-POST_WINDOW:])
             self.assertEqual(restored.pager.cursor, "c2940")
             self.assertEqual(restored.bookmark, bookmark)
             cached = storage.cached_page("invented", "following", "c2940")
@@ -147,3 +149,52 @@ class FeedStateTests(unittest.TestCase):
         self.assertEqual(
             Bookmark.parse({"uri": "invented", "offset": float("nan"), "neighbours": 4}).offset, 0
         )
+
+    def test_legacy_window_is_narrowed_around_reader_with_exact_cached_continuation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            storage = Storage(directory)
+            old = posts(0, 250)
+            for start in range(0, 250, 25):
+                storage.cache(
+                    "invented",
+                    "following",
+                    Page(old[start : start + 25], f"c{start + 25}"),
+                    None if start == 0 else f"c{start}",
+                )
+            legacy = Pager(list(old), "c250")
+            # Older checkpoints may omit page-start metadata; recover it from the archive.
+            for anchor in (0, 40, 125, 220, 249):
+                bookmark = Bookmark(old[anchor].uri, -37, old[anchor].uri)
+                storage.checkpoint("invented", "following", legacy, bookmark)
+                restored = storage.cached_state("invented", "following")
+                self.assertLessEqual(len(restored.pager.posts), POST_WINDOW)
+                self.assertIn(old[anchor], restored.pager.posts)
+                self.assertEqual(restored.bookmark, bookmark)
+                last = int(restored.pager.posts[-1].uri.rsplit("/", 1)[-1])
+                if last < 249:
+                    continuation = storage.cached_page(
+                        "invented", "following", restored.pager.cursor
+                    )
+                    self.assertIsNotNone(continuation)
+                    self.assertEqual(continuation.posts[0], old[last + 1])
+                else:
+                    self.assertEqual(restored.pager.cursor, "c250")
+                self.assertEqual(len(legacy.posts), 250)
+            missing = Bookmark(
+                "at://did:example:cache/post/missing",
+                -37,
+                old[222].uri,
+                (old[220].uri, old[221].uri),
+            )
+            storage.checkpoint("invented", "following", legacy, missing)
+            restored = storage.cached_state("invented", "following")
+            self.assertIn(old[220], restored.pager.posts)
+            self.assertEqual(restored.bookmark.uri, old[220].uri)
+            self.assertEqual(restored.bookmark.offset, 0)
+            self.assertEqual(restored.bookmark.selected, old[222].uri)
+            with storage.connect("invented") as db:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM feed_posts").fetchone()[0], 250)
+
+    def test_legacy_window_without_a_safe_boundary_preserves_readable_data(self):
+        legacy = Pager(list(posts(0, 250)), "opaque-tail")
+        self.assertIs(legacy.bounded(legacy.posts[0].uri), legacy)

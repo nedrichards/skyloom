@@ -8,6 +8,7 @@ from typing import get_type_hints
 
 from skyloom.demo import DemoService
 from skyloom.domain import (
+    POST_WINDOW,
     Author,
     Media,
     Page,
@@ -168,7 +169,7 @@ class ModelTests(unittest.TestCase):
         self.assertIsNone(pager.cursor)
         self.assertEqual(len(pager.posts), 2)
         pager.merge(Page(tuple(replace(p, uri=str(i)) for i in range(300)), None), True)
-        self.assertEqual(len(pager.posts), 250)
+        self.assertEqual(len(pager.posts), POST_WINDOW)
 
     def test_refresh_preserves_omitted_history_and_leaves_previous_window_immutable(self):
         posts = [replace(sample(), uri=str(i)) for i in range(90)]
@@ -197,18 +198,18 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(disjoint.gaps, {posts[0].uri: "disjoint"})
 
     def test_refresh_bound_rewinds_to_a_real_page_without_skipping_dropped_posts(self):
-        posts = [replace(sample(), uri=str(i)) for i in range(250)]
+        posts = [replace(sample(), uri=str(i)) for i in range(POST_WINDOW)]
         pager = Pager()
-        for start in range(0, 250, 25):
+        for start in range(0, POST_WINDOW, 25):
             pager.merge(Page(tuple(posts[start : start + 25]), str(start + 25)))
         arrivals = [replace(sample(), uri=f"new-{i}") for i in range(10)]
         refreshed = pager.reconciled(Page((*arrivals, *posts[:15]), "head"), reorder=True)
-        self.assertEqual(refreshed.posts, [*arrivals, *posts[:225]])
-        self.assertEqual(refreshed.cursor, "225")
-        refreshed.merge(Page(tuple(posts[225:]), "250"))
-        self.assertEqual(refreshed.cursor, "250")
-        self.assertEqual(refreshed.posts[-25:], posts[225:])
-        self.assertEqual(len(refreshed.posts), 250)
+        self.assertEqual(refreshed.posts, [*arrivals, *posts[: POST_WINDOW - 25]])
+        self.assertEqual(refreshed.cursor, str(POST_WINDOW - 25))
+        refreshed.merge(Page(tuple(posts[POST_WINDOW - 25 :]), str(POST_WINDOW)))
+        self.assertEqual(refreshed.cursor, str(POST_WINDOW))
+        self.assertEqual(refreshed.posts[-25:], posts[POST_WINDOW - 25 :])
+        self.assertEqual(len(refreshed.posts), POST_WINDOW)
 
     def test_time(self):
         now = datetime(2026, 10, 26, 12, 0, tzinfo=UTC)

@@ -72,3 +72,113 @@ class VideoPlayerTests(unittest.TestCase):
             self.assertEqual(start.call_count, 3)
             second.finished()
             self.assertIsNone(self.window.video_player)
+
+    def inline_player(self, source):
+        from gi.repository import Gtk
+
+        from skyloom.video_player import InlineVideo
+        from skyloom.widgets import ImagePreview
+
+        player = InlineVideo(self.window, source, ImagePreview(Gtk.Label(label="Invented poster")))
+        self.addCleanup(player.finished)
+        return player
+
+    def test_inline_play_is_explicit_single_owner_and_unmap_releases_pipeline(self):
+        from gi.repository import Gtk
+
+        from skyloom.domain import Video
+        from skyloom.video_player import Playback
+
+        first = self.inline_player(Video("/invented-first.mp4", local=True))
+        second = self.inline_player(Video("/invented-second.mp4", local=True))
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        body.append(first)
+        body.append(second)
+        self.window.set_content(body)
+        self.assertTrue(settle(self.window))
+        self.assertIsNone(first.stream)
+        self.assertIsNone(first.video)
+        self.assertIsNone(first.owner_watch)
+        with patch.object(Playback, "start") as start:
+            first.play.emit("clicked")
+            self.assertEqual(start.call_count, 1)
+            self.assertIs(first.preview.get_first_child(), first.video)
+            self.assertIs(self.window.video_player, first)
+            second.play.emit("clicked")
+            self.assertIs(self.window.video_player, second)
+            self.assertIsNone(first.owner_watch)
+            self.assertIs(first.play.get_child(), first.preview)
+            second.set_visible(False)
+            self.assertIsNone(second.stream)
+            self.assertIsNone(second.owner_watch)
+            self.assertIsNone(self.window.video_player)
+            self.assertIs(second.preview.get_first_child(), second.poster)
+
+    def test_inline_offline_retry_and_account_replacement(self):
+        from skyloom.domain import Video
+        from skyloom.video_player import Playback
+
+        player = self.inline_player(Video("https://video.invalid/invented.m3u8"))
+        self.window.set_content(player)
+        self.assertTrue(settle(self.window))
+        self.window.read_only = True
+        player.play.emit("clicked")
+        self.assertIsNone(player.stream)
+        self.assertIn("offline", player.message.get_label())
+        self.assertTrue(player.retry.get_visible())
+        self.window.read_only = False
+        with patch.object(Playback, "start") as start:
+            player.retry.emit("clicked")
+            start.assert_called_once()
+        self.window.generation += 1
+        player.check_owner()
+        self.assertIsNone(player.owner_watch)
+        self.assertIsNone(self.window.video_player)
+        with patch.object(Playback, "start") as start:
+            player.play.emit("clicked")
+            start.assert_not_called()
+        self.assertTrue(player.closed)
+
+    def test_feed_thumbnail_obeys_download_policy_and_recycling_disposes_player(self):
+        from dataclasses import replace
+
+        from content_fixture import ContentFixture
+
+        from skyloom.domain import Video
+        from skyloom.video_player import InlineVideo
+        from skyloom.widgets import PostRow, list_children
+
+        fixture = ContentFixture()
+        fixture.window.generation = 1
+        callbacks = []
+
+        def submit(coro, success, failure):
+            coro.close()
+            callbacks.append((success, failure))
+
+        fixture.window.worker.submit = submit
+        source = Video(
+            "https://video.invalid/invented.m3u8",
+            "Invented video description",
+            "https://video.invalid/invented.jpg",
+            160,
+            90,
+        )
+        post = replace(fixture.post, images=(), labels=(), video=source)
+        for enabled in (False, True):
+            fixture.requests.clear()
+            fixture.window.settings.set_boolean("load-images", enabled)
+            row = PostRow(post, fixture.window)
+            player = next(c for c in list_children(row.attachments) if isinstance(c, InlineVideo))
+            self.assertEqual(player.preview.ratio, 160 / 90)
+            self.assertEqual(source.thumbnail in fixture.requests, enabled)
+            self.assertNotIn(source.playlist, fixture.requests)
+            self.assertIsNone(player.stream)
+            fallback = player.poster.get_last_child().get_last_child()
+            self.assertTrue(fallback.get_visible())
+            if enabled:
+                callbacks[-1][1]("Invented failure")
+                self.assertIn("Preview unavailable", fallback.get_label())
+            row.cancel()
+            self.assertTrue(player.closed)
+            self.assertIsNone(player.stream)

@@ -4,6 +4,119 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Sustained mixed-height feed scrolling — 14 November 2026
+
+The user reported that pixel-only redraw improved scrolling but did not resolve
+severe stalls on longer scrolls. A new 12-second-per-direction, 6,000-pixel/second
+mixed-media trace reproduced the problem in the installed previous build:
+1,972/2,644 native row binds and 1,672/1,904 media measurements during forward/back
+scrolls of about 72,000 pixels each. Peak paint spans were 116.2/116.1 ms, including
+54/71 spans above 50 ms. Slow frames rebound about 45 rows even without downloads.
+The supported GTK 4.24.1 source confirms a 200-widget list tracker and median
+estimates for unknown row heights. A below-capacity control removed that cycling.
+
+Active post/record windows now hold 150 items, leaving room for normal gap/footer
+rows below that tracker budget. This changes data windowing, not media geometry:
+the aspect-aware images, thumbnails, centred crop and explicit inline playback
+remain. Archive retention is unchanged. Existing saved windows of up to 250 posts
+are narrowed on the worker around the bookmark; archived page metadata supplies
+real continuation boundaries. No safe boundary means the readable legacy window
+is retained until normal reconciliation, rather than skipping data or inventing
+a cursor. The conversation graph's separate limits are unchanged.
+
+The candidate trace recorded zero row binds and zero media remeasurements in
+both scroll directions, with 71,895/71,408 pixels travelled and peak paint spans
+of 26.1/25.4 ms (one span above 25 ms in each direction, none above 50 ms).
+This is a diagnostic comparison on Wayland/Vulkan with local fixture pixels;
+trace overhead, differing active row counts and the absence of physical momentum
+or real download latency preclude a universal frame-rate claim. A native regression
+also scrolls a mixed portrait-photo/landscape-video window in both directions and
+asserts no rebinds. Archive tests check five legacy bookmark positions, exact
+cached continuation and retention of all archived records. The initial 388-test
+source suite exposed one old assertion expecting all 240 saved rows to remain
+active; it now checks the narrower window while keeping anchor/offset/selection
+and refresh assertions. All 21 focused startup tests then passed. A final
+missing-anchor migration case resolves the saved neighbour before narrowing;
+all ten archive/window tests passed with that case. The final offline
+build/export/install passed (Flatpak commit
+`ae181942ddbe7ed4e339202fef469264e0551ebdae262830ac42093871570426`).
+All 388 final installed default-renderer native tests passed with zero skips,
+and all 56 installed Python modules matched source. The installed long trace
+confirmed zero binds/unbinds/remeasurements in both directions, roughly
+71,937/71,442 pixels of travel, and peak spans of 25.7/29.9 ms. Initial allocation
+of newly encountered media still occurred, as expected. Installed thumbnail,
+narrow playback and fallback captures were visually inspected, and the actual
+app's navigation smoke passed at 1280/light and 480/dark. The final anchor-only
+correction does not change those widgets. The user subsequently confirmed that the scrolling fix works perfectly.
+Remote video thumbnails still do not appear in the live feed despite working
+playback; that delivery path is a separate follow-up.
+
+## Media scrolling layout churn — 14 November 2026
+
+The user confirmed inline video works, then reported judder as differently sized
+media entered the feed. A mapped fixed-rectangle probe showed that replacing or
+evicting native picture paintables still caused 55 preview measurements and 11
+allocations across 12 updates. Reserved height alone did not prevent layout
+invalidation. Feed photos and video thumbnails now use `PreviewTexture`, which
+snapshots the shared immutable texture with the same centred cover crop and only
+queues drawing when pixels change. Accessible image labels, descriptions,
+viewport release and cache budgets remain. Thumbnail badge updates keep their
+layout, and `Gtk.Video` controls are constructed on the first explicit play.
+The regression test asserts zero remeasurements/allocations across portrait,
+landscape and square texture arrival/eviction, while keeping the reserved size.
+GTK's drawing/texture/clip contracts were checked against upstream documentation.
+
+The maintained performance harness now has a network-free mixed-media workload;
+its reports cannot be compared with the ordinary workload. Three unprofiled
+250-post runs per version used the same default backend/renderer and roughly
+42,253 versus 42,384 logical pixels of total scripted travel. Baseline scroll
+phases recorded 1,392 frames, 19 paint spans above 25 ms and four above 50 ms
+(maximum 59.4 ms); candidate phases recorded 1,395 frames, 13 above 25 ms and none
+above 50 ms (maximum 32.8 ms). Individual runs varied; some baseline runs were
+already similar to the candidate. These are before-paint/after-paint spans, not
+GPU completion, a universal frame-rate claim or physical momentum acceptance.
+Local fixture pixels also do not represent distinct-photo decoding/downloads.
+Raw captures and the separate diagnostic profile remain ignored in
+`build-performance/`. Lint, desktop/schema validation and the full 385-test source
+suite passed on the default renderer with zero skips. Offline Flatpak build,
+export and install passed (commit
+`82c6f4fa91f17b69090ee3fb562ec784c06314aa11ffe988488386787786a672`).
+The complete installed default-renderer suite also passed all 385 tests with zero
+skips; all 56 installed Python modules matched source. Installed generated-video
+preview/playback, narrow playback and disabled-thumbnail fallback captures were
+visually inspected. The actual installed app's navigation smoke passed at
+1280/light and 480/dark, and its image previews were visually inspected. Physical
+momentum on the user's live mixed-media feed still needs user confirmation.
+
+## Inline feed video and thumbnails — 14 November 2026
+
+Feed videos now use the supplied Bluesky thumbnail, with the existing image
+policy, viewport scheduling and bounded cache. The pinned atproto 0.0.74
+`AppBskyEmbedVideo.View` optional `thumbnail` and `aspect_ratio` fields and GTK's
+`Video.set_media_stream` contract were checked. No video download or pipeline
+starts until explicit playback. The thumbnail becomes a native inline player
+with the same reserved geometry, descriptions, sound/seek controls and explicit
+retry. One player owns playback; unmap/recycling, replacement and account changes
+release it. Missing, disabled and failed thumbnails retain a clear play card;
+preview failures do not prevent explicit playback. Composer previews retain the
+dialog player.
+
+Lint, desktop/settings validation and offline Flatpak build/export/install passed.
+The initial 380-test default-renderer source run hit two existing focus/layout
+settling assertions in label popovers and distant list recycling. The expanded
+X11/Cairo source suite passed 383 tests, and the installed suite passed 384 with
+zero skips. After the final badge/padding refinements, all 29 video-focused native
+tests passed on the default renderer against both source and installed modules;
+the installed run also included an explicit thumbnail-failure fallback assertion.
+Generated H.264 footage rendered and advanced through the inline widget. Installed
+wide preview/playback, narrow playback and disabled-thumbnail fallback captures
+were visually inspected using invented records and the installed stylesheet.
+All 56 final installed Python modules matched source. The actual installed
+application passed the default-renderer navigation smoke at 1280/light and
+480/dark; both captures were visually inspected. Live Bluesky streams, audible
+sound and human accessibility acceptance remain unverified. Cairo results are not default-renderer performance
+proof.
+
 ## AppStream showcase links — 14 November 2026
 
 Added the existing light/dark showcase screenshot URLs and the published 0.1.1

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Keep active reading windows below GTK’s row-tracker capacity to stop mixed-height feeds repeatedly rebuilding rows during long scrolling. Preserve differently sized media, archived history, reading anchors and real pagination cursors when opening older saved windows.
+
+- Avoid feed relayout when image/video thumbnail pixels arrive or are evicted, and create inline video controls only on Play. Keep aspect-aware previews, centred cropping, descriptions and playback.
+
+- Show video thumbnails in feed rows and play videos inline on request, with native sound/seek controls, explicit retry and single-player lifecycle cleanup.
+
 - Add light/dark showcase screenshots and the 0.1.1 release link to AppStream metadata.
 
 - Give feed images aspect-aware previews up to 560 pixels tall, using supplied dimensions without pixel analysis. Preserve reserved geometry through loading, failures and eviction.

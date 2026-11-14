@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .bookmark_service import reconcile_bookmarks, with_bookmark
 from .domain import (
+    POST_WINDOW,
     Author,
     CachedFeed,
     Media,
@@ -444,12 +445,29 @@ class Storage:
             bookmark = self._bookmark(db, feed, value)
             posts = self._records(db, feed, window.get("uris", ())[:250]) if window else None
             if posts:
+                # Resolve a missing saved anchor against the full legacy window
+                # before narrowing, so an archived neighbour is not clipped away.
+                bookmark = bookmark.resolve(posts) if bookmark else None
                 pager = Pager(
                     posts=posts,
                     cursor=window.get("cursor"),
                     page_starts=window.get("starts", {}),
                     gaps=window.get("gaps", {}),
                 )
+                if len(posts) > POST_WINDOW:
+                    # Old installations saved up to 250 live posts. Recover real
+                    # archived page boundaries before narrowing around the reader.
+                    present = {post.uri for post in posts}
+                    for request_cursor, payload in db.execute(
+                        "SELECT cursor,value FROM feed_pages WHERE feed=? "
+                        "ORDER BY touched DESC LIMIT 1000",
+                        (feed,),
+                    ):
+                        uris = json.loads(payload).get("uris", ())
+                        if uris and uris[0] in present:
+                            pager.page_starts.setdefault(uris[0], request_cursor or None)
+                    pager = pager.bounded(bookmark.uri if bookmark else None)
+                    posts = pager.posts
             else:
                 page = self._head_page(db, feed, value)
                 pager = Pager()

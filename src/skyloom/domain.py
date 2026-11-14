@@ -110,6 +110,11 @@ def retained_metadata(posts, values):
     return {key: value for key, value in values.items() if key in keys}
 
 
+# Keep a live reading window below GTK's 200-row tracker budget, including gaps
+# and the footer. Larger archived histories remain available through real cursors.
+POST_WINDOW = 150
+
+
 @dataclass
 class Pager:
     """Bounded window, de-duplication and repeated-cursor protection."""
@@ -119,6 +124,39 @@ class Pager:
     seen_cursors: set[str] = field(default_factory=set)
     page_starts: dict[str, str | None] = field(default_factory=dict)
     gaps: dict[str, str | None] = field(default_factory=dict)
+
+    def bounded(self, anchor=None):
+        """Normalise an older saved window without skipping its real continuation."""
+        if len(self.posts) <= POST_WINDOW:
+            return self
+        anchor_index = next((i for i, p in enumerate(self.posts) if p.uri == anchor), 0)
+        start = min(max(0, len(self.posts) - POST_WINDOW), max(0, anchor_index - 30))
+        end = start + POST_WINDOW
+        cursor = self.cursor
+        if end < len(self.posts):
+            boundaries = [
+                (i, self.page_starts[p.uri])
+                for i, p in enumerate(self.posts[: end + 1])
+                if self.page_starts.get(p.uri)
+            ]
+            if boundaries:
+                boundary, cursor = boundaries[-1]
+                # A page boundary after the anchor can be the exact new tail.
+                # Otherwise replay that real page and de-duplicate retained records.
+                if boundary > max(start, anchor_index):
+                    end = boundary
+            else:
+                # Preserve readable legacy data until a real page boundary is
+                # available; never skip history or invent a continuation cursor.
+                return self
+        posts = self.posts[start:end]
+        return Pager(
+            posts,
+            cursor,
+            set(self.seen_cursors) if cursor == self.cursor else set(),
+            retained_metadata(posts, self.page_starts),
+            retained_metadata(posts, self.gaps),
+        )
 
     def projected(self, states=None):
         states = states or {}
@@ -131,7 +169,7 @@ class Pager:
 
     def reconciled(self, page, *, reorder=False, anchor=None):
         """Retain omissions as history; absence from a head page is not deletion."""
-        head = unique_posts(page.posts)[:250]
+        head = unique_posts(page.posts)[:POST_WINDOW]
         if not self.posts:
             result = Pager()
             result.merge(Page(tuple(head), page.cursor), reset=True)
@@ -152,20 +190,24 @@ class Pager:
             gaps[self.posts[0].uri] = page.cursor
         # The cursor always belongs to the retained tail, never to a prepended head.
         cursor = self.cursor
-        if len(combined) > 250:
+        if len(combined) > POST_WINDOW:
             anchor_index = next((i for i, p in enumerate(combined) if p.uri == anchor), 0)
             boundaries = [
-                (i, starts[p.uri]) for i, p in enumerate(combined[:251]) if starts.get(p.uri)
+                (i, starts[p.uri])
+                for i, p in enumerate(combined[: POST_WINDOW + 1])
+                if starts.get(p.uri)
             ]
-            if anchor_index < 250 and boundaries:
+            if anchor_index < POST_WINDOW and boundaries:
                 end, cursor = boundaries[-1]
                 # Retain a partial page when necessary; re-fetch from its real boundary.
                 end = max(end, anchor_index + 1)
                 combined = combined[:end]
             else:
-                prefix = combined[: min(30, max(0, len(combined) - 220))]
-                start = max(len(prefix), min(anchor_index, len(combined) - (250 - len(prefix))))
-                end = start + 250 - len(prefix)
+                prefix = combined[: min(30, max(0, len(combined) - (POST_WINDOW - 30)))]
+                start = max(
+                    len(prefix), min(anchor_index, len(combined) - (POST_WINDOW - len(prefix)))
+                )
+                end = start + POST_WINDOW - len(prefix)
                 suffix = combined[start:end]
                 if end < len(combined):
                     cursor = next(
@@ -187,8 +229,8 @@ class Pager:
         added = unique_posts(page.posts, (p.uri for p in self.posts))
         combined = self.posts + added
         anchor_index = next((i for i, p in enumerate(combined) if p.uri == anchor), len(combined))
-        start = min(max(0, len(combined) - 250), anchor_index)
-        end = start + 250
+        start = min(max(0, len(combined) - POST_WINDOW), anchor_index)
+        end = start + POST_WINDOW
         retained = combined[start:end]
         starts = self.page_starts.copy()
         if added:
@@ -231,18 +273,18 @@ class Pager:
         combined = prefix + added + suffix
         cursor = self.cursor
         seen = set(self.seen_cursors)
-        if len(combined) > 250:
+        if len(combined) > POST_WINDOW:
             anchor_index = next((i for i, p in enumerate(combined) if p.uri == anchor), 0)
-            if anchor_index >= 250:
+            if anchor_index >= POST_WINDOW:
                 return self
             # Keep the reader and the newly connected segment. Rewind the omitted
             # tail to a real cursor; pages already archived can be replayed offline.
             cursor = next(
-                (starts[p.uri] for p in reversed(combined[:251]) if starts.get(p.uri)),
+                (starts[p.uri] for p in reversed(combined[: POST_WINDOW + 1]) if starts.get(p.uri)),
                 self.gaps[before],
             )
             seen.clear()
-            combined = combined[:250]
+            combined = combined[:POST_WINDOW]
         return Pager(
             combined,
             cursor,
@@ -262,7 +304,7 @@ class Pager:
         if added:
             self.page_starts[added[0].uri] = start
         self.posts.extend(added)
-        self.posts = self.posts[-250:]
+        self.posts = self.posts[-POST_WINDOW:]
         self.page_starts = retained_metadata(self.posts, self.page_starts)
         self.gaps = retained_metadata(self.posts, self.gaps)
         self.cursor = page.cursor if page.cursor not in self.seen_cursors else None

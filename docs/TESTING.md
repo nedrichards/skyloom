@@ -43,12 +43,20 @@ notification cutoff parameters, publication indexing/deduplication/filtering,
 avatar rendering/editor reopen, and draft cleanup failure after publishing.
 These use invented data and mocked HTTP, not live service indexing evidence.
 
+A sustained mixed-photo/video scroll checks that the active window never triggers
+native row rebinding. Saved-window migration tests cover head/middle/tail anchors,
+archived continuation cursors and preservation of all archived records.
+
 The feature tests cover deletion confirmation and cache tombstones, private
 bookmarks, profile conflicts, people paging and thread controls with invented
 records. Video tests use the runtime's ffmpeg/ffprobe to prepare tiny generated
 clips and a loopback HLS fixture to assert decoded/rendered frames, timestamps
-and native mute/volume delegation. They do not exercise a real account or prove
-audible output. Native composer tests verify descriptions and durable video
+and native mute/volume delegation. Inline-player checks cover generated decoded
+frames, explicit play, thumbnail download preferences, single-player ownership,
+unmap/recycling, account changes and offline retry. Image-preview tests also
+assert that differently sized decoded textures can arrive and be evicted without
+remeasuring or reallocating their reserved rectangle. They do not exercise a real
+account or prove audible output. Native composer tests verify descriptions and durable video
 draft recovery after upload failure.
 
 `test_sdk.py` exercises atproto's public serializer, unknown `DotDict` records,

@@ -106,3 +106,65 @@ class NativeVideoPlayback(unittest.TestCase):
                 server.shutdown()
                 server.server_close()
                 server_thread.join(timeout=2)
+
+    def test_inline_player_renders_local_clip_and_releases_on_unmap(self):
+        from types import SimpleNamespace
+
+        from gtk_support import settle
+
+        from skyloom.domain import Video
+        from skyloom.video_player import InlineVideo
+        from skyloom.widgets import ImagePreview
+
+        with tempfile.TemporaryDirectory(prefix="skyloom-inline-fixture-") as directory:
+            clip = Path(directory) / "invented.mp4"
+            subprocess.run(  # noqa: S603 - fixed encoder and invented temporary fixture
+                [
+                    "/usr/bin/ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "testsrc2=size=160x90:rate=15",
+                    "-t",
+                    "3",
+                    "-an",
+                    "-c:v",
+                    "libx264",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-y",
+                    str(clip),
+                ],
+                check=True,
+                capture_output=True,
+                timeout=15,
+            )
+            window = Gtk.Window(default_width=480, default_height=360)
+            window.service = SimpleNamespace(account=object())
+            window.generation = 1
+            window.read_only = False
+            player = InlineVideo(
+                window,
+                Video(str(clip), "Invented moving pattern", local=True),
+                ImagePreview(Gtk.Label(label="Invented preview")),
+            )
+            window.set_child(player)
+            try:
+                self.assertTrue(settle(window))
+                self.assertIsNone(player.stream)
+                player.play.emit("clicked")
+                stream = player.stream
+                self.assertIsNotNone(stream)
+                self.assertTrue(settle(window, ready=lambda: stream.get_timestamp() > 0))
+                self.assertIsNone(stream.get_error())
+                self.assertGreater(stream.sink.get_property("stats").get_value("rendered"), 0)
+                player.set_visible(False)
+                self.assertIsNone(player.stream)
+                self.assertIsNone(player.owner_watch)
+                self.assertIsNone(window.video_player)
+            finally:
+                player.finished()
+                window.destroy()

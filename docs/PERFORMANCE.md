@@ -21,6 +21,22 @@ Use `--help` for startup, scrolling, interactions, idle, reduced-motion and
 plain-list control workloads. Run `--profile` separately: cProfile overhead
 invalidates frame comparisons.
 
+Use `--mixed-media --scroll-only` for alternating portrait, square and landscape
+photos/video thumbnails. These are invented records backed by local fixture
+pixels; no stream plays and no external thumbnail request is made. Reports record
+this workload separately, and the comparator rejects mixing it with the ordinary
+feed. This isolates row layout/rendering and does not simulate remote download
+latency, distinct-photo decoding or physical momentum.
+
+For sustained row-tracker diagnostics, add `--scroll-seconds 12 --scroll-speed
+6000 --trace-layout`. The trace counts factory binds/unbinds, media measurements
+and allocations, and records counts on slow paint spans. Record generated posts,
+active row count and actual travel together: the active pager window can be
+smaller than the generated history. Trace instrumentation adds overhead; use a
+separate run without `--trace-layout` for frame comparisons. The comparator also
+checks speed, duration and trace mode. A short, warm scroll is insufficient to
+exercise mixed-height tracker oscillation.
+
 Focused probes in `scripts/` cover post-cell binding, label/row measurement,
 media residency and thread prefetch. Their `--help` describes inputs. Construction
 and retain-all modes simulate alternative ownership with current code; they are
