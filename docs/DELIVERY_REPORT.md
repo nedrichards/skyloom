@@ -4,6 +4,12 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## AppStream showcase links — 14 November 2026
+
+Added the existing light/dark showcase screenshot URLs and the published 0.1.1
+release URL. Offline and online `appstreamcli validate` passed. All three URLs
+returned HTTP 200 in host-side checks. Screenshot files were not changed.
+
 ## Taller aspect-aware image previews — 14 November 2026
 
 Image embeds now retain validated optional aspect dimensions through immutable

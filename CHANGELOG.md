@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add light/dark showcase screenshots and the 0.1.1 release link to AppStream metadata.
+
 - Give feed images aspect-aware previews up to 560 pixels tall, using supplied dimensions without pixel analysis. Preserve reserved geometry through loading, failures and eviction.
 
 - Keep the feed-management browser action available while the main menu has focus or is closing.
