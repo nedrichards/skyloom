@@ -18,6 +18,36 @@ The installed default-renderer profile smoke passed, including both 1280-pixel
 headers and the 800/480-pixel layouts. Both wide captures were visually inspected.
 The seven focused profile/compact-header checks also passed.
 
+## Confirmed-write reconciliation — 14 November 2026
+
+Audited all requested mutations. Profile and mute/block saves now use successful
+write inputs/results without a dependent AppView read. Session-scoped, bounded
+confirmations protect identity/images, relationship fields and reactions across
+service and cached reads for two minutes. Read markers use the confirmed cutoff,
+and unread counts pass it explicitly through the pinned SDK's `seen_at` parameter.
+New posts retain their returned URI/CID and submitted immutable content while
+missing from compatible head pages and reply threads; indexed records win.
+Publishing refreshes the active profile/thread as well as Home, and later draft
+cleanup failure is reported as successful publishing with a cleanup problem.
+Existing deletion tombstones, bookmark overlays and repository gate writes remain
+in use; mutation target validation has not been weakened.
+
+Contract verification used the installed/pinned atproto 0.0.74 generated
+notification parameter model and async-client write response types. The complete
+source suite passed 373 tests, and after the final text-only profile preservation
+check, the installed suite passed all 374 tests with zero skips under X11/Cairo.
+The pinned offline Flatpak build/export and local installation passed; all 56
+installed Python modules matched current source. The full installed demo GUI
+smoke passed with the default renderer, including publishing/drafts, profiles,
+notifications, reactions, conversations, offline recovery and responsive
+light/dark layouts. The compact profile capture was visually inspected. The direct
+`check.sh` run passed lint, formatting, compilation and desktop/schema checks,
+then encountered the nested Flatpak instance boundary; native runs use the host
+Flatpak route. Live service propagation, delays longer than the two-minute
+confirmation window, cross-device edits during that window, and physical
+accessibility acceptance remain unverified. No account mutations were performed
+against a real service and no mutations were retried automatically.
+
 ## Profile refinements — 13 November 2026
 
 Profile actions wrap at minimum widths rather than reserving the post filter's

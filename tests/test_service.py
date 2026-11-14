@@ -7,6 +7,7 @@ import tempfile
 import time
 import unittest
 from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
@@ -14,6 +15,7 @@ from atproto import AsyncClient
 from atproto_client.exceptions import AtProtocolError, RateLimitExceededError
 from atproto_client.request import AsyncRequest
 
+from skyloom.confirmed import ConfirmedChanges
 from skyloom.credentials import KeyringError
 from skyloom.domain import Author
 from skyloom.errors import UserError, message
@@ -645,6 +647,181 @@ class Contract(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("token", message(RuntimeError("token")))
         with self.assertRaises(UserError):
             await self.service.sign_in("x", "test", "http://insecure.invalid")
+
+    async def test_moderation_success_never_depends_on_profile_read(self):
+        await self.login()
+        author = Author("did:example:other", "other.invalid", "Other")
+        self.fail_response = ("app.bsky.actor.getProfile", 503)
+        muted = await self.service.moderate(author, "mute")
+        self.assertTrue(muted.muted)
+        self.assertFalse((await self.service.moderate(muted, "mute")).muted)
+        blocked = await self.service.moderate(author, "block")
+        self.assertTrue(blocked.blocking.startswith(f"at://{DID}/app.bsky.graph.block/"))
+        self.assertFalse((await self.service.moderate(blocked, "block")).blocking)
+
+    async def test_relationships_survive_stale_profiles_and_failed_write_does_not_override(self):
+        await self.login()
+        author = await self.service.profile(DID)
+        followed = await self.service.follow(author)
+        self.assertEqual((await self.service.profile(DID)).following, followed.following)
+        muted = await self.service.moderate(author, "mute")
+        self.assertTrue((await self.service.profile(DID)).muted)
+        self.fail_response = ("app.bsky.graph.unmuteActor", 503)
+        with self.assertRaises(AtProtocolError):
+            await self.service.moderate(muted, "mute")
+        self.fail_response = None
+        self.assertTrue((await self.service.profile(DID)).muted)
+        # An explicit reversal replaces the confirmed state.
+        self.deletion_subject = DID
+        await self.service.follow(followed)
+        self.assertFalse((await self.service.profile(DID)).following)
+
+    async def test_reactions_survive_feed_profile_search_thread_and_cache_reads(self):
+        await self.login()
+        post = (await self.service.feed()).posts[0]
+        liked = await self.service.mutate(post, "like")
+        reposted = await self.service.mutate(liked, "repost")
+        for page in (
+            await self.service.feed(),
+            await self.service.author_feed(DID),
+            await self.service.search("Invented"),
+            await self.service.thread(URI),
+        ):
+            self.assertEqual(page.posts[0].like_uri, liked.like_uri)
+            self.assertEqual(page.posts[0].repost_uri, reposted.repost_uri)
+        self.assertEqual((await self.service.cached("following")).posts[0].like_uri, liked.like_uri)
+        await self.service.mutate(reposted, "like")
+        self.assertFalse((await self.service.feed()).posts[0].like_uri)
+        self.assertEqual((await self.service.feed()).posts[0].repost_uri, reposted.repost_uri)
+
+    async def test_new_session_same_did_and_expiry_discard_confirmations(self):
+        await self.login()
+        now = [0]
+        self.service._confirmed = ConfirmedChanges(self.service.account, clock=lambda: now[0])
+        author = await self.service.profile(DID)
+        await self.service.follow(author)
+        now[0] = 121
+        self.assertFalse((await self.service.profile(DID)).following)
+        await self.service.follow(author)
+        self.service.account = replace(self.service.account)
+        self.assertFalse((await self.service.profile(DID)).following)
+
+    async def test_seen_marker_preserves_new_notifications_and_uses_cutoff_query(self):
+        await self.login()
+        await self.service.mark_seen("2026-10-26T10:00:00Z")
+        self.assertTrue((await self.service.notifications())[0][0].read)
+        await self.service.unread()
+        self.assertEqual(self.requests[-1][2]["seenAt"], "2026-10-26T10:00:00Z")
+        self.service.confirmed().remember("notification", "seen", timestamp="2026-10-26T09:59:00Z")
+        self.assertFalse((await self.service.notifications())[0][0].read)
+
+    async def test_successful_publish_visible_until_indexing_without_duplicates_or_filter_leak(
+        self,
+    ):
+        await self.login()
+        result = await self.service.send("Invented newly published post")
+        feed = await self.service.feed()
+        own = next(p for p in feed.posts if p.uri == result.uri)
+        self.assertEqual((own.cid, own.text), (result.cid, "Invented newly published post"))
+        self.assertEqual((await self.service.author_feed(DID)).posts[0].uri, result.uri)
+        self.assertFalse(
+            any(
+                p.uri == result.uri
+                for p in (await self.service.author_feed("did:example:other")).posts
+            )
+        )
+        self.assertFalse(
+            any(p.uri == result.uri for p in (await self.service.feed(cursor="page-2")).posts)
+        )
+        self.assertFalse(
+            any(
+                p.uri == result.uri
+                for p in (await self.service.author_feed(DID, feed_filter="posts_with_media")).posts
+            )
+        )
+        self.post = {**self.post, "uri": result.uri, "cid": result.cid}
+        indexed = await self.service.feed()
+        self.assertEqual(sum(p.uri == result.uri for p in indexed.posts), 1)
+        self.assertEqual(indexed.posts[0].text, "Hi 🌤️")
+
+    async def test_reply_is_visible_in_parent_thread_but_not_posts_only(self):
+        await self.login()
+        parent = (await self.service.thread(URI)).posts[0]
+        result = await self.service.send("Invented reply", reply=parent)
+        thread = await self.service.thread(URI)
+        own = next(p for p in thread.posts if p.uri == result.uri)
+        self.assertEqual(own.parent, (parent.uri, parent.cid))
+        self.assertIn((result.uri, URI), thread.edges)
+        self.assertFalse(
+            any(
+                p.uri == result.uri
+                for p in (await self.service.author_feed(DID, feed_filter="posts_no_replies")).posts
+            )
+        )
+        self.assertTrue(
+            any(
+                p.uri == result.uri
+                for p in (
+                    await self.service.author_feed(DID, feed_filter="posts_with_replies")
+                ).posts
+            )
+        )
+
+    async def test_failed_publish_never_adds_a_post(self):
+        await self.login()
+        self.fail_response = ("com.atproto.repo.createRecord", 503)
+        with self.assertRaises(AtProtocolError):
+            await self.service.send("Invented failed post")
+        self.assertFalse(self.service.confirmed().published())
+
+    async def test_published_post_deletion_and_direct_not_found_do_not_resurrect(self):
+        await self.login()
+        result = await self.service.send("Invented own post")
+        self.thread_response = {
+            "thread": {
+                "$type": "app.bsky.feed.defs#notFoundPost",
+                "uri": result.uri,
+                "notFound": True,
+            }
+        }
+        own = (await self.service.thread(result.uri)).posts[0]
+        self.assertEqual(own.text, "Invented own post")
+        self.assertEqual(own.context, "Selected post")
+        self.fail_response = ("app.bsky.feed.getPostThread", 404)
+        self.assertEqual((await self.service.thread(result.uri)).posts[0].uri, result.uri)
+        self.fail_response = None
+        await self.service.delete_post(own)
+        self.assertFalse(self.service.confirmed().published())
+        self.assertFalse(any(p.uri == result.uri for p in (await self.service.feed()).posts))
+
+    async def test_pending_quote_and_image_keep_real_identity_media_and_facets(self):
+        await self.login()
+        quoted = (await self.service.feed()).posts[0]
+        path = Path(self.tmp.name) / "prepared.png"
+        path.write_bytes(b"\x89PNG" + b"invented fixture")
+        result = await self.service.send(
+            "An invented @alice.invalid quote",
+            (Attachment(str(path), "Invented image description"),),
+            quote=quoted,
+        )
+        own = next(p for p in (await self.service.feed()).posts if p.uri == result.uri)
+        self.assertEqual(own.quote.uri, quoted.uri)
+        self.assertEqual(own.images[0].url, str(path))
+        self.assertTrue(own.images[0].local)
+        self.assertEqual(own.images[0].alt, "Invented image description")
+        self.assertEqual(own.facets[0]["features"][0]["did"], DID)
+
+    async def test_failed_seen_marker_keeps_previous_cutoff_and_newer_seen_cannot_regress(self):
+        await self.login()
+        await self.service.mark_seen("2026-11-14T10:00:00Z")
+        await self.service.mark_seen("2026-11-14T09:00:00Z")
+        self.assertEqual(self.requests[-1][1]["seenAt"], "2026-11-14T10:00:00Z")
+        self.fail_response = ("app.bsky.notification.updateSeen", 503)
+        with self.assertRaises(AtProtocolError):
+            await self.service.mark_seen("2026-11-14T11:00:00Z")
+        self.fail_response = None
+        await self.service.unread()
+        self.assertEqual(self.requests[-1][2]["seenAt"], "2026-11-14T10:00:00Z")
 
 
 class CooldownTests(unittest.IsolatedAsyncioTestCase):

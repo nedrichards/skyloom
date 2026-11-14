@@ -4,6 +4,7 @@ import re
 import time
 from dataclasses import dataclass, replace
 
+from .confirmed import ConfirmedState
 from .domain import Page, Post, post_from
 from .errors import UserError
 from .sdk import page_items
@@ -69,7 +70,7 @@ def reconcile_bookmarks(post, changes, *, now=None):
     return replace(post, **fields) if fields else post
 
 
-class BookmarkService:
+class BookmarkService(ConfirmedState):
     async def bookmarks(self, cursor=None):
         async with self.authenticated():
             result = await self.client.app.bsky.bookmark.get_bookmarks(
@@ -87,7 +88,7 @@ class BookmarkService:
                 if post and post.unavailable == "This post was deleted.":
                     item = UnavailableBookmark(item.uri, post.unavailable)
                 elif post:
-                    item = post
+                    item = self.confirmed().post(post)
                 items.append(item)
             return replace(page, items=tuple(items))
 

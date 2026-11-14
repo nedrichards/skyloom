@@ -1480,6 +1480,7 @@ class Window(Adw.ApplicationWindow):
             local = banner_path is not None
             if not local:
                 banner_path = author.banner
+                local = author.banner_local
             if (
                 banner_path
                 and should_load_image(self, banner_path, local=local)

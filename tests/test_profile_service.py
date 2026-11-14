@@ -65,7 +65,12 @@ class ProfileContracts(unittest.IsolatedAsyncioTestCase):
 
     def handle(self, request):
         method = request.url.path.rsplit("/", 1)[-1]
-        body = json.loads(request.content) if request.content else None
+        body = (
+            json.loads(request.content)
+            if request.content
+            and request.headers.get("content-type", "").startswith("application/json")
+            else None
+        )
         self.requests.append((method, body, dict(request.url.params)))
         if method.endswith("getRecord"):
             if self.missing:
@@ -75,6 +80,15 @@ class ProfileContracts(unittest.IsolatedAsyncioTestCase):
             if self.conflict:
                 return httpx.Response(400, json={"error": "InvalidSwap"})
             value = {"uri": f"at://{DID}/{COLLECTION}/self", "cid": CID}
+        elif method.endswith("uploadBlob"):
+            value = {
+                "blob": {
+                    "$type": "blob",
+                    "ref": {"$link": CID},
+                    "mimeType": "image/png",
+                    "size": 20,
+                }
+            }
         elif method.endswith("getProfile"):
             if self.profile_unavailable:
                 return httpx.Response(503, json={"error": "Unavailable"})
@@ -181,3 +195,40 @@ class ProfileContracts(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(validate_profile("x" * 65, ""))
         self.assertTrue(validate_profile("", "x" * 257))
         self.assertTrue(validate_profile("a" + "\u0301" * 400, ""))
+
+    async def test_uploaded_images_and_text_survive_stale_profile_and_reopen(self):
+        from pathlib import Path
+
+        path = Path(self.directory.name) / "prepared.png"
+        path.write_bytes(b"\x89PNG" + b"invented prepared fixture")
+        account = self.service.account
+        original = await self.service.editable_profile()
+        result = await self.service.update_profile(
+            original, "Saved", "New bio", avatar=str(path), banner=str(path)
+        )
+        self.assertEqual((result.avatar, result.banner), (str(path), str(path)))
+        self.assertTrue(result.avatar_local and result.banner_local)
+        self.assertFalse(any(method.endswith("getProfile") for method, _, _ in self.requests))
+        self.assertIs(self.service.account, account)
+        stale = await self.service.profile(DID)
+        self.assertEqual((stale.name, stale.bio), ("Saved", "New bio"))
+        self.assertEqual(stale.avatar, str(path))
+        self.assertTrue(stale.avatar_local)
+        await self.service.update_profile(original, "Saved", "New bio", avatar="", banner="")
+        removed = await self.service.profile(DID)
+        self.assertFalse(
+            removed.avatar or removed.banner or removed.avatar_local or removed.banner_local
+        )
+
+    async def test_text_only_edit_keeps_the_displayed_images_without_a_dependent_read(self):
+        from dataclasses import replace
+
+        current = replace(
+            self.service.account,
+            avatar="https://cdn.bsky.app/avatar/new-before-editor.png",
+            banner="https://cdn.bsky.app/banner/new-before-editor.png",
+        )
+        original = await self.service.editable_profile()
+        result = await self.service.update_profile(original, "Saved", "Updated", current=current)
+        self.assertEqual((result.avatar, result.banner), (current.avatar, current.banner))
+        self.assertFalse(result.avatar_local or result.banner_local)

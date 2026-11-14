@@ -36,6 +36,13 @@ Shared display setup lives in `tests/gtk_support.py`; reusable content and
 startup fixtures live beside it. Test classes should use these helpers rather
 than instantiate other test classes.
 
+`test_confirmed.py`, the SDK service/profile contracts, and native profile and
+composer completion tests cover stale reads after confirmed writes, reversals,
+failed writes, field expiry, same-DID session replacement, nested quotes,
+notification cutoff parameters, publication indexing/deduplication/filtering,
+avatar rendering/editor reopen, and draft cleanup failure after publishing.
+These use invented data and mocked HTTP, not live service indexing evidence.
+
 The feature tests cover deletion confirmation and cache tombstones, private
 bookmarks, profile conflicts, people paging and thread controls with invented
 records. Video tests use the runtime's ffmpeg/ffprobe to prepare tiny generated

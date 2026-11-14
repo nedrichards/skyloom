@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -50,7 +49,9 @@ class ProfileService:
                 else self.client.app.bsky.graph.get_follows
             )
             result = await method({"actor": actor, "limit": 30, "cursor": cursor})
-            return page_items(result, author_from), result.cursor
+            return tuple(
+                self.confirmed().author(a) for a in page_items(result, author_from)
+            ), result.cursor
 
     async def editable_profile(self):
         async with self.authenticated():
@@ -75,7 +76,9 @@ class ProfileService:
                 raise UserError("This profile record is invalid. Reload it and try again.")
             return EditableProfile(did, result["cid"], json.dumps(record), self.account)
 
-    async def update_profile(self, original, name, description, avatar=None, banner=None):
+    async def update_profile(
+        self, original, name, description, avatar=None, banner=None, *, current=None
+    ):
         """None keeps an image, an empty path removes it, a prepared path replaces it."""
         if error := validate_profile(name, description):
             raise UserError(error)
@@ -136,15 +139,14 @@ class ProfileService:
                         "Your profile changed in another client. Copy any edits you want to keep, then reopen the editor to load the latest profile."
                     ) from None
                 raise
-            # A successful write must not become a reported failure because a
-            # subsequent AppView read failed (or has not indexed the write yet).
-            author = self.account
-            with suppress(AtProtocolError):
-                author = author_from(model_data(await self.client.get_profile(original.did)))
-            return replace(
-                author,
-                name=name or author.handle,
-                bio=description,
-                avatar="" if avatar == "" else author.avatar,
-                banner="" if banner == "" else author.banner,
-            )
+            # Repository success is authoritative; AppView may still have old images
+            # or be unavailable. Keep the exact prepared upload until indexing catches up.
+            base = current if current is not None and current.did == original.did else self.account
+            author = self.confirmed().author(base)
+            changes = {"name": name or author.handle, "bio": description}
+            for field, path in (("avatar", avatar), ("banner", banner)):
+                if path is not None:
+                    changes[field] = path
+                    changes[field + "_local"] = bool(path)
+            self.confirmed().remember("author", original.did, **changes)
+            return replace(author, **changes)

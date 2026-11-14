@@ -453,9 +453,13 @@ class Composer(Adw.Dialog):
                 expected_account=account,
                 **kwargs,
             )
+            cleanup_failed = False
             if service.account is account:
-                await service.draft_save(self.key, {})
-            return result
+                try:
+                    await service.draft_save(self.key, {})
+                except Exception:  # noqa: BLE001 — publishing succeeded; never invite a duplicate retry.
+                    cleanup_failed = True
+            return result, cleanup_failed
 
         self.snapshot_value, self.send_text, self.send_attachments = (
             self.snapshot(),
@@ -464,11 +468,20 @@ class Composer(Adw.Dialog):
         )
         self.send_video = self.video
 
-        def success(_result):
+        def success(outcome):
             if not self.alive():
                 return
-            self.window.toast("Demo post added" if self.window.demo else "Post published")
+            if outcome and outcome[1]:
+                self.window.toast(
+                    "Post published. The saved draft could not be cleared; remove it before publishing again."
+                )
+            else:
+                self.window.toast("Demo post added" if self.window.demo else "Post published")
             self.force_close()
+            self.window.thread_cache.clear()
+            current = self.window.interactions.current_view(mapped=False)
+            if current and current not in self.window.feed_views.values():
+                current.refresh()
             self.window.refresh()
 
         def failure(msg):

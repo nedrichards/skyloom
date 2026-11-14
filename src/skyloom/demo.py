@@ -158,7 +158,9 @@ class DemoService(DemoThreadService):
             self.account,
         )
 
-    async def update_profile(self, original, name, description, avatar=None, banner=None):
+    async def update_profile(
+        self, original, name, description, avatar=None, banner=None, *, current=None
+    ):
         await self.pause()
         if (
             original.did != self.account.did
@@ -182,6 +184,8 @@ class DemoService(DemoThreadService):
             bio=description,
             avatar=current.avatar if avatar is None else avatar,
             banner=current.banner if banner is None else banner,
+            avatar_local=current.avatar_local if avatar is None else bool(avatar),
+            banner_local=current.banner_local if banner is None else bool(banner),
         )
         self.posts = [
             replace(post, author=self.profile_override)

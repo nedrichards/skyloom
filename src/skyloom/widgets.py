@@ -172,7 +172,7 @@ def avatar(author, window, size=44, *, pending=None, widget=None):
         w.set_text(author.name)
     if (
         author.avatar
-        and should_load_image(window, author.avatar)
+        and should_load_image(window, author.avatar, local=author.avatar_local)
         and not (author.labels and window.settings.get_boolean("warn-labelled-content"))
     ):
 
@@ -185,12 +185,13 @@ def avatar(author, window, size=44, *, pending=None, widget=None):
             window.images.unbind(w)
 
         def load():
-            cached = getattr(window.images, "cache", {}).get((author.avatar, False))
+            cached = getattr(window.images, "cache", {}).get((author.avatar, author.avatar_local))
             if cached is not None:
                 loaded(cached)
                 return None
             future = window.worker.submit(
-                window.images.get(author.avatar), image_callback(w, loaded)
+                window.images.get(author.avatar, local=author.avatar_local),
+                image_callback(w, loaded),
             )
             remember_request(pending, future)
             return future

@@ -105,6 +105,29 @@ class ProfileFeatures(StartupFixture, unittest.TestCase):
             calls[1].saved(replace(self.account, banner="https://invented.invalid/stale.png"))
             self.assertFalse(any(call.args[0].endswith("stale.png") for call in get.call_args_list))
 
+    def test_uploaded_avatar_reopens_and_renders_from_prepared_copy(self):
+        from skyloom.profile_editor import ProfileEditor
+
+        self.window.profile(self.account.did)
+        page = self.window.nav.get_visible_page()
+        self.wait(lambda: hasattr(page, "profile_edit"))
+        editor = ProfileEditor(self.window, lambda _: self.window.profile(self.account.did))
+        editor.present(self.window)
+        self.addCleanup(editor.force_close)
+        self.wait(lambda: editor.original is not None)
+        path = str(self.window.images.fixture_dir / "demo-landscape.png")
+        editor.set_image("avatar", path)
+        editor.save()
+        self.wait(lambda: not editor.saving)
+        page = self.window.nav.get_visible_page()
+        self.wait(lambda: hasattr(page, "profile_portrait"))
+        self.wait(lambda: page.profile_portrait.get_custom_image() is not None)
+        self.assertTrue(self.app.service.profile_override.avatar_local)
+        again = ProfileEditor(self.window, lambda _: None, self.app.service.profile_override)
+        again.present(self.window)
+        self.addCleanup(again.force_close)
+        self.wait(lambda: again.previews["avatar"].get_paintable() is not None)
+
     def test_own_and_other_profile_actions_share_the_identity_row_when_wide(self):
         for actor in (self.account.did, self.app.service.posts[0].author.did):
             with self.subTest(actor=actor):

@@ -12,9 +12,20 @@ from atproto import models
 from atproto_client.exceptions import AtProtocolError
 
 from .bookmark_service import BookmarkService
-from .conversation import thread_from
+from .confirmed import at_or_before
+from .conversation import ThreadPage, thread_from
 from .credentials import KeyringError, SecretStore
-from .domain import Notice, Page, author_from, deleted_post, feed_from, post_from
+from .domain import (
+    Media,
+    Notice,
+    Page,
+    Post,
+    Video,
+    author_from,
+    deleted_post,
+    feed_from,
+    post_from,
+)
 from .errors import POST_UNAVAILABLE, UserError
 from .network import new_client
 from .profile_service import ProfileService
@@ -54,6 +65,18 @@ class Service(BookmarkService, ProfileService, ThreadService):
         self._storage_lease = None
         self.client.on_session_change(self._session_changed)
 
+    def _published_head(self, page, actor, feed_filter="posts_with_replies"):
+        known = {post.uri for post in page.posts}
+        additions = tuple(
+            self.confirmed().post(post)
+            for post in reversed(self.confirmed().published())
+            if post.author.did == actor
+            and post.uri not in known
+            and not (feed_filter == "posts_no_replies" and post.parent)
+            and not (feed_filter == "posts_with_media" and not (post.images or post.video))
+        )
+        return replace(page, posts=(additions + page.posts)[:250])
+
     def _io(self, operation, *args, account=None):
         did = account or self.account.did
         lease = getattr(self, "_storage_lease", None)
@@ -72,7 +95,21 @@ class Service(BookmarkService, ProfileService, ThreadService):
         async def execute():
             if owner is None or self.account is not owner:
                 return None
-            return await asyncio.to_thread(self.storage.run, did, token, operation, *args)
+            value = await asyncio.to_thread(self.storage.run, did, token, operation, *args)
+            if self.account is not owner:
+                return None
+            if operation in ("cached", "cached_page") and value is not None:
+                return self.confirmed().page(value)
+            if operation == "cached_post" and value is not None:
+                return self.confirmed().post(value)
+            if operation == "cached_state" and value is not None:
+                return replace(
+                    value,
+                    pager=replace(
+                        value.pager, posts=[self.confirmed().post(p) for p in value.pager.posts]
+                    ),
+                )
+            return value
 
         async def serialized():
             async with self.draft_lock:
@@ -221,6 +258,7 @@ class Service(BookmarkService, ProfileService, ThreadService):
                 )
                 await asyncio.to_thread(self.storage.clear, account.did, token)
             self.account = None
+            self._confirmed = None
             getattr(self, "_gate_overrides", {}).clear()
             await self.client.request.close()
             self.client = self.client_factory()
@@ -247,6 +285,9 @@ class Service(BookmarkService, ProfileService, ThreadService):
             page = await self._io(
                 "reconcile_page", feed_from({"feed": page_items(result), "cursor": result.cursor})
             )
+            page = self.confirmed().page(page)
+            if cursor is None and feed == "following":
+                page = self._published_head(page, self.account.did)
             if self.account:
                 await self._io("cache", feed, page, cursor)
             return page
@@ -298,20 +339,50 @@ class Service(BookmarkService, ProfileService, ThreadService):
 
     async def thread(self, uri, *, earlier=False, replies_only=False):
         async with self.authenticated():
-            node = data(
-                await self.client.get_post_thread(
-                    uri, depth=0 if earlier else 2, parent_height=0 if replies_only else 20
-                )
-            )["thread"]
+            published = self.confirmed().published()
+            own = next((post for post in published if post.uri == uri), None)
+            try:
+                node = data(
+                    await self.client.get_post_thread(
+                        uri, depth=0 if earlier else 2, parent_height=0 if replies_only else 20
+                    )
+                )["thread"]
+            except AtProtocolError as exc:
+                if (
+                    own is None
+                    or getattr(getattr(exc, "response", None), "status_code", None) != 404
+                ):
+                    raise
+                node = {}
             if "post" not in node:
-                raise UserError(POST_UNAVAILABLE)
+                if (
+                    own is None
+                    or node.get("blocked")
+                    or node.get("$type", "").endswith("#blockedPost")
+                ):
+                    raise UserError(POST_UNAVAILABLE)
+                page = ThreadPage((replace(own, context="Selected post"),))
+            else:
+                page = thread_from(node, include_replies=not earlier)
+            if not earlier:
+                known = {post.uri for post in page.posts}
+                added = tuple(
+                    post
+                    for post in published
+                    if post.uri not in known and post.parent and post.parent[0] in known
+                )
+                page = replace(
+                    page,
+                    posts=page.posts + added,
+                    edges=page.edges + tuple((p.uri, p.parent[0]) for p in added),
+                )
             return self.apply_gate_controls(
-                await self._io("reconcile_page", thread_from(node, include_replies=not earlier))
+                self.confirmed().page(await self._io("reconcile_page", page))
             )
 
     async def profile(self, actor):
         async with self.authenticated():
-            return author_from(data(await self.client.get_profile(actor)))
+            return self.confirmed().author(author_from(data(await self.client.get_profile(actor))))
 
     async def author_feed(self, actor, cursor=None, feed_filter="posts_no_replies"):
         async with self.authenticated():
@@ -319,23 +390,25 @@ class Service(BookmarkService, ProfileService, ThreadService):
                 actor, cursor=cursor, filter=feed_filter, limit=30
             )
             page = feed_from({"feed": page_items(result), "cursor": result.cursor})
-            return await self._io("reconcile_page", page)
+            page = self.confirmed().page(await self._io("reconcile_page", page))
+            if cursor is None:
+                page = self._published_head(page, actor, feed_filter)
+            return page
 
     async def mutate(self, post, kind):
         async with self.authenticated():
             if post.unavailable == "This post was deleted." or kind not in ("like", "repost"):
                 raise UserError("This post action is not supported.")
-            if kind == "like":
-                if post.like_uri:
-                    await self._delete_record(post.like_uri, "app.bsky.feed.like", post.uri)
-                    return replace(post, like_uri="", likes=max(0, post.likes - 1))
-                result = await self.client.like(post.uri, post.cid)
-                return replace(post, like_uri=result.uri, likes=post.likes + 1)
-            if post.repost_uri:
-                await self._delete_record(post.repost_uri, "app.bsky.feed.repost", post.uri)
-                return replace(post, repost_uri="", reposts=max(0, post.reposts - 1))
-            result = await self.client.repost(post.uri, post.cid)
-            return replace(post, repost_uri=result.uri, reposts=post.reposts + 1)
+            field, count = ("like_uri", "likes") if kind == "like" else ("repost_uri", "reposts")
+            if getattr(post, field):
+                await self._delete_record(getattr(post, field), "app.bsky.feed." + kind, post.uri)
+                changes = {field: "", count: max(0, getattr(post, count) - 1)}
+            else:
+                method = self.client.like if kind == "like" else self.client.repost
+                result = await method(post.uri, post.cid)
+                changes = {field: result.uri, count: getattr(post, count) + 1}
+            self.confirmed().remember("post", post.uri, **changes)
+            return replace(post, **changes)
 
     async def delete_post(self, post, *, expected_account=None):
         async with self.authenticated():
@@ -365,6 +438,8 @@ class Service(BookmarkService, ProfileService, ThreadService):
                 ):
                     raise UserError("This post has changed. Refresh it before deleting.")
                 await self.client.com.atproto.repo.delete_record({**params, "swapRecord": post.cid})
+            self.confirmed().forget("published", post.uri)
+            self.confirmed().forget("post", post.uri)
             await self._io("delete_post", post.uri)
             return deleted_post(post)
 
@@ -406,9 +481,11 @@ class Service(BookmarkService, ProfileService, ThreadService):
         async with self.authenticated():
             if author.following:
                 await self._delete_record(author.following, "app.bsky.graph.follow", author.did)
-                return replace(author, following="")
-            result = await self.client.follow(author.did)
-            return replace(author, following=result.uri)
+                following = ""
+            else:
+                following = (await self.client.follow(author.did)).uri
+            self.confirmed().remember("author", author.did, following=following)
+            return replace(author, following=following)
 
     async def moderate(self, author, kind):
         async with self.authenticated():
@@ -419,17 +496,24 @@ class Service(BookmarkService, ProfileService, ThreadService):
                     else self.client.app.bsky.graph.mute_actor
                 )
                 await method({"actor": author.did})
+                changes = {"muted": not author.muted}
             elif kind == "block":
                 if author.blocking:
                     await self._delete_record(author.blocking, "app.bsky.graph.block", author.did)
+                    blocking = ""
                 else:
-                    await self.client.app.bsky.graph.block.create(
+                    result = await self.client.app.bsky.graph.block.create(
                         self.account.did,
                         models.AppBskyGraphBlock.Record(
                             subject=author.did, created_at=self.client.get_current_time_iso()
                         ),
                     )
-        return await self.profile(author.did)
+                    blocking = result.uri
+                changes = {"blocking": blocking}
+            else:
+                raise UserError("This account action is not supported.")
+            self.confirmed().remember("author", author.did, **changes)
+            return replace(author, **changes)
 
     async def search(self, query, people=False, cursor=None):
         async with self.authenticated():
@@ -437,13 +521,14 @@ class Service(BookmarkService, ProfileService, ThreadService):
                 result = await self.client.app.bsky.actor.search_actors(
                     {"q": query, "limit": 30, "cursor": cursor}
                 )
-                return page_items(result, author_from), result.cursor
+                return tuple(
+                    self.confirmed().author(a) for a in page_items(result, author_from)
+                ), result.cursor
             result = await self.client.app.bsky.feed.search_posts(
                 {"q": query, "limit": 30, "cursor": cursor}
             )
-            return await self._io(
-                "reconcile_page",
-                Page(page_items(result, post_from), result.cursor),
+            return self.confirmed().page(
+                await self._io("reconcile_page", Page(page_items(result, post_from), result.cursor))
             )
 
     async def notifications(self, cursor=None):
@@ -453,7 +538,7 @@ class Service(BookmarkService, ProfileService, ThreadService):
             )
             items = tuple(
                 Notice(
-                    author_from(data(item.author)),
+                    self.confirmed().author(author_from(data(item.author))),
                     item.reason,
                     item.uri,
                     item.reason_subject or "",
@@ -462,15 +547,26 @@ class Service(BookmarkService, ProfileService, ThreadService):
                 )
                 for item in result.get_page_items()
             )
+            seen = self.confirmed().fields("notification", "seen").get("timestamp")
+            if seen:
+                items = tuple(
+                    replace(n, read=True) if at_or_before(n.indexed_at, seen) else n for n in items
+                )
             return items, result.cursor, self.client.get_current_time_iso()
 
     async def mark_seen(self, timestamp):
         async with self.authenticated():
+            previous = self.confirmed().fields("notification", "seen").get("timestamp")
+            if previous and at_or_before(timestamp, previous):
+                timestamp = previous
             await self.client.app.bsky.notification.update_seen({"seenAt": timestamp})
+            self.confirmed().remember("notification", "seen", timestamp=timestamp)
 
     async def unread(self):
         async with self.authenticated():
-            return (await self.client.app.bsky.notification.get_unread_count()).count
+            timestamp = self.confirmed().fields("notification", "seen").get("timestamp")
+            params = models.AppBskyNotificationGetUnreadCount.Params(seen_at=timestamp)
+            return (await self.client.app.bsky.notification.get_unread_count(params)).count
 
     def drafts(self):
         return self._local("drafts")
@@ -537,6 +633,26 @@ class Service(BookmarkService, ProfileService, ThreadService):
                     else record
                 )
             # No automatic retry: a timeout can occur after the server creates the post.
-            return await self.client.send_post(
+            created = self.client.get_current_time_iso()
+            result = await self.client.send_post(
                 text, reply_to=reply_ref, embed=embed, facets=facets, langs=["en"]
             )
+            published = Post(
+                result.uri,
+                result.cid,
+                self.confirmed().author(self.account),
+                text,
+                created,
+                facets=tuple(data(facet) for facet in facets),
+                images=tuple(Media(a.path, a.alt, local=True) for a in attachments),
+                video=Video(
+                    video.path, video.alt, width=video.width, height=video.height, local=True
+                )
+                if video
+                else None,
+                quote=quote,
+                parent=(reply.uri, reply.cid) if reply else None,
+                root=(reply.root or (reply.uri, reply.cid)) if reply else None,
+            )
+            self.confirmed().remember("published", result.uri, post=published)
+            return result

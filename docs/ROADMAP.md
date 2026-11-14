@@ -7,8 +7,9 @@
   text/quote/image posts with descriptions, profiles/follow/mute/block, search,
   notification read state and sign-out.
 - Check live deletion and indexing propagation, bookmark synchronisation,
-  profile edits and conflict recovery, followers/following pagination, reply/quote
-  permissions, hidden replies and detached quotes. Check video eligibility,
+  profile edits and conflict recovery, delayed read-after-write propagation for
+  profiles/relationships/reactions/notifications and publishing, followers/following
+  pagination, reply/quote permissions, hidden replies and detached quotes. Check video eligibility,
   processing/quota failures, upload and playback with sound on real services.
 - Check Orca, physical keyboard/pointer/touch input, file portals, network and
   power changes, and suspend/resume. Include selection, focus return and branch

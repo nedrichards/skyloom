@@ -171,7 +171,7 @@ class ProfileEditor(Adw.Dialog):
     def preview(self, field):
         selected = self.images[field]
         path = getattr(self.author, field) if selected is None else selected
-        local = selected is not None
+        local = selected is not None or getattr(self.author, field + "_local")
         key = (path, local)
         if self.preview_keys.get(field) == key:
             return
@@ -286,7 +286,9 @@ class ProfileEditor(Adw.Dialog):
         async def update():
             if service.account is not account:
                 raise UserError("The signed-in account changed. Reopen the profile editor.")
-            return await service.update_profile(original, name, description, **images)
+            return await service.update_profile(
+                original, name, description, current=self.author, **images
+            )
 
         self.window.worker.submit(update(), ready, failed)
 

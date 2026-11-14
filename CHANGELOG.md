@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Preserve confirmed profile, follow, mute/block and reaction changes across briefly stale service reads. Keep new posts, replies and quotes visible while indexing catches up, and refresh the active profile or thread after publishing.
+- Query unread notifications with the confirmed seen cutoff, retaining read markers without hiding newer arrivals. Report draft cleanup failures separately from a successful publish.
+
 - Place your profile actions and other people’s profile actions beside the identity when they fit, show newly uploaded banners immediately after saving, and integrate the banner above the identity with an overlapping profile picture.
 
 ## 0.1.1 — 13 November 2026

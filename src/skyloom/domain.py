@@ -22,6 +22,8 @@ class Author:
     blocking: str = ""
     labels: tuple[str, ...] = ()
     banner: str = ""
+    avatar_local: bool = False
+    banner_local: bool = False
 
 
 @dataclass(frozen=True, slots=True)

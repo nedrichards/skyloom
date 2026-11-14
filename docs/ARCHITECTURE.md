@@ -38,9 +38,30 @@ conversations also have their own projection and loader handling. Use the
 Own and other profiles share one adaptive identity/actions row. Actions sit beside
 the name and handle when space permits and wrap within the header on narrow pages.
 
-Profile pages retain a page-local prepared banner after a successful save, so an
-immediate, stale AppView read cannot restore the previous image. Removing a
-banner also overrides that read. Later profile navigation uses the service again.
+`confirmed.py` retains only successful writes for two minutes, scoped to the
+exact signed-in session object and bounded to 2,000 records. Profile and
+relationship fields, reactions and notification cutoffs have independent expiry;
+reads never renew them. Service reads reconcile these facts across profiles,
+feeds, search, people, notifications, nested quotes and cached content. Mutations
+still validate the exact supplied record URI and ownership before deleting it.
+Account replacement or sign-out drops these in-memory confirmations.
+
+Profile edits return the submitted name/description and prepared local images
+without a dependent AppView read. Immutable author flags distinguish trusted
+prepared images from remote URLs; API mapping cannot supply those flags. The
+current profile also retains its prepared banner across view replacement.
+
+A successful publish retains its returned URI/CID and submitted text, facets,
+media and reply/quote references until indexing catches up. Missing posts are
+added only to the Following head, the matching author's compatible profile head,
+and threads containing their parent. Indexed records win; tail pages and custom
+feeds do not receive invented membership. Deleting a post removes its pending
+publication. Draft cleanup failures cannot turn successful publishing into an
+invitation to retry.
+
+Notification reads apply the confirmed seen timestamp only to older records.
+Unread-count requests pass the SDK's explicit `seen_at` cutoff, allowing newer
+notifications to remain unread. No mutation is automatically retried.
 
 ## Storage locations and retention
 
