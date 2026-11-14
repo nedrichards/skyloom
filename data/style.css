@@ -83,3 +83,13 @@ button.post-action, menubutton.post-action > button, button.post-menu-item {
 .appearance-selector popover.menu > arrow {
   border: 1px solid var(--border-color);
 }
+
+.profile-backdrop {
+  border-radius: 12px;
+  background: var(--card-bg-color);
+}
+.profile-portrait {
+  border: 4px solid var(--window-bg-color);
+  border-radius: 999px;
+  background: var(--window-bg-color);
+}

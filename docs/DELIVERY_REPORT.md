@@ -4,6 +4,45 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Shared profile identity/actions row — 14 November 2026
+
+Corrected the remaining layout issue: the controls are now children of the same
+adaptive identity row as the name and handle, for both own and other profiles.
+Wide layouts place actions beside the identity; narrow layouts wrap within that
+header instead of leaving an action row below the biography and statistics.
+Long names/handles retain wrapping and native selection. Native tests assert
+both profile types share the row at 1280 pixels and remain usable at 480 pixels;
+the installed profile smoke now also captures and checks both wide headers.
+The updated installed suite passed all 375 tests with zero skips under X11/Cairo.
+The installed default-renderer profile smoke passed, including both 1280-pixel
+headers and the 800/480-pixel layouts. Both wide captures were visually inspected.
+The seven focused profile/compact-header checks also passed.
+
+## Profile refinements — 13 November 2026
+
+Profile actions wrap at minimum widths rather than reserving the post filter's
+longest natural label. The banner now sits above the identity with the avatar
+crossing its lower edge. Successful edits retain the prepared banner on the
+current page while AppView indexes the write, including explicit removal.
+Image completions now bind to the replacement view rather than the closed view.
+Optional content warnings retain ownership of hidden banner imagery.
+
+Lint, formatting, desktop/schema validation passed; the direct `check.sh`
+runtime stage hit the nested Flatpak instance boundary. The host-launched source
+suite passed 355 tests. An initial installed Wayland run exposed an unrelated
+popup-mapping failure and an incorrect new test assumption that `profile()`
+returns its page; that test now reads the visible navigation page.
+The offline Flatpak build/export and local installation succeeded. The installed
+suite passed 356 tests with zero skips under the documented X11/Cairo gate.
+After the final image-callback and fixed-height crop changes, an installed
+native rendering check passed: a saved fixture banner acquired its paintable,
+kept a 160-pixel crop, and the Edit profile/browser/Posts controls stayed on one
+row at both 480 and 800 pixels. Invented screenshots were visually inspected.
+The installed profile GUI smoke passed with the default renderer, covering
+expanded/compact headers, scrolling, return, and own-profile layouts.
+Live uploads, server indexing timing and physical accessibility acceptance
+remain unverified.
+
 ## Skyloom 0.1.1 — 13 November 2026
 
 Recorded the SDK, profile, post-management and video work as four semantic commits

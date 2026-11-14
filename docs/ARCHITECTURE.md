@@ -35,6 +35,13 @@ For scrolling issues, start with the shared list and reading-position code;
 conversations also have their own projection and loader handling. Use the
 [profiling guide](PERFORMANCE.md) for measurements.
 
+Own and other profiles share one adaptive identity/actions row. Actions sit beside
+the name and handle when space permits and wrap within the header on narrow pages.
+
+Profile pages retain a page-local prepared banner after a successful save, so an
+immediate, stale AppView read cannot restore the previous image. Removing a
+banner also overrides that read. Later profile navigation uses the service again.
+
 ## Storage locations and retention
 
 Account databases and prepared uploads live in `$XDG_DATA_HOME/skyloom`;

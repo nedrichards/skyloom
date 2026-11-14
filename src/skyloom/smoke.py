@@ -90,6 +90,7 @@ class Smoke:
             self.restore_reply,
             self.verify_reply,
             self.profile,
+            self.profile_header_wide,
             self.profile_expanded,
             self.profile_scrolled,
             self.profile_narrow,
@@ -99,6 +100,7 @@ class Smoke:
             self.profile_return,
             self.profile_navigation,
             self.own_profile_card,
+            self.own_profile_header_wide,
             self.own_profile_wide,
             self.own_profile_narrow,
             self.notifications,
@@ -616,6 +618,26 @@ class Smoke:
         self.w.service.profile = complete_profile
         self.w.service.author_feed = complete_feed
         self.w.profile(self.w.service.posts[1].author.did)
+        return True
+
+    def profile_header_wide(self) -> bool:
+        return self.capture_profile_header("profile-header-1280-light")
+
+    def own_profile_header_wide(self) -> bool:
+        return self.capture_profile_header("own-profile-header-1280-light")
+
+    def capture_profile_header(self, name) -> bool:
+        if self.w.page_requests or not self.capture(name):
+            return False
+        page = self.w.nav.get_visible_page()
+        row = page.profile_identity_row
+        valid, details = page.profile_details.compute_bounds(row)
+        assert valid
+        valid, actions = page.profile_controls.compute_bounds(row)
+        assert valid
+        assert actions.origin.x >= details.origin.x + details.size.width
+        assert actions.origin.y < details.origin.y + details.size.height
+        self.w.set_default_size(800, 820)
         return True
 
     def profile_expanded(self) -> bool:

@@ -1448,6 +1448,7 @@ class Window(Adw.ApplicationWindow):
             "author": None,
             "pager": Pager(),
             "filter": "posts_no_replies",
+            "banner_local": None,
         }
 
         def load():
@@ -1468,28 +1469,87 @@ class Window(Adw.ApplicationWindow):
             if previous_view in self.views:
                 previous_view.close()
                 self.views.remove(previous_view)
+            banner_requests = []
+            page.profile_banner = None
             intro = box(spacing=12, margin=24)
             identity = box(spacing=12)
             portrait = avatar(author, self, 72)
+            page.profile_portrait = portrait
             portrait.set_halign(Gtk.Align.START)
-            identity.append(portrait)
-            identity.append(label(author.name, "title-1"))
-            identity.append(label("@" + author.handle, "dim-label", selectable=True))
+            banner_path = state["banner_local"]
+            local = banner_path is not None
+            if not local:
+                banner_path = author.banner
+            if (
+                banner_path
+                and should_load_image(self, banner_path, local=local)
+                and not (author.labels and self.settings.get_boolean("warn-labelled-content"))
+            ):
+                backdrop = Gtk.Overlay()
+                backdrop.add_css_class("profile-backdrop")
+                banner = Gtk.Picture(
+                    content_fit=Gtk.ContentFit.COVER,
+                    can_shrink=True,
+                )
+                page.profile_banner = banner
+                banner.set_alternative_text("Profile banner")
+                backdrop.set_child(Gtk.Box(height_request=200))
+                banner_frame = Gtk.Overlay(
+                    child=Gtk.Box(height_request=160), valign=Gtk.Align.START
+                )
+                banner_frame.set_overflow(Gtk.Overflow.HIDDEN)
+                banner_frame.add_overlay(banner)
+                backdrop.add_overlay(banner_frame)
+                portrait.set_valign(Gtk.Align.END)
+                portrait.set_margin_start(16)
+                portrait.add_css_class("profile-portrait")
+                backdrop.add_overlay(portrait)
+                identity.append(backdrop)
+                banner_requests.append((banner, banner_path, local))
+            else:
+                identity.append(portrait)
+            identity_row = Adw.WrapBox(child_spacing=24, line_spacing=12)
+            details = box(spacing=4)
+            details.set_hexpand(True)
+            for text, style, selectable in (
+                (author.name, "title-1", False),
+                ("@" + author.handle, "dim-label", True),
+            ):
+                text_label = label(text, style, selectable=selectable, max_width_chars=24)
+                text_label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+                details.append(text_label)
+            identity_row.append(details)
+            identity.append(identity_row)
+            page.profile_details = details
+            page.profile_identity_row = identity_row
             intro.append(identity)
+
+            def load_banner(picture, path, is_local):
+                if getattr(page, "content_view", None) is previous_view:
+                    banner_requests.append((picture, path, is_local))
+                    return
+                self.worker.submit(
+                    self.images.get(path, local=is_local),
+                    guard(self, page, picture.set_paintable),
+                    guard(self, page, lambda _: picture.set_visible(False)),
+                )
 
             def biography():
                 content = box(spacing=12)
-                if author.banner and should_load_image(self, author.banner):
-                    banner = Gtk.Picture(
-                        content_fit=Gtk.ContentFit.COVER, can_shrink=True, height_request=120
+                # Keep the optional warning's reveal/hide ownership: imagery
+                # inside a warning is constructed only when it is revealed.
+                if (
+                    banner_path
+                    and author.labels
+                    and self.settings.get_boolean("warn-labelled-content")
+                    and should_load_image(self, banner_path, local=local)
+                ):
+                    revealed_banner = Gtk.Picture(
+                        content_fit=Gtk.ContentFit.COVER, can_shrink=True, height_request=160
                     )
-                    banner.set_alternative_text("Profile banner")
-                    content.append(banner)
-                    self.worker.submit(
-                        self.images.get(author.banner),
-                        guard(self, page, lambda pix: banner.set_paintable(pix)),
-                        guard(self, page, lambda _: banner.set_visible(False)),
-                    )
+                    revealed_banner.set_alternative_text("Profile banner")
+                    content.append(revealed_banner)
+                    load_banner(revealed_banner, banner_path, local)
                 if author.bio.strip():
                     content.append(label(author.bio, selectable=True))
                 return content
@@ -1519,7 +1579,9 @@ class Window(Adw.ApplicationWindow):
                     else:
                         statistics.append(label(f"{value:,} {title}", "dim-label"))
             intro.append(statistics)
-            controls = Adw.WrapBox(child_spacing=6, line_spacing=6)
+            controls = Adw.WrapBox(
+                child_spacing=6, line_spacing=6, wrap_policy=Adw.WrapPolicy.MINIMUM
+            )
             if author.did != self.service.account.did:
                 follow = button(
                     "",
@@ -1554,13 +1616,21 @@ class Window(Adw.ApplicationWindow):
 
                 def edited(updated):
                     state["author"] = updated
+                    if editor.images["banner"] is not None:
+                        state["banner_local"] = editor.images["banner"]
                     render()
                     self.toast("Profile saved.")
 
+                def edit_profile():
+                    nonlocal editor
+                    editor = ProfileEditor(self, guard(self, page, edited), author)
+                    editor.present(self)
+
+                editor = None
                 edit = button(
                     "",
                     "Edit your profile",
-                    lambda: ProfileEditor(self, guard(self, page, edited), author).present(self),
+                    edit_profile,
                     "Edit profile",
                 )
                 controls.append(self.online_control(edit))
@@ -1583,7 +1653,8 @@ class Window(Adw.ApplicationWindow):
             state["filters"] = filters
             filters.connect("notify::selected", filtered)
             controls.append(filters)
-            intro.append(controls)
+            controls.set_valign(Gtk.Align.CENTER)
+            identity_row.append(controls)
             page.profile_controls = controls
             page.profile_filter = filters
             page.profile_browser = browser
@@ -1593,6 +1664,8 @@ class Window(Adw.ApplicationWindow):
             view.refresh = lambda: more(True)
             state["view"] = view
             page.content_view = view
+            for picture, path, is_local in banner_requests:
+                load_banner(picture, path, is_local)
             page.profile_title = ProfileTitle(header, view, identity, author)
             toolbar.set_content(view)
             more(True)

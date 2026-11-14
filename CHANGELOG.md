@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Place your profile actions and other people’s profile actions beside the identity when they fit, show newly uploaded banners immediately after saving, and integrate the banner above the identity with an overlapping profile picture.
+
 ## 0.1.1 — 13 November 2026
 
 - Update atproto to 0.0.74 with verified wheel hashes. Use typed page-item access for feeds, search, people, bookmarks and notifications, and share the SDK's public serializer to preserve unknown records and extension fields.
