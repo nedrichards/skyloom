@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Give feed images aspect-aware previews up to 560 pixels tall, using supplied dimensions without pixel analysis. Preserve reserved geometry through loading, failures and eviction.
+
 - Keep the feed-management browser action available while the main menu has focus or is closing.
 
 - Prefer current saved-feed preferences over legacy entries, preventing removed feeds reappearing; preserve pinned custom-feed order. Add a main-menu link to Bluesky’s saved-feed editor.

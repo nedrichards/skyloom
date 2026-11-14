@@ -25,7 +25,7 @@
       "created_at": "2026-10-26T14:15:00Z", "text": "A little reminder to add alt text. A good description tells someone what matters about a picture, not only what objects are in it.",
       "reply_count": 2, "repost_count": 4, "like_count": 29,
       "viewer": {"liked": true, "reposted": false},
-      "embeds": [{"kind": "images", "images": [{"local_fixture": "demo-landscape", "alt": "Illustrated rolling hills under a pale blue sky with a winding path."}]}]
+      "embeds": [{"kind": "images", "images": [{"local_fixture": "demo-landscape", "width": 800, "height": 420, "alt": "Illustrated rolling hills under a pale blue sky with a winding path."}]}]
     },
     {
       "id": "p3", "uri": "at://did:example:demo3/app.bsky.feed.post/p3", "cid": "demo-cid-p3",
@@ -50,8 +50,8 @@
       "reply_count": 23, "repost_count": 8, "like_count": 123,
       "viewer": {"liked": false, "reposted": false},
       "embeds": [{"kind": "images", "images": [
-        {"local_fixture": "demo-landscape", "alt": "A winding trail across green hills, with fluffy clouds overhead."},
-        {"local_fixture": "demo-architecture", "alt": "Simple angular buildings, warm terracotta walls and cobalt windows."}
+        {"local_fixture": "demo-landscape", "width": 800, "height": 420, "alt": "A winding trail across green hills, with fluffy clouds overhead."},
+        {"local_fixture": "demo-architecture", "width": 800, "height": 420, "alt": "Simple angular buildings, warm terracotta walls and cobalt windows."}
       ]}]
     },
     {

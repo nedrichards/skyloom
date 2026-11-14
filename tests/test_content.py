@@ -202,7 +202,9 @@ class ContentTests(unittest.TestCase):
         view.interaction.move("last")
         self.assertTrue(settle(window, ready=lambda: not view.check_pending))
         self.assertIsNone(picture.get_paintable())
-        self.assertEqual(picture.get_size_request()[1], 220)
+        self.assertEqual(
+            picture.get_parent().measure(Gtk.Orientation.VERTICAL, 480)[:2], (360, 360)
+        )
         late(images.cache[(posts[0].images[0].url, False)])
         self.assertEqual(calls, [])
         self.assertLess(images.residency()["bound_consumers"], 8)
@@ -983,6 +985,36 @@ class ContentTests(unittest.TestCase):
         self.assertIsNone(picture.get_paintable())
         self.assertIn("New binding", self.labels(row))
 
+    def test_image_aspect_geometry_is_bounded_and_survives_decode_and_eviction(self):
+        from gi.repository import Gdk, GLib
+
+        from skyloom.domain import Media
+        from skyloom.widgets import ImagePreview
+
+        picture = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.COVER)
+        preview = ImagePreview(picture)
+        for width, height, expected in [
+            (800, 400, 240),
+            (800, 800, 480),
+            (800, 1200, 560),
+            (8000, 100, 160),
+        ]:
+            preview.set_media(Media("invented", "", width=width, height=height))
+            reserved = preview.measure(Gtk.Orientation.VERTICAL, 480)[:2]
+            self.assertEqual(reserved, (expected, expected))
+            texture = Gdk.MemoryTexture.new(
+                8, 8, Gdk.MemoryFormat.R8G8B8A8, GLib.Bytes.new(bytes([0, 0, 0, 255]) * 64), 32
+            )
+            picture.set_paintable(texture)
+            self.assertEqual(preview.measure(Gtk.Orientation.VERTICAL, 480)[:2], reserved)
+            picture.set_paintable(None)
+            self.assertEqual(preview.measure(Gtk.Orientation.VERTICAL, 480)[:2], reserved)
+        preview.set_media(Media("invented", "", width=800, height=1200))
+        self.assertEqual(preview.measure(Gtk.Orientation.VERTICAL, 320)[:2], (480, 480))
+        placeholder = Gtk.Label(label="View image")
+        preview.set_child(placeholder)
+        self.assertEqual(preview.measure(Gtk.Orientation.VERTICAL, 320)[:2], (480, 480))
+
     def test_failed_image_keeps_reserved_geometry_and_view_action(self):
         from skyloom.widgets import PostRow
 
@@ -995,12 +1027,13 @@ class ContentTests(unittest.TestCase):
         self.window.worker.submit = submit
         row = PostRow(self.post, self.window)
         picture = next(widget for widget in self.walk(row) if isinstance(widget, Gtk.Picture))
-        viewer = picture.get_parent()
-        self.assertEqual(picture.get_size_request().height, 220)
+        preview = picture.get_parent()
+        viewer = preview.get_parent()
+        reserved = preview.measure(Gtk.Orientation.VERTICAL, 480)[:2]
         failures[-1]("Invented download failure")
-        self.assertIs(viewer.get_child(), picture)
+        self.assertIs(viewer.get_child(), preview)
         self.assertTrue(viewer.get_visible())
-        self.assertEqual(picture.get_size_request().height, 220)
+        self.assertEqual(preview.measure(Gtk.Orientation.VERTICAL, 480)[:2], reserved)
         self.assertIn("unavailable", viewer.get_tooltip_text())
         opened = []
         self.window.view_media = opened.append

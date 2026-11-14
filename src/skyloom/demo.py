@@ -43,7 +43,14 @@ class DemoService(DemoThreadService):
             images, external = [], None
             for e in d["embeds"]:
                 images.extend(
-                    Media(i["local_fixture"], i["alt"], local=True) for i in e.get("images", [])
+                    Media(
+                        i["local_fixture"],
+                        i["alt"],
+                        local=True,
+                        width=i.get("width", 0),
+                        height=i.get("height", 0),
+                    )
+                    for i in e.get("images", [])
                 )
                 if e["kind"] == "external":
                     external = (e["url"], e["title"], e["description"])

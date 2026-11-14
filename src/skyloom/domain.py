@@ -32,6 +32,8 @@ class Media:
     alt: str
     fullsize: str = ""
     local: bool = False
+    width: int = 0
+    height: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -363,10 +365,20 @@ def post_from(d: dict, depth=0) -> Post:
     images, quoted, external, unavailable, video = [], None, None, "", None
     kind = embed.get("$type", "")
     media = embed.get("media", embed)
-    images.extend(
-        Media(safe_url(im.get("thumb", "")), im.get("alt", ""), safe_url(im.get("fullsize", "")))
-        for im in media.get("images", [])[:4]
-    )
+    for im in media.get("images", [])[:4]:
+        ratio = im.get("aspectRatio")
+        ratio = ratio if isinstance(ratio, dict) else {}
+        width, height = ratio.get("width", 0), ratio.get("height", 0)
+        valid = all(type(n) is int and 0 < n <= 100000 for n in (width, height))
+        images.append(
+            Media(
+                safe_url(im.get("thumb", "")),
+                im.get("alt", ""),
+                safe_url(im.get("fullsize", "")),
+                width=width if valid else 0,
+                height=height if valid else 0,
+            )
+        )
     if "external" in media:
         e = media["external"]
         external = (safe_url(e.get("uri", "")), e.get("title", "Link"), e.get("description", ""))

@@ -22,6 +22,43 @@ from .richtext import markup
 from .thread_context import ThreadContext
 
 
+class ImagePreview(Gtk.Box):
+    """Reserve a bounded aspect-aware rectangle independent of decoded pixels."""
+
+    def __init__(self, child):
+        super().__init__()
+        self.set_layout_manager(None)
+        self.ratio = 4 / 3
+        self.append(child)
+
+    def set_media(self, media):
+        ratio = media.width / media.height if media.width > 0 and media.height > 0 else 4 / 3
+        if self.ratio != ratio:
+            self.ratio = ratio
+            self.queue_resize()
+
+    def set_child(self, child):
+        previous = self.get_first_child()
+        if previous is not child:
+            self.remove(previous)
+            self.append(child)
+
+    def do_get_request_mode(self):
+        return Gtk.SizeRequestMode.HEIGHT_FOR_WIDTH
+
+    def do_measure(self, orientation, for_size):
+        if orientation == Gtk.Orientation.HORIZONTAL:
+            return 0, 720, -1, -1
+        height = round(min(560, max(160, for_size / self.ratio))) if for_size >= 0 else 360
+        return height, height, -1, -1
+
+    def do_size_allocate(self, width, height, baseline):
+        self.get_first_child().allocate(width, height, baseline, None)
+
+    def do_snapshot(self, snapshot):
+        self.snapshot_child(self.get_first_child(), snapshot)
+
+
 def box(vertical=True, spacing=12, margin=0):
     widget = Gtk.Box(
         orientation=Gtk.Orientation.VERTICAL if vertical else Gtk.Orientation.HORIZONTAL,
@@ -1668,10 +1705,9 @@ class PostRow(Gtk.Box):
         if index == len(self.media_cells):
             group = box(spacing=4)
             group.add_css_class("card")
-            group.pic = Gtk.Picture(
-                can_shrink=True, content_fit=Gtk.ContentFit.COVER, height_request=220
-            )
-            group.viewer = Gtk.Button(child=group.pic)
+            group.pic = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.COVER)
+            group.preview = ImagePreview(group.pic)
+            group.viewer = Gtk.Button(child=group.preview)
             group.viewer.add_css_class("flat")
             group.media = None
             group.viewer.connect(
@@ -1688,6 +1724,7 @@ class PostRow(Gtk.Box):
         else:
             group = self.media_cells[index]
         group.media = media
+        group.preview.set_media(media)
         pic, viewer = group.pic, group.viewer
         pic.set_alternative_text(media.alt if media.alt.strip() else "Image")
         viewer.set_tooltip_text("View image and description")
@@ -1707,14 +1744,12 @@ class PostRow(Gtk.Box):
             group.alt.set_label("ALT · " + media.alt)
             group.alt.set_visible(True)
         if should_load_image(self.window, media.url, media.local):
-            if viewer.get_child() is not pic:
-                viewer.set_child(pic)
+            group.preview.set_child(pic)
 
             def loaded(pix):
                 if self.alive and serial == self.binding_serial:
                     self.window.images.bind(pic, pix)
                     pic.set_paintable(pix)
-                    pic.set_size_request(-1, 220)
 
             def failed(_msg):
                 if self.alive and serial == self.binding_serial:
@@ -1745,9 +1780,8 @@ class PostRow(Gtk.Box):
             start_image(pic, load, self, release)
         else:
             if group.placeholder is None:
-                group.placeholder = Gtk.Label(label="View image", height_request=220)
-            if viewer.get_child() is not group.placeholder:
-                viewer.set_child(group.placeholder)
+                group.placeholder = Gtk.Label(label="View image")
+            group.preview.set_child(group.placeholder)
         if group.get_parent() is None:
             content.append(group)
 

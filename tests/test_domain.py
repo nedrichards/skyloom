@@ -110,6 +110,25 @@ class RichTextTests(unittest.TestCase):
 
 
 class ModelTests(unittest.TestCase):
+    def test_image_dimensions_are_optional_validated_and_cached(self):
+        from dataclasses import asdict
+
+        from skyloom.storage import post_restore
+
+        for ratio, expected in [
+            ({"width": 800, "height": 1200}, (800, 1200)),
+            (None, (0, 0)),
+            ({"width": 0, "height": 1200}, (0, 0)),
+            ({"width": True, "height": 2}, (0, 0)),
+            ({"width": "800", "height": 1200}, (0, 0)),
+            ({"width": 100001, "height": 1}, (0, 0)),
+            ([], (0, 0)),
+        ]:
+            with self.subTest(ratio=ratio):
+                post = post_from({"embed": {"images": [{"aspectRatio": ratio}]}})
+                self.assertEqual((post.images[0].width, post.images[0].height), expected)
+                self.assertEqual(post_restore(asdict(post)), post)
+
     def test_sparse_and_unknown_embed(self):
         p = post_from(
             {"uri": "at://x/y/z", "record": {"text": "hi"}, "embed": {"$type": "unknown"}}

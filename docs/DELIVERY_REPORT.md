@@ -4,6 +4,29 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Taller aspect-aware image previews — 14 November 2026
+
+Image embeds now retain validated optional aspect dimensions through immutable
+models and cached posts. The pinned atproto 0.0.74 `ViewImage.aspect_ratio`
+contract was inspected. Preview height follows available width and source shape,
+bounded to 160–560 logical pixels, with a 4:3 fallback. Extreme shapes retain a
+centred crop. Download-policy placeholders, failure and eviction share reserved
+geometry; decoded pixel dimensions never trigger a height change. No subject
+analysis or additional decoding/network work was introduced on the scroll path.
+No measured performance improvement or physical-scroll acceptance is claimed.
+The user confirmed the updated image presentation looks good in manual testing.
+Local lint, desktop/schema validation and the initial 378-test source suite
+passed. The pinned offline build/export and install passed; all 56 installed
+Python modules matched source (Flatpak commit
+`ea5897359d0230ccedaca96f43c7026d428062af35ee3d2ce39145f66f9f8c55`).
+The expanded 380-test installed default-renderer run hit a feed-selector layout
+settling timeout; an isolated rerun passed that check but hit a native text
+selection assertion. Image geometry, model validation and cache tests passed.
+The complete installed X11/Cairo suite then passed all 380 tests with zero skips.
+The installed default-renderer navigation smoke passed at 1280/light and 480/dark;
+both captures were visually inspected. These results do not establish measured
+scrolling performance.
+
 ## Feed-management menu focus — 14 November 2026
 
 The installed demo's actual menu row reached Gtk.UriLauncher, and the user

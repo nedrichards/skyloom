@@ -88,3 +88,11 @@ creation are never automatically retried.
 See `storage.py` and `media.py` for retention limits and cleanup. These are local
 application files, not separately encrypted backups. Use temporary demo storage
 when debugging or sharing a reproduction.
+
+Feed image previews reserve height from immutable `Media` dimensions supplied by
+the image embed's optional `aspectRatio`. Native height-for-width measurement is
+bounded to 160–560 logical pixels, with a 4:3 fallback for older records. GTK
+centres any remaining crop using `ContentFit.COVER`; image arrival/eviction and
+download-policy placeholders do not change the reserved rectangle. This uses
+constant arithmetic during layout, with no pixel/subject analysis, decode or
+network work added to scrolling. Dimension fields survive cached post round trips.
