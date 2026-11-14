@@ -1,0 +1,48 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    name: Source checks (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: '3.14'
+      - name: Install locked development dependencies
+        run: |
+          test "$(uname -m)" = "$BUILD_ARCH"
+          python -m venv .venv
+          .venv/bin/python -m pip install --only-binary=:all: -r requirements-dev.lock
+          .venv/bin/python -m pip check
+        env:
+          BUILD_ARCH: ${{ matrix.arch }}
+      - name: Fast source and dependency checks
+        run: |
+          ./scripts/lint.sh
+          .venv/bin/python scripts/ci/dependencies.py
+          .venv/bin/python -m unittest discover -s tests -p 'test_*maintenance.py' -v
+          bash scripts/ci/actionlint.sh
+  native:
+    name: Installed Flatpak
+    uses: ./.github/workflows/native.yml

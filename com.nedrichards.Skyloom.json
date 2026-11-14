@@ -40,7 +40,8 @@
             ".venv-sdk",
             "build-native",
             "local-install",
-            "build-runtime"
+            "build-runtime",
+            "build-ci"
           ]
         }
       ]

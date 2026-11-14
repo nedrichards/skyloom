@@ -64,6 +64,23 @@ nested extension-field round trips and typed page-item access without serialisin
 unused response metadata. Existing SDK/HTTP contracts cover the production
 feed/search/notification, profile, bookmark, thread and upload paths.
 
+## Hosted artifacts and generated cases
+
+The hosted workflow runs these native gates on both x86_64 and aarch64. The full
+installed demo smoke is followed by separate high-contrast and large-text
+navigation runs, each capturing wide/light and narrow/dark layouts. Its HTML
+contact sheet is a review aid; there are no pixel-difference assertions. All
+captures use invented records in demo storage. Physical input, Orca, real portals,
+audible sound and live-account acceptance remain separate.
+
+`test_properties.py` generates reproducible Unicode/facet, cache round-trip and
+corruption, and pagination sequences. Ordinary runs use 50 cases per test; the
+weekly extended gate uses 1,000. Each failure reports the fixed seed and case
+index. Set `SKYLOOM_PROPERTY_CASES` to reproduce a larger run (bounded at 5,000).
+The runtime runner's optional `--report PATH` writes test counts, named failures,
+errors and skips, or a distinct display/runtime preflight failure. Reports and
+smokes are diagnostic evidence, not proof of a real account or physical device.
+
 ## Display troubleshooting
 
 Wayland full-suite runs have timed out waiting for native frames. To diagnose

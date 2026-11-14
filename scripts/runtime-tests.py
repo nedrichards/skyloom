@@ -2,6 +2,7 @@
 
 import argparse
 import fnmatch
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -39,15 +40,35 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tests", type=Path, required=True)
     parser.add_argument("--allow-skip", action="append", default=[], metavar="TEST_ID_GLOB")
+    parser.add_argument("--report", type=Path, help="Write an invented-data CI result summary")
     args = parser.parse_args()
     try:
         require_runtime()
     except (ImportError, ValueError, RuntimeError) as error:
         print(f"RUNTIME_PREFLIGHT_FAIL: {error}", file=sys.stderr)
+        if args.report:
+            args.report.parent.mkdir(parents=True, exist_ok=True)
+            args.report.write_text(json.dumps({"preflight": str(error)}), encoding="utf-8")
         return 2
     suite = unittest.defaultTestLoader.discover(str(args.tests))
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     errors = result_errors(result, args.allow_skip)
+    if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(
+            json.dumps(
+                {
+                    "tests": result.testsRun,
+                    "failures": [test.id() for test, _ in result.failures],
+                    "errors": [test.id() for test, _ in result.errors],
+                    "skips": [(test.id(), reason) for test, reason in result.skipped],
+                    "gate_errors": errors,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     for error in errors:
         print(error, file=sys.stderr)
     if errors or not result.wasSuccessful():

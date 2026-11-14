@@ -1,0 +1,28 @@
+name: Extended compatibility
+on:
+  schedule:
+    - cron: '41 6 * * 3'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: extended-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  boundaries:
+    name: Extended generated cases
+    uses: ./.github/workflows/native.yml
+    with:
+      property_cases: '1000'
+  sdk:
+    name: Latest SDK probe
+    uses: ./.github/workflows/native.yml
+    with:
+      sdk_probe: true
+  wayland:
+    name: Advisory Wayland renderer
+    # Advisory failures stay visible as a separate scheduled workflow result;
+    # neither this job nor the SDK probe is a required PR gate.
+    uses: ./.github/workflows/native.yml
+    with:
+      backend: wayland

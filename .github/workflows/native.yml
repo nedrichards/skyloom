@@ -1,0 +1,152 @@
+name: Native validation
+on:
+  workflow_call:
+    inputs:
+      source_ref:
+        type: string
+        default: ''
+      release:
+        type: boolean
+        default: false
+      release_tag:
+        type: string
+        default: ''
+      sdk_probe:
+        type: boolean
+        default: false
+      backend:
+        type: string
+        default: x11
+      property_cases:
+        type: string
+        default: '50'
+permissions:
+  contents: read
+jobs:
+  native:
+    name: ${{ matrix.arch }} / ${{ inputs.backend }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    container:
+      # GNOME 51 index verified for linux/amd64 and linux/arm64.
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51@sha256:78d969b18225ae107ca29497bf09c4a3f791e5f1838a9a912a529d0024fb6210
+      options: --privileged
+    defaults:
+      run:
+        shell: bash
+    timeout-minutes: 60
+    env:
+      BUILD_ARCH: ${{ matrix.arch }}
+      BUILD_BACKEND: ${{ inputs.backend }}
+      SDK_PROBE: ${{ inputs.sdk_probe }}
+      SKYLOOM_PROPERTY_CASES: ${{ inputs.property_cases }}
+    steps:
+      - name: Check out build tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check out application source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          path: source
+          persist-credentials: false
+      - name: Verify native source and packaging
+        id: source
+        env:
+          SOURCE_REF: ${{ inputs.release_tag || inputs.source_ref }}
+          RELEASE_BUILD: ${{ inputs.release }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python3 scripts/ci/prepare.py
+      - name: Prepare container display tools
+        id: setup
+        run: |
+          test "$(uname -m)" = "$BUILD_ARCH"
+          for tool in Xvfb xvfb-run weston dbus-run-session; do command -v "$tool"; done
+          bash scripts/ci/display-tools.sh > source/build-ci/display-tools.log 2>&1
+          flatpak info --show-commit org.gnome.Platform//51
+          flatpak info --show-commit org.gnome.Sdk//51
+      - name: Validate desktop metadata
+        working-directory: source
+        run: |
+          desktop-file-validate data/com.nedrichards.Skyloom.desktop
+          glib-compile-schemas --strict --dry-run data
+          appstreamcli validate --pedantic --no-net data/com.nedrichards.Skyloom.metainfo.xml
+          flatpak info --show-commit org.gnome.Platform//51 >> "dist/BUILD_INFO-$BUILD_ARCH.txt"
+      - name: Build and export pinned application
+        id: build
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6.8
+        with:
+          arch: ${{ matrix.arch }}
+          manifest-path: source/com.nedrichards.Skyloom.json
+          bundle: source/dist/${{ steps.source.outputs.bundle }}
+          build-dir: source/build-flatpak
+          repo-dir: source/flatpak-repo
+          state-dir: source/.flatpak-builder
+          cache-key: skyloom-gnome51-${{ github.sha }}
+          # Tests need the composited session below; don't run a second,
+          # non-composited test invocation inside Builder.
+          run-tests: false
+          keep-build-dirs: true
+          upload-artifact: false
+      - name: Install, test and capture demo application
+        id: native
+        working-directory: source
+        env:
+          BUNDLE: ${{ steps.source.outputs.bundle }}
+        run: |
+          set -o pipefail
+          flatpak install --user --reinstall --noninteractive "$PWD/dist/$BUNDLE"
+          dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1200x24' bash ../scripts/ci/display.sh 2>&1 | tee build-ci/native.log
+      - name: Checksum validated bundle
+        working-directory: source/dist
+        run: sha256sum -- *.flatpak > "SHA256SUMS-$BUILD_ARCH"
+      - name: Upload validated bundle
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: skyloom-${{ inputs.release && 'release' || 'development' }}-${{ matrix.arch }}-${{ inputs.backend }}${{ inputs.sdk_probe && '-sdk' || '' }}
+          path: source/dist/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Link installable bundle
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          BUNDLE: ${{ steps.source.outputs.bundle }}
+        run: |
+          {
+            echo "### Validated $BUILD_ARCH Flatpak"
+            echo "[Download bundle]($ARTIFACT_URL) (14 days; GitHub sign-in required)"
+            echo 'After extracting:'
+            echo '```console'
+            printf 'flatpak install --user ./%s\n' "$BUNDLE"
+            echo '```'
+            cat "source/dist/BUILD_INFO-$BUILD_ARCH.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Summarize diagnostics and prepare visual review
+        if: always()
+        env:
+          CI_OUTCOMES: '{"source":"${{ steps.source.outcome }}","setup":"${{ steps.setup.outcome }}","build":"${{ steps.build.outcome }}","native":"${{ steps.native.outcome }}"}'
+        run: python3 scripts/ci/report.py source/build-ci
+      - name: Preserve diagnostics and demo screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: skyloom-diagnostics-${{ matrix.arch }}-${{ inputs.backend }}${{ inputs.sdk_probe && '-sdk' || '' }}
+          path: |
+            source/build-ci/*.log
+            source/build-ci/*.json
+            source/build-ci/*.txt
+            source/build-ci/*.md
+            source/build-ci/index.html
+            source/build-ci/visual/
+            source/.flatpak-builder/build/**/meson-logs/testlog.*
+          if-no-files-found: warn
+          retention-days: 14

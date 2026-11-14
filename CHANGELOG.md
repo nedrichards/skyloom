@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Add native x86_64 and aarch64 CI with installed Flatpak tests, downloadable
+  preview bundles, failure diagnostics and demo screenshot contact sheets, using
+  the official Flathub build container and Flatpak Builder action.
+- Check dependency-lock and wheel parity, report runtime and PyPI dependency
+  health, and schedule SDK, generated-boundary and Wayland compatibility checks
+  on both architectures.
+- Replace the ARM64-only release builder with verified dual-architecture builds,
+  checksums, signed artifact provenance and optional draft release preparation.
+  Publication remains manual.
+
 ## 0.1.2 — 14 November 2026
 
 - Load video thumbnails from Bluesky’s video service and follow checked redirects to its video CDN, keeping existing cache, download-policy and image-size limits.

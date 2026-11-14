@@ -70,19 +70,79 @@ The generator verifies wheel digests against PyPI and updates
 delta and rebuild. Keep downloaded wheels out of Git. Lint settings belong in
 `pyproject.toml`; development tools are pinned in `requirements-dev.lock`.
 
-## Native ARM64 release builder
+## Hosted validation and releases
 
-The manual `Build ARM64 Flatpak` GitHub Actions workflow uses an
-`ubuntu-24.04-arm` runner and GNOME 51. Dispatch it with an existing version tag.
-It checks out that immutable application source, verifies the dependency versions
-match the builder's pins, and supplies the checked multi-architecture wheel
-manifest. This permits building 0.1.2 without moving its existing tag.
+Every application check runs on native x86_64 (`ubuntu-24.04`) and aarch64
+(`ubuntu-24.04-arm`) runners, using GNOME 51. `CI` runs on pushes to main,
+pull requests and manual dispatch. Fast jobs install the locked Python 3.14
+development environment, check lint and dependency consistency, test maintenance
+guards and run checksum-pinned actionlint. The shared `native.yml` workflow
+uses the official Flathub GNOME 51 build container (pinned multi-architecture
+image digest) and SHA-pinned Flatpak Builder action. Flatpak and its runtimes
+belong to that container; workflows do not install Flatpak on the Ubuntu runner
+or change runner kernel settings. Inside the container it builds, exports and
+installs a Flatpak, proves installed architecture/version and
+Python source parity, then runs source tests, installed tests and demo smokes
+sequentially. Unexpected skips fail the native gate.
 
-The job builds and installs an aarch64 bundle, verifies the native architecture,
-version and installed Python source parity, runs the strict native test gate on
-X11/Cairo and an installed navigation smoke, then uploads the bundle, checksums
-and application/tooling commit provenance as a short-lived Actions artifact.
-Release-asset publication stays a separate reviewed maintainer action.
+Download installable bundles through the job summaries. Filenames identify the
+built commit, including GitHub's merge commit for pull requests; `BUILD_INFO`
+records application and tooling commits. Diagnostic artifacts contain logs,
+named test failures and an offline visual contact sheet (`index.html`). Extract
+the whole artifact before opening it. Artifacts expire after 14 days. Preview
+bundles use the production application ID: installing one replaces that local
+installation. Restore the published bundle after review if needed.
+
+`Dependency health` checks runtime/SDK support, published wheel digests, newer
+PyPI versions and vulnerability advisories weekly and when dependency inputs
+change. Version differences are information; published advisories, unavailable
+runtimes, EOL notices and inconsistent pins fail the job. Transport errors remain
+visible failures rather than a clean health report. Dependency updates remain
+reviewed changes across all locks and both architectures; the checker never
+rewrites production pins. Dependabot groups updates to SHA-pinned Actions.
+Review build-container digest updates manually with both native builds. The
+container supplies Xvfb and Weston; two checksum-pinned Openbox/xcompmgr source
+archives supply the composited X11 test session. They are built only in the
+disposable CI container and are not bundled with Skyloom.
+
+`Extended compatibility` runs weekly or manually on both architectures. It runs
+1,000 generated cases per boundary test, probes the newest atproto with other
+runtime versions constrained to the production lock, and runs a separate advisory
+Wayland/default-renderer check under headless Weston. The SDK probe installs into
+a disposable overlay and records its resolved versions; an incompatible resolver
+result is a probe failure. These jobs do not gate PRs, but their failures remain
+visible in the scheduled workflow. Required functional tests use composited
+X11/Cairo. Neither renderer on hosted hardware establishes desktop performance.
+
+Dispatch `Prepare release Flatpaks` from the default branch with an existing
+`vX.Y.Z` tag. The workflow resolves that tag once and builds the same immutable
+application commit on both architectures. The tag must match the application
+version. Tooling may supply the current multi-architecture wheel manifest and
+hash lock for incomplete legacy packaging only when the runtime pins are
+byte-identical, preserving support for
+the existing 0.1.2 tag; any overlay is recorded in each `BUILD_INFO`. Packaging
+also excludes disposable CI reports from the source input.
+
+Both architectures must pass before the workflow attests the bundles and their
+build information, then creates a draft release with checksums. Disable
+`create_draft` to rebuild an existing release into Actions artifacts. Existing
+releases are never overwritten, and publication remains a manual maintainer
+action. The single tag-resolution and draft-assembly jobs run once; application
+builds, tests, probes, reports and attestations run on both architectures.
+
+Verify downloaded release assets with `sha256sum --check SHA256SUMS` and, using
+GitHub CLI, `gh attestation verify BUNDLE.flatpak --repo nedrichards/skyloom`.
+Verify the accompanying `BUILD_INFO` the same way to inspect the application
+commit and packaging overlay. Attestation provenance identifies the release
+workflow/tooling commit; it does not imply live-service or human acceptance.
+See [GitHub's attestation documentation](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations).
+
+Workflows use read-only repository permissions by default. Write/OIDC permissions
+are confined to artifact attestation and draft creation; those jobs do not execute
+application code. No account credentials or signed-in data belong in CI. There
+is no privileged PR repair workflow. Automation using `GITHUB_TOKEN` must arrange
+validation explicitly rather than relying on a push to retrigger CI; see
+[GitHub's trigger rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
 
 For dependency updates, download the exact requirements for both CPython 3.14
 architectures into `wheels/` or architecture subdirectories before regenerating.

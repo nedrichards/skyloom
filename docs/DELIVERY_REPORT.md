@@ -4,6 +4,56 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Dual-architecture workflow implementation — 14 November 2026
+
+Added PR/main validation, dependency health, extended generated cases, latest-SDK
+and advisory Wayland checks, and verified release packaging for both native
+x86_64 and aarch64 runners. Application jobs share the official Flathub GNOME 51
+container and SHA-pinned Flatpak Builder action. The pinned OCI index was checked
+live and supplies linux/amd64 and linux/arm64 images. Workflows do not install
+Flatpak on the Ubuntu runner or modify runner kernel settings. Two pinned source
+archives provide CI-only Openbox/xcompmgr helpers inside the build container;
+both compiled and loaded successfully in the local Builder environment.
+
+Release preparation resolves the tag once for both builds, validates its version,
+records application/tooling commits and any packaging overlay, and requires both
+architectures to pass before attesting bundles/build information and optionally
+creating a draft. Existing releases cannot be overwritten. No release is
+published automatically. A disposable checkout of the real 0.1.2 tag passed
+source/overlay preparation; mismatched and malformed tags were rejected.
+
+Local actionlint 1.7.12, stable/selected-preview Ruff, formatting, compilation,
+shell syntax, dependency parity and all nine maintenance checks passed. Three
+generated-boundary tests passed 1,000 cases each. `./scripts/check.sh` passed
+399 source tests with zero skips before the final three CI maintenance tests
+were added; those passed separately. The agent sandbox could not allocate a
+nested Flatpak instance. Host-side validation used GNOME 51 and the existing
+pinned Ruff binary because host Python 3.15 cannot use the Python 3.14 venv.
+The offline x86_64 build/export/install passed (Flatpak commit
+`4442c52ae910eaa49f4945bd9bd610f6add9f0c00032aafbf19d8dfcf1379546`).
+All 56 installed modules matched source. The final installed X11/Cairo suite
+passed 402 tests with zero skips, including 1,000 cases per generated-boundary
+test. An earlier default-Wayland installed run failed the existing feed-switcher
+header-resize settling assertion; it is retained as a limitation, not suppressed.
+The complete installed X11/Cairo demo smoke and separate high-contrast/large-text
+navigation variants passed sequentially, producing 54 invented-data screenshots
+and an HTML contact sheet. The wide high-contrast and narrow large-text captures
+were visually inspected. These are functional/layout evidence, not physical
+input, Orca or default-renderer performance acceptance.
+
+The live PyPI health report verified all pinned wheel URLs/digests and correctly
+failed for dnspython 2.9.0's published GHSA-vvf4-9x63-8xvv advisory. Production
+dependency pins remain unchanged; the coordinated patch update is in the roadmap.
+The SDK probe uses pip from the SDK to prepare a disposable overlay, then runs
+the installed application against that overlay; the production Platform has no
+pip. The local probe resolved atproto 0.0.75 with all other production pins constrained;
+all 402 installed X11/Cairo tests passed against that disposable overlay with
+zero skips. The production SDK pin remains 0.0.74. Hosted image startup, native
+ARM64 execution of these new jobs, scheduled runs, draft creation and signature
+verification still require GitHub execution.
+No workflows have been dispatched and no commits, releases or tags published
+as part of this implementation.
+
 ## Native ARM64 packaging — 14 November 2026
 
 A native GitHub-hosted ARM64 builder validated the same 0.1.2

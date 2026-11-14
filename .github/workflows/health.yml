@@ -1,0 +1,83 @@
+name: Dependency health
+on:
+  schedule:
+    - cron: '23 7 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - requirements*.lock
+      - python-dependencies.json
+      - pyproject.toml
+      - com.nedrichards.Skyloom.json
+      - scripts/ci/dependencies.py
+      - .github/workflows/health.yml
+permissions:
+  contents: read
+concurrency:
+  group: health-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  health:
+    name: Dependency health (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51@sha256:78d969b18225ae107ca29497bf09c4a3f791e5f1838a9a912a529d0024fb6210
+    defaults:
+      run:
+        shell: bash
+    timeout-minutes: 15
+    env:
+      BUILD_ARCH: ${{ matrix.arch }}
+      LC_ALL: C.UTF-8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify dependency locks and published wheel digests
+        id: dependencies
+        run: |
+          set -o pipefail
+          mkdir -p build-ci
+          test "$(uname -m)" = "$BUILD_ARCH"
+          python3 scripts/ci/dependencies.py --health build-ci/dependency-health.json 2>&1 | tee build-ci/dependency-health.log
+      - name: Check runtime and SDK support
+        if: ${{ !cancelled() }}
+        id: runtime
+        run: |
+          set -o pipefail
+          mkdir -p build-ci
+          for component in Platform Sdk; do
+            flatpak remote-info --arch="$BUILD_ARCH" flathub "org.gnome.$component//51" | tee -a build-ci/runtime-health.txt
+          done
+          if grep -Ei 'end.of.life|EOL' build-ci/runtime-health.txt; then
+            echo 'Runtime or SDK is marked end of life' >&2
+            exit 1
+          fi
+      - name: Summarize dependency health
+        if: always()
+        env:
+          DEPENDENCY_OUTCOME: ${{ steps.dependencies.outcome }}
+          RUNTIME_OUTCOME: ${{ steps.runtime.outcome }}
+        run: |
+          {
+            echo "### Dependency health ($BUILD_ARCH)"
+            echo "Dependencies: $DEPENDENCY_OUTCOME; runtime: $RUNTIME_OUTCOME"
+            echo '```text'
+            cat build-ci/dependency-health.log build-ci/runtime-health.txt 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: dependency-health-${{ matrix.arch }}
+          path: build-ci/
+          if-no-files-found: warn
+          retention-days: 14
