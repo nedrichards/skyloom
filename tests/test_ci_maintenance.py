@@ -3,6 +3,7 @@
 import contextlib
 import io
 import json
+import os
 import runpy
 import shutil
 import tempfile
@@ -86,7 +87,13 @@ class CiMaintenanceTests(unittest.TestCase):
         self.assertEqual((ROOT / "requirements.lock").read_bytes(), original)
 
     def test_missing_native_results_and_preflight_failure_are_visible(self):
-        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            contextlib.redirect_stdout(io.StringIO()),
+            patch.dict(
+                os.environ, {"GITHUB_STEP_SUMMARY": str(Path(directory) / "job-summary.md")}
+            ),
+        ):
             root = Path(directory)
             REPORT["summary"](root, {"native": "failure"})
             self.assertIn("before a test report", (root / "summary.md").read_text())
@@ -96,3 +103,4 @@ class CiMaintenanceTests(unittest.TestCase):
             REPORT["summary"](root, {"native": "failure"})
             self.assertIn("setup failed before tests ran", (root / "summary.md").read_text())
             self.assertIn("<main></main>", (root / "index.html").read_text())
+            self.assertIn("setup failed before tests ran", (root / "job-summary.md").read_text())

@@ -92,6 +92,14 @@ uses an anonymous `/var/lib/flatpak` volume, initialised from the image, so runt
 updates stay on one filesystem. Build information records the validated runtime
 and SDK commits after Builder has finished. The custom Openbox prefix is also
 included in its XDG data/config paths so its installed themes can be found.
+Both hosted builds subsequently installed successfully and reached the native
+suite. The CI-summary regression now directs its summary into its temporary
+fixture directory instead of inheriting a runner path inaccessible inside the
+application sandbox. Installed image tests exposed missing Flatpak portal
+activation in the minimal build container; the display session now starts that
+portal explicitly and preflights sandboxed PNG encoding before the suite. The
+container also provides the conventional D-Bus daemon path expected by its
+accessibility launcher. Decoder sandboxing remains enabled.
 
 ## Native ARM64 packaging — 14 November 2026
 

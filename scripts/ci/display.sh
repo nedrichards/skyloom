@@ -6,6 +6,9 @@ cleanup() {
     for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done
 }
 trap cleanup EXIT
+/app/libexec/flatpak-portal --replace --verbose >build-ci/flatpak-portal.log 2>&1 &
+pids+=("$!")
+gdbus wait --session --timeout 10 org.freedesktop.portal.Flatpak
 if [[ ${BUILD_BACKEND:-x11} == x11 ]]; then
     export XDG_DATA_DIRS="$tooling/build-ci/display-tools/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
     export XDG_CONFIG_DIRS="$tooling/build-ci/display-tools/etc/xdg:${XDG_CONFIG_DIRS:-/etc/xdg}"

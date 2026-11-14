@@ -71,6 +71,12 @@ jobs:
         run: |
           test "$(uname -m)" = "$BUILD_ARCH"
           for tool in Xvfb xvfb-run weston dbus-run-session; do command -v "$tool"; done
+          # The Builder image installs D-Bus under /app; accessibility launchers
+          # in the SDK use the conventional absolute daemon path.
+          if [[ ! -e /usr/bin/dbus-daemon ]]; then
+            ln -s "$(command -v dbus-daemon)" /usr/bin/dbus-daemon
+          fi
+          dbus-uuidgen --ensure
           bash scripts/ci/display-tools.sh 2>&1 | tee source/build-ci/display-tools.log
           flatpak info --show-commit org.gnome.Platform//51
           flatpak info --show-commit org.gnome.Sdk//51

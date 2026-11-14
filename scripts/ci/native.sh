@@ -11,6 +11,17 @@ fi
 app=com.nedrichards.Skyloom
 runtime=(flatpak run --user "${display_args[@]}" --env=SKYLOOM_PROPERTY_CASES="${SKYLOOM_PROPERTY_CASES:-50}" --command=python3 --filesystem="$PWD:ro" --filesystem="$tooling:ro" --filesystem="$PWD/build-ci")
 "${runtime[@]}" --env=PYTHONPATH=/app/share/skyloom "$app" "$tooling/scripts/ci/installed.py" "$PWD" "$BUILD_ARCH"
+"${runtime[@]}" "$app" - <<'PY'
+import gi
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import GdkPixbuf
+pixels = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, 4, 4)
+pixels.fill(0x224466ff)
+ok, payload = pixels.save_to_bufferv("png", [], [])
+if not ok or not payload.startswith(b"\x89PNG"):
+    raise RuntimeError("Sandboxed PNG encoder preflight failed")
+print("DECODER_SANDBOX_PREFLIGHT_PASS: generated PNG encoded with sandbox enabled")
+PY
 # Source and installed modules are tested separately; GUI processes never overlap tests.
 "${runtime[@]}" --env=PYTHONPATH="$PWD/src" "$app" "$tooling/scripts/runtime-tests.py" --tests "$PWD/tests" --report "$PWD/build-ci/source-tests.json"
 "${runtime[@]}" --env=PYTHONPATH=/app/share/skyloom "$app" "$tooling/scripts/runtime-tests.py" --tests "$PWD/tests" --report "$PWD/build-ci/installed-tests.json"
