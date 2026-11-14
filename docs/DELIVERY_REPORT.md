@@ -591,3 +591,15 @@ missing profiles, invalid images, ownership, cursor/viewer mapping, failed-edit
 retention and navigation. They do not establish live account interoperability or
 physical-input/Orca acceptance. Full build/install verification is recorded with
 the combined feature gate.
+
+## Hosted dual-architecture confirmation — 14 November 2026
+
+[CI run 43654472987](https://github.com/nedrichards/skyloom/actions/runs/43654472987)
+passed at `333aed7` on both native x86_64 and aarch64, including source checks,
+build/export/install, installed/source module parity, both native test suites and
+sequential demo/high-contrast/large-text captures. Flatpak and the decoder portal
+ran entirely inside the official build container. Container-only D-Bus machine
+state and an explicit shared runtime directory were required for the image
+encoder sandbox; sandboxing remains enabled. Earlier failed hosted attempts are
+retained in Actions history. This confirms hosted functional checks, not human
+visual, physical-input, live-account or screen-reader acceptance.
