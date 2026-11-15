@@ -56,6 +56,7 @@ class Window(Adw.ApplicationWindow):
         self.online_controls = WeakSet()
         self.revealed_labels = {}
         self.settings.connect("changed::warn-labelled-content", self.label_preference_changed)
+        self.settings.connect("changed::show-alt-text", self.redisplay_media)
         self.read_only = False
         self.composer = None
         self.generation = 0

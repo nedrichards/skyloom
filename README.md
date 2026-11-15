@@ -63,6 +63,8 @@ revoke the app password in Bluesky.
   with sound and playback controls. Only one video plays at a time; leaving its
   row stops playback. There is no feed autoplay.
 - Preferences controls appearance, downloads and labelled-content warnings.
+  Enable “Always show alt text” under Reading for descriptions below feed images
+  (off by default). Open an image to read or copy its description at any time.
   Labelled content is visible by default; explicit mutes and blocks remain separate.
 - Open your profile to edit its name, description and images. Select follower or
   following counts on any profile to browse people.

@@ -1054,9 +1054,32 @@ class ContentTests(unittest.TestCase):
         self.assertFalse(self.requests)
         self.assertFalse(any(text.startswith("ALT") for text in self.labels(row)))
 
+    def test_alt_text_preference_and_recycled_image(self):
+        from skyloom.widgets import PostRow
+
+        self.assertFalse(self.window.settings.get_boolean("show-alt-text"))
+        row = PostRow(self.post, self.window)
+        self.assertIsNone(row.media_cells[0].alt)
+        self.assertEqual(row.media_cells[0].pic.get_alternative_text(), self.post.images[0].alt)
+        opened = []
+        self.window.view_media = opened.append
+        row.media_cells[0].viewer.emit("clicked")
+        self.assertEqual(opened, list(self.post.images))
+        self.window.settings.set_boolean("show-alt-text", True)
+        row.bind_post(self.post)
+        caption = row.media_cells[0].alt
+        self.assertTrue(caption.get_visible())
+        self.assertEqual(caption.get_label(), "ALT · " + self.post.images[0].alt)
+        self.window.settings.set_boolean("show-alt-text", False)
+        row.bind_post(self.post)
+        self.assertFalse(caption.get_visible())
+        self.assertEqual(caption.get_label(), "")
+        row.cancel()
+
     def test_empty_alt_has_no_visible_alt_section(self):
         from skyloom.widgets import PostRow
 
+        self.window.settings.set_boolean("show-alt-text", True)
         images = (replace(self.post.images[0], alt=""), replace(self.post.images[0], alt="  "))
         row = PostRow(replace(self.post, images=images), self.window)
         texts = self.labels(row)

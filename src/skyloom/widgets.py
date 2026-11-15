@@ -1812,7 +1812,7 @@ class PostRow(Gtk.Box):
         pic.set_alternative_text(media.alt if media.alt.strip() else "Image")
         viewer.set_tooltip_text("View image and description")
         group.set_visible(True)
-        if media.alt.strip():
+        if media.alt.strip() and self.window.settings.get_boolean("show-alt-text"):
             if group.alt is None:
                 group.alt = label(
                     "",
@@ -1826,6 +1826,9 @@ class PostRow(Gtk.Box):
                 group.append(group.alt)
             group.alt.set_label("ALT · " + media.alt)
             group.alt.set_visible(True)
+        elif group.alt is not None:
+            group.alt.set_label("")
+            group.alt.set_visible(False)
         if should_load_image(self.window, media.url, media.local):
             group.preview.set_child(pic)
 

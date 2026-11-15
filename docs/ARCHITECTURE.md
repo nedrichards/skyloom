@@ -119,6 +119,9 @@ constant arithmetic during layout, with no pixel/subject analysis, decode or
 network work added to scrolling. Dimension fields survive cached post round trips.
 `PreviewTexture` queues drawing only when decoded pixels arrive or are released;
 it does not inherit a picture's pixel-dependent natural size or propagate a resize
-to the list. Alt text remains an accessible image label. Inline `Gtk.Video`
+to the list. Alt text remains an accessible image label. The default-off
+`show-alt-text` GSettings preference adds selectable captions below post images;
+changes redisplay existing lists while preserving their reading positions. Image
+overlays always retain descriptions and their copy action independently. Inline `Gtk.Video`
 controls are created on the first explicit play action, not while binding a feed
 thumbnail. Thumbnail badge changes use opacity rather than changing layout.

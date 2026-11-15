@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add a default-off “Always show alt text” reading preference for feed image
+  descriptions; image overlays retain descriptions and Copy description.
+
 - Update dnspython to 2.9.2 for GHSA-vvf4-9x63-8xvv, keeping runtime,
   development and hashed locks and the two-architecture wheel manifest aligned.
 

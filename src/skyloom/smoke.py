@@ -1003,6 +1003,7 @@ class Smoke:
         assert isinstance(dialog, Adw.PreferencesDialog)
         for key, title in [
             ("load-images", "Load images"),
+            ("show-alt-text", "Always show alt text"),
             ("warn-labelled-content", "Warn about labelled content"),
             ("auto-refresh", "Refresh automatically"),
             ("use-metered", "Use metered connections"),

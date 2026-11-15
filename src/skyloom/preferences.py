@@ -23,6 +23,9 @@ class Preferences(Adw.PreferencesDialog):
         images = self.switch(window, "load-images", "Load images")
         images.connect("notify::active", window.redisplay_media)
         reading.add(images)
+        reading.add(
+            self.switch(window, "show-alt-text", "Always show alt text", "Below images in posts")
+        )
         reading.add(self.switch(window, "warn-labelled-content", "Warn about labelled content"))
         page.add(reading)
 

@@ -4,6 +4,29 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Alt text reading preference — 15 November 2026
+
+Added a persistent, default-off “Always show alt text” switch under Reading.
+Post images keep their accessible descriptions and clickable viewer; the viewer
+continues to show nonempty descriptions and Copy description independently of
+the preference. Changing the setting refreshes existing lists through the
+reading-position-preserving media redisplay path. Empty descriptions remain
+hidden, and recycled cells clear captions when disabled.
+
+Native coverage checks the default, opt-in captions, recycled-cell clearing,
+accessible image labels and viewer activation. The existing recycling fixture
+explicitly opts into captions; the Preferences GUI smoke toggles the new switch.
+
+`./scripts/check.sh` passed all 403 tests with zero skips, plus lint, formatting,
+compilation, desktop/schema and dependency parity checks. Offline Flatpak
+build/export/install succeeded. The installed full demo smoke completed the
+preference toggles and image-description overlay steps, then terminated with
+status 143 during later conversation checks without a smoke completion marker.
+The focused installed Preferences smoke then passed, including the new toggle
+and wide/narrow light/dark captures. The narrow Preferences capture was
+inspected: the new switch fits and is off.
+No live-account or physical-input acceptance is claimed.
+
 ## dnspython security update — 14 November 2026
 
 Updated only dnspython from 2.9.0 to 2.9.2 across runtime/development locks and

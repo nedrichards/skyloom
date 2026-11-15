@@ -28,6 +28,7 @@ class CellResidencyTests(unittest.TestCase):
             return future
 
         fixture.window.worker.submit = submit
+        fixture.window.settings.set_boolean("show-alt-text", True)
         first = replace(fixture.post, labels=(), author=replace(fixture.post.author, avatar=""))
         row = PostRow(first, fixture.window)
         self.addCleanup(row.cancel)
