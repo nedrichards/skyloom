@@ -4,6 +4,26 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Relative timestamps — 16 November 2026
+
+Added one window-owned 60-second BOOTTIME timer, including resume catch-up,
+activation and mapped-card refresh. Weakly held bound rows share one current
+time per tick; unchanged labels are untouched and cancelled rows unregister.
+Timer sources and file descriptors close with the monitor. Focused native tests
+cover row filtering and unchanged-label suppression.
+
+Lint, formatting, compilation, desktop and schema checks passed. The restricted
+sandbox could not start Flatpak (`Unable to allocate instance id`), but the
+host route built/exported and installed commit
+`adb4bba4f0e86b614e89893a7a0e1b9f7be40b7f6b812e87bd7449ed7e6ab3c7`.
+Both changed Python modules matched the build output by SHA-256. Subsequent
+host native validation passed all 405 tests with zero skips and dependency
+parity for 22 packages on both architectures. The existing manually constructed
+monitor fixture now initializes the timestamp timer fields; close clears its
+timer source after removal. The user
+reported the installed change working well. No measured performance claim is made.
+
+
 ## Alt text reading preference — 15 November 2026
 
 Added a persistent, default-off “Always show alt text” switch under Reading.

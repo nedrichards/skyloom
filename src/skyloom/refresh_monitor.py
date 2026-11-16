@@ -3,6 +3,7 @@
 import math
 import os
 import time
+from datetime import UTC, datetime
 
 from gi.repository import Gio, GLib, GLibUnix
 
@@ -22,14 +23,52 @@ class RefreshMonitor:
         self.signals = [
             (self.network, self.network.connect("notify", self.changed)),
             (self.power, self.power.connect("notify::power-saver-enabled", self.changed)),
-            (window, window.connect("notify::is-active", self.changed)),
+            (window, window.connect("notify::is-active", self.activated)),
             (window, window.connect("notify::visible-dialog", self.changed)),
             (window, window.connect("notify::focus-widget", self.queue)),
             (window.settings, window.settings.connect("changed::auto-refresh", self.changed)),
             (window.settings, window.settings.connect("changed::use-metered", self.changed)),
         ]
         window.worker.after_dispatch = self.queue
+        self.timestamp_fd = None
+        try:
+            self.timestamp_fd = os.timerfd_create(
+                time.CLOCK_BOOTTIME, flags=os.TFD_CLOEXEC | os.TFD_NONBLOCK
+            )
+            os.timerfd_settime(self.timestamp_fd, initial=60, interval=60)
+            self.timestamp_source = GLibUnix.fd_add_full(
+                GLib.PRIORITY_DEFAULT,
+                self.timestamp_fd,
+                GLib.IOCondition.IN,
+                self.timestamp_tick,
+                None,
+            )
+        except OSError:
+            if self.timestamp_fd is not None:
+                os.close(self.timestamp_fd)
+                self.timestamp_fd = None
+            self.timestamp_source = GLib.timeout_add_seconds(60, self.timestamp_tick)
         self.changed()
+
+    def activated(self, *_args):
+        if self.window.is_active():
+            self.refresh_timestamps()
+        self.changed()
+
+    def refresh_timestamps(self):
+        now = datetime.now(UTC)
+        for row in tuple(getattr(self.window, "timestamp_rows", ())):
+            if row.alive and row.get_mapped():
+                row.refresh_timestamp(now)
+
+    def timestamp_tick(self, *_args):
+        if self.timestamp_fd is not None:
+            try:
+                os.read(self.timestamp_fd, 8)
+            except BlockingIOError:
+                return True
+        self.refresh_timestamps()
+        return True
 
     def queue(self, *_args):
         if self.closed or self.queued is not None:
@@ -60,7 +99,10 @@ class RefreshMonitor:
         if self.closed:
             return
         boot, awake = time.clock_gettime(time.CLOCK_BOOTTIME), time.monotonic()
-        if self.clock.update(boot, awake):
+        resumed = self.clock.update(boot, awake)
+        if resumed:
+            self.refresh_timestamps()
+        if resumed:
             for policy in self.window.interactions.policies.values():
                 policy.last_finished = policy.last_success
                 policy.failures = 0
@@ -127,6 +169,12 @@ class RefreshMonitor:
         if self.closed:
             return
         self.closed = True
+        if self.timestamp_source is not None:
+            GLib.source_remove(self.timestamp_source)
+            self.timestamp_source = None
+        if self.timestamp_fd is not None:
+            os.close(self.timestamp_fd)
+            self.timestamp_fd = None
         self.stop_timer()
         if self.queued is not None:
             GLib.source_remove(self.queued)

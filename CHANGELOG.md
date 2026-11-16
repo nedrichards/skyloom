@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Refresh relative post timestamps once per minute with a shared suspend-aware
+  timer, on window activation and when cards become visible; change only labels
+  whose displayed text differs.
+
 - Add a default-off “Always show alt text” reading preference for feed image
   descriptions; image overlays retain descriptions and Copy description.
 

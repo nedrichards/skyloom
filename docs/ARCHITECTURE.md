@@ -125,3 +125,8 @@ changes redisplay existing lists while preserving their reading positions. Image
 overlays always retain descriptions and their copy action independently. Inline `Gtk.Video`
 controls are created on the first explicit play action, not while binding a feed
 thumbnail. Thumbnail badge changes use opacity rather than changing layout.
+
+Relative post times use one window-owned 60-second BOOTTIME timer in
+`refresh_monitor.py`. Bound cards register weakly; only mapped live cards are
+checked, sharing one wall-clock instant. Resume expiry, activation and card
+mapping catch up stale labels without rebinding posts.

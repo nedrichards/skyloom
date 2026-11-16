@@ -393,6 +393,7 @@ class ImageTests(unittest.TestCase):
         from types import SimpleNamespace
 
         monitor.fd = monitor.source = monitor.queued = None
+        monitor.timestamp_fd = monitor.timestamp_source = None
         monitor.window = SimpleNamespace(worker=SimpleNamespace(after_dispatch=None))
         monitor.closed = False
         monitor.signals = []

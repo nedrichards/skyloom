@@ -64,3 +64,36 @@ class MonitorIntegrationTests(StartupFixture, unittest.TestCase):
         monitor.close()
         self.assertIsNone(monitor.source)
         self.assertIsNone(monitor.fd)
+
+
+@unittest.skipUnless(DISPLAY, "GNOME GTK display required")
+class TimestampTests(unittest.TestCase):
+    def test_shared_refresh_uses_one_now_and_skips_inactive_rows(self):
+        from skyloom.refresh_monitor import RefreshMonitor
+
+        visible = Mock(alive=True)
+        visible.get_mapped.return_value = True
+        hidden = Mock(alive=True)
+        hidden.get_mapped.return_value = False
+        cancelled = Mock(alive=False)
+        monitor = SimpleNamespace(
+            window=SimpleNamespace(timestamp_rows=[visible, hidden, cancelled])
+        )
+        RefreshMonitor.refresh_timestamps(monitor)
+        visible.refresh_timestamp.assert_called_once()
+        hidden.refresh_timestamp.assert_not_called()
+        cancelled.refresh_timestamp.assert_not_called()
+
+    def test_timestamp_changes_only_when_text_changes(self):
+        from datetime import UTC, datetime
+
+        from skyloom.widgets import PostRow
+
+        row = SimpleNamespace(
+            post=SimpleNamespace(created="2026-11-16T12:00:00Z"), timestamp=Mock()
+        )
+        row.timestamp.get_label.return_value = "2 min"
+        PostRow.refresh_timestamp(row, datetime(2026, 11, 16, 12, 2, 30, tzinfo=UTC))
+        row.timestamp.set_label.assert_not_called()
+        PostRow.refresh_timestamp(row, datetime(2026, 11, 16, 13, 0, tzinfo=UTC))
+        row.timestamp.set_label.assert_called_once_with("1 h")

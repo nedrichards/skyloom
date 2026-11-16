@@ -1394,6 +1394,7 @@ class PostRow(Gtk.Box):
         self.timestamp = label("", "dim-label", wrap=False)
         self.timestamp.add_css_class("caption")
         self.heading.append(self.timestamp)
+        self.connect("map", lambda *_: self.refresh_timestamp() if self.alive else None)
         self.position_pill = label("", "conversation-position", wrap=False)
         self.position_pill.add_css_class("caption")
         self.position_pill.set_valign(Gtk.Align.CENTER)
@@ -1413,7 +1414,10 @@ class PostRow(Gtk.Box):
         self.context_label.set_visible(bool(post.context))
         self.name_label.set_label(post.author.name)
         self.handle_label.set_label("@" + post.author.handle)
-        self.timestamp.set_label(relative_time(post.created))
+        if not hasattr(self.window, "timestamp_rows"):
+            self.window.timestamp_rows = WeakSet()
+        self.window.timestamp_rows.add(self)
+        self.refresh_timestamp()
         self.author_button.focus_key = ("post-author", post.uri)
         self.author_button.update_property(
             [Gtk.AccessibleProperty.LABEL], [f"View profile of {post.author.name}"]
@@ -1544,6 +1548,11 @@ class PostRow(Gtk.Box):
             # Let a second mouse click select a word instead of navigating on its first release.
             delay = 0 if touch else Gtk.Settings.get_default().get_property("gtk-double-click-time")
             self.text_open_source = GLib.timeout_add(delay, open_post)
+
+    def refresh_timestamp(self, now=None):
+        text = relative_time(self.post.created, now)
+        if self.timestamp.get_label() != text:
+            self.timestamp.set_label(text)
 
     def cancel_text_open(self, *_args):
         if self.text_open_source is not None:
@@ -1929,6 +1938,7 @@ class PostRow(Gtk.Box):
     def cancel(self):
         self.binding_serial += 1
         self.alive = False
+        getattr(self.window, "timestamp_rows", set()).discard(self)
         if hasattr(self, "position_owner"):
             self.position_owner.rows.discard(self)
         self.cancel_text_open()
