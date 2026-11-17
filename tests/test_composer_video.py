@@ -79,7 +79,7 @@ class ComposerVideo(StartupFixture, unittest.TestCase):
         self.wait(lambda: not editor.sending)
         self.assertEqual(attempts, [video])
         self.assertEqual(editor.video, video)
-        self.assertIn("draft is kept", editor.feedback.get_text())
+        self.assertIn("draft is saved", editor.feedback.get_text())
         editor.force_close()
         self.wait(lambda: self.window.composer is None)
         restored = self.composer("invented-video-failure")

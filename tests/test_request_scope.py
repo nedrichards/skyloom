@@ -68,6 +68,19 @@ class RequestScopeTests(unittest.TestCase):
         self.callbacks[1][0]("foreground")
         self.assertEqual(self.events, ["foreground"])
 
+    def test_two_rejected_submissions_still_have_distinct_completion_ownership(self):
+        def reject(coro, _done, failed):
+            coro.close()
+            self.callbacks.append(failed)
+
+        self.window.worker.submit = reject
+        for _ in range(2):
+            submit(self.window, "page", self.request(), self.events.append, self.events.append)
+        self.callbacks[0]("obsolete rejection")
+        self.callbacks[1]("current rejection")
+        self.assertEqual(self.events, ["current rejection"])
+        self.assertNotIn("page", self.window.page_requests)
+
     def test_replaced_or_closed_content_is_retired_before_page_detachment(self):
         for replaced in (False, True):
             self.setUp()

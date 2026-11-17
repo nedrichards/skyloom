@@ -437,11 +437,14 @@ class Composer(Adw.Dialog):
             self.save_timer = None
 
         service, account = self.window.service, self.account
+        draft_saved = False
 
         async def publish():
+            nonlocal draft_saved
             if service.account is not account:
                 return None
             await service.draft_save(self.key, self.snapshot_value)
+            draft_saved = True
             if service.account is not account:
                 return None
             kwargs = {"video": self.send_video} if self.send_video else {}
@@ -492,10 +495,14 @@ class Composer(Adw.Dialog):
             self.editor.set_editable(True)
             self.attach_box.set_sensitive(True)
             self.changed()
-            self.feedback.set_label(
-                msg
-                + " Your draft is kept. If the connection failed, check your profile before trying again to avoid a duplicate."
-            )
+            if draft_saved:
+                msg += (
+                    " Your draft is saved. If the connection failed, check your profile "
+                    "before trying again to avoid a duplicate."
+                )
+            else:
+                msg += " Publishing did not start. Your edits are still open in the composer."
+            self.feedback.set_label(msg)
 
         self.window.worker.submit(publish(), success, failure)
 

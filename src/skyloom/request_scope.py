@@ -1,5 +1,7 @@
 """Identity and liveness ownership for completions already queued to the UI loop."""
 
+from concurrent.futures import Future
+
 
 def guard(window, page, callback):
     generation = window.generation
@@ -32,10 +34,10 @@ def submit(window, key, coro, done, failed, *, page=None):
     previous = window.page_requests.pop(key, None)
     if previous:
         previous.cancel()
-    future = None
+    request = None
 
     def finish(callback, value):
-        if key not in window.page_requests or window.page_requests[key] is not future:
+        if window.page_requests.get(key) is not request:
             return
         window.page_requests.pop(key)
         callback(value)
@@ -45,5 +47,8 @@ def submit(window, key, coro, done, failed, *, page=None):
     future = window.worker.submit(
         coro, lambda value: finish(success, value), lambda value: finish(error, value)
     )
-    window.page_requests[key] = future
+    # The worker queues its rejection before returning None. Track that queued
+    # completion with its own cancellable identity too.
+    request = future if future is not None else Future()
+    window.page_requests[key] = request
     return future

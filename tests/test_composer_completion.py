@@ -8,6 +8,34 @@ from startup_fixture import StartupFixture
 
 @unittest.skipUnless(DISPLAY, "GNOME GTK display required")
 class ComposerCompletion(StartupFixture, unittest.TestCase):
+    def test_unsaved_publish_reports_edits_are_open_and_skips_network(self):
+        from skyloom.errors import UserError
+
+        self.open(self.restored_account)
+        self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
+        self.window.show_offline(False)
+        self.window.compose(draft_key="invented-pre-publish-save-failure")
+        editor = self.window.composer
+        self.addCleanup(editor.force_close)
+        self.wait(lambda: editor.ready)
+        sends = []
+
+        async def fail_save(*_args):
+            raise UserError("Invented draft save failure")
+
+        async def send(*args, **_kwargs):
+            sends.append(args)
+
+        self.app.service.draft_save = fail_save
+        self.app.service.send = send
+        editor.buffer.set_text("An unsaved revision")
+        editor.send()
+        self.wait(lambda: not editor.sending)
+        self.assertEqual(sends, [])
+        self.assertEqual(editor.text(), "An unsaved revision")
+        self.assertTrue(editor.editor.get_editable())
+        self.assertIn("Publishing did not start", editor.feedback.get_text())
+
     def test_published_post_closes_composer_refreshes_profile_and_reports_cleanup_separately(self):
         self.open(self.restored_account)
         self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
