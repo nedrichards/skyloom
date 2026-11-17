@@ -4,6 +4,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from skyloom.image_cache import ImageCache, digest
 
@@ -51,6 +52,29 @@ class ImageCacheTests(unittest.TestCase):
             self.assertIsNone(cache.write("alice", old, "image", b"late"))
             cache.write("alice", new, "image", b"new")
             self.assertEqual(cache.read("alice", "image"), b"new")
+
+    def test_warm_writes_use_index_and_reconcile_after_failed_eviction(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = ImageCache(directory, max_files=2, max_bytes=8)
+            token = cache.activate("alice")
+            with patch.object(cache, "_scan", wraps=cache._scan) as scan:
+                cache.write("alice", token, "first", b"1234")
+                cache.write("alice", token, "second", b"5678")
+                cache.read("alice", "first")
+                cache.write("alice", token, "first", b"12")
+                self.assertEqual(scan.call_count, 1)
+                original_unlink = Path.unlink
+
+                def fail_eviction(path, **kwargs):
+                    if path == cache.path("alice", "second"):
+                        raise OSError("Invented eviction failure")
+                    return original_unlink(path, **kwargs)
+
+                with patch.object(Path, "unlink", fail_eviction), self.assertRaises(OSError):
+                    cache.write("alice", token, "third", b"3456")
+                entries = cache.write("alice", token, "fourth", b"78")
+                self.assertEqual(scan.call_count, 2)
+                self.assertEqual(entries, {digest("third"), digest("fourth")})
 
     def test_catalog_drops_stale_partial_files_and_ignores_symlinks(self):
         with tempfile.TemporaryDirectory() as directory:
