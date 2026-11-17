@@ -18,6 +18,7 @@ class VideoStream(Gtk.MediaStream, Gdk.Paintable):
         self.bus_signal = None
         self.paintable_signals = []
         self.closed = False
+        self.accurate_seek = False
         if self.pipeline is None or self.sink is None:
             self.gerror(
                 GLib.Error.new_literal(
@@ -64,12 +65,20 @@ class VideoStream(Gtk.MediaStream, Gdk.Paintable):
         if not self.closed and self.pipeline is not None:
             self.pipeline.set_state(Gst.State.PAUSED)
 
+    def seek_for_resume(self, timestamp):
+        self.accurate_seek = True
+        try:
+            self.seek(timestamp)
+        finally:
+            self.accurate_seek = False
+
     def do_seek(self, timestamp):
+        flags = Gst.SeekFlags.ACCURATE if self.accurate_seek else Gst.SeekFlags.KEY_UNIT
         if (
             self.closed
             or self.pipeline is None
             or not self.pipeline.seek_simple(
-                Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, timestamp * 1000
+                Gst.Format.TIME, Gst.SeekFlags.FLUSH | flags, timestamp * 1000
             )
         ):
             self.seek_failed()
@@ -100,7 +109,7 @@ class VideoStream(Gtk.MediaStream, Gdk.Paintable):
                     seekable,
                     max(0, duration) // 1000,
                 )
-            if self.is_seeking():
+            elif self.is_seeking():
                 self.seek_success()
 
     def position(self):

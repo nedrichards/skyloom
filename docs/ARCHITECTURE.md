@@ -98,8 +98,11 @@ remain disabled. The original thumbnail URL remains the memory/disk cache key.
 An explicit play action replaces the
 preview with inline controls, retaining its aspect-aware rectangle. Only one
 player owns a pipeline; row unmap/recycling, another play action or account
-replacement releases it. Errors offer an explicit retry. The dialog player remains
-available to other callers. The Flatpak audio socket enables sound.
+replacement releases it. Inline players keep up to 32 seek positions in memory
+for the active account generation. An explicit resume seeks once the stream is
+prepared; finishing the video clears its position. Errors offer an explicit retry.
+The dialog player remains available to other callers. The Flatpak audio socket
+enables sound.
 Video preparation runs under the account storage lease on a worker, validates
 MP4/H.264/AAC, strips metadata without re-encoding, and retains private copies
 until sign-out. Upload streams to the fixed Bluesky video service using scoped,
@@ -109,6 +112,16 @@ creation are never automatically retried.
 See `storage.py` and `media.py` for retention limits and cleanup. These are local
 application files, not separately encrypted backups. Use temporary demo storage
 when debugging or sharing a reproduction.
+
+The encoded image cache indexes one account’s directory on cataloguing or the
+first write. Reads update recency, and atomic writes and evictions maintain the
+index under the existing I/O lock. An I/O error invalidates the index for
+reconciliation on the next write.
+
+The Home reading marker follows a retained post key and uses an unmeasured row
+overlay. Undo still uses the existing key and offset. Home parent previews use
+the current feed’s matching URI and CID, honour content warnings and account
+visibility, and reuse ordinary conversation navigation.
 
 Feed image previews reserve height from immutable `Media` dimensions supplied by
 the image embed's optional `aspectRatio`. Native height-for-width measurement is

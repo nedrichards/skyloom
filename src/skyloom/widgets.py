@@ -557,6 +557,7 @@ class FeedView(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, vexpand=True)
         self.reading = None
         self.feed = None
+        self.reading_marker = None
         self.input_serial = 0
         self.last_scroll_activity = -float("inf")
         self.update_row = update
@@ -808,6 +809,9 @@ class FeedView(Gtk.Box):
             media_binding.reset(token)
         row._media_requests = requests
         row._value = value
+        if isinstance(row, PostRow) and self.feed is not None:
+            row.set_reading_marker(value.uri == self.reading_marker)
+            row.sync_parent_peek(self)
         if (
             value is not None
             and self.arrival_active
@@ -1090,6 +1094,10 @@ class FeedView(Gtk.Box):
                     entries[i] = PostObject(value)
                     self.model.splice(i, 1, [entries[i]])
         self.entries = {key(entry.post): (i, entry) for i, entry in enumerate(entries)}
+        if self.feed is not None:
+            if self.reading_marker not in self.entries:
+                self.set_reading_marker(None)
+            self.sync_parent_peeks()
         if items and (reset or not old):
             self.list.scroll_to(0, Gtk.ListScrollFlags(0), None)
             if self.content_header is not None:
@@ -1105,6 +1113,19 @@ class FeedView(Gtk.Box):
         if restore_place:
             self.interaction.restore(place, reveal=False)
         return added
+
+    def set_reading_marker(self, uri):
+        if uri == self.reading_marker:
+            return
+        previous, self.reading_marker = self.reading_marker, uri
+        for row in tuple(self.rows):
+            if isinstance(row, PostRow) and row.alive and row.post.uri in (previous, uri):
+                row.set_reading_marker(row.post.uri == uri)
+
+    def sync_parent_peeks(self):
+        for row in tuple(self.rows):
+            if isinstance(row, PostRow):
+                row.sync_parent_peek(self)
 
     def layout_unchanged(self, previous, current):
         if isinstance(previous, FeedGap) and isinstance(current, FeedGap):
@@ -1252,6 +1273,8 @@ class FeedView(Gtk.Box):
         entry = PostObject(value)
         self.model.splice(index, 1, [entry])
         self.entries[post.uri] = (index, entry)
+        if self.feed is not None:
+            self.sync_parent_peeks()
         if selected_key is not None:
             self.interaction.select(self.interaction.index(selected_key), focus=False)
 
@@ -1354,6 +1377,9 @@ class PostRow(Gtk.Box):
         self.add_css_class("post-tile")
         self.body = box(spacing=10, margin=16 if compact else 20)
         self.append(self.body)
+        self.reading_marker = None
+        self.parent_peek = None
+        self.peek_preview = None
         cancel_click = Gtk.GestureClick(
             button=Gdk.BUTTON_PRIMARY, propagation_phase=Gtk.PropagationPhase.CAPTURE
         )
@@ -1488,14 +1514,110 @@ class PostRow(Gtk.Box):
     def update_position(self, position):
         self.position_pill.set_visible(position is not None)
         if position is None:
+            self.position_pill.set_label("")
+        else:
+            index, total, partial = position
+            self.position_pill.set_label(f"{index}/{total}")
+            description = f"Post {index} of {total} known messages in reading order."
+            if partial:
+                description += " The conversation is incomplete."
+            self.position_pill.set_tooltip_text(description)
+            self.position_pill.update_property([Gtk.AccessibleProperty.LABEL], [description])
+        view = self.get_ancestor(FeedView)
+        if view is not None and view.feed is not None:
+            self.sync_parent_peek(view)
+
+    def set_reading_marker(self, visible):
+        if visible and self.reading_marker is None:
+            overlay = Gtk.Overlay()
+            self.remove(self.body)
+            overlay.set_child(self.body)
+            marker = box(False, spacing=8)
+            marker.set_valign(Gtk.Align.START)
+            for child in (
+                Gtk.Separator(hexpand=True, valign=Gtk.Align.CENTER),
+                label("Where you left off", "caption"),
+                Gtk.Separator(hexpand=True, valign=Gtk.Align.CENTER),
+            ):
+                marker.append(child)
+            marker.set_margin_start(20)
+            marker.set_margin_end(20)
+            marker.set_can_target(False)
+            overlay.add_overlay(marker)
+            overlay.set_measure_overlay(marker, False)
+            self.append(overlay)
+            self.reading_marker = marker
+        if self.reading_marker is not None:
+            self.reading_marker.set_visible(visible)
+
+    def sync_parent_peek(self, view):
+        if self.compact:
             return
-        index, total, partial = position
-        self.position_pill.set_label(f"{index}/{total}")
-        description = f"Post {index} of {total} known messages in reading order."
-        if partial:
-            description += " The conversation is incomplete."
-        self.position_pill.set_tooltip_text(description)
-        self.position_pill.update_property([Gtk.AccessibleProperty.LABEL], [description])
+        parent = None
+        if (
+            self.post
+            and self.post.parent
+            and not self.post.unavailable
+            and not self.post.author.muted
+            and not self.post.author.blocking
+            and self.position_pill.get_label()
+        ):
+            uri, cid = self.post.parent
+            entry = view.entries.get(uri)
+            candidate = entry[1].post if entry else None
+            if (
+                isinstance(candidate, Post)
+                and candidate.cid == cid
+                and candidate.text
+                and not candidate.unavailable
+                and not candidate.author.muted
+                and not candidate.author.blocking
+                and not (
+                    (candidate.labels or candidate.author.labels)
+                    and self.window.settings.get_boolean("warn-labelled-content")
+                )
+            ):
+                parent = (candidate.uri, candidate.author.name, candidate.text)
+        if self.parent_peek is None and parent is not None:
+            self.parent_peek = Gtk.MenuButton(valign=Gtk.Align.CENTER, has_frame=False)
+            self.parent_peek.add_css_class("conversation-peek")
+            self.parent_peek.set_create_popup_func(self.open_parent_peek)
+            self.heading.append(self.parent_peek)
+        if self.parent_peek is not None:
+            if self.peek_preview != parent:
+                self.parent_peek.set_popover(None)
+            self.peek_preview = parent
+            self.parent_peek.set_visible(parent is not None)
+            if parent is not None:
+                self.position_pill.set_visible(False)
+                self.parent_peek.set_label(self.position_pill.get_label())
+                description = (
+                    self.position_pill.get_tooltip_text() + f" Preview reply to {parent[1]}."
+                )
+                self.parent_peek.set_tooltip_text(description)
+                self.parent_peek.update_property([Gtk.AccessibleProperty.LABEL], [description])
+                self.parent_peek.focus_key = ("parent-preview", self.post.uri)
+            else:
+                self.position_pill.set_visible(bool(self.position_pill.get_label()))
+
+    def open_parent_peek(self, menu):
+        if not self.alive or self.peek_preview is None:
+            return
+        _uri, author, text = self.peek_preview
+        popover = Gtk.Popover()
+        body = box(spacing=8, margin=8)
+        body.append(label(f"Replying to {author}", "heading", max_width_chars=32))
+        body.append(label(text, max_width_chars=32, lines=5, ellipsize=Pango.EllipsizeMode.END))
+        open_thread = Gtk.Button(label="Open conversation")
+
+        def open_conversation(_button):
+            popover.popdown()
+            self.activate()
+
+        open_thread.connect("clicked", open_conversation)
+        body.append(open_thread)
+        popover.set_child(body)
+        menu.set_popover(popover)
 
     def text_pressed(self, gesture, presses, x, y):
         self.cancel_text_open()
@@ -1631,7 +1753,7 @@ class PostRow(Gtk.Box):
             preview.set_media(
                 Media(source.thumbnail, source.alt, width=source.width, height=source.height)
             )
-            player = InlineVideo(window, source, preview)
+            player = InlineVideo(window, source, preview, badge=fallback)
             content.append(player)
             if source.thumbnail and should_load_image(window, source.thumbnail):
                 serial = self.binding_serial
@@ -1640,17 +1762,15 @@ class PostRow(Gtk.Box):
                     if self.alive and serial == self.binding_serial:
                         window.images.bind(picture, pix)
                         picture.set_paintable(pix)
-                        fallback.set_opacity(1 if pix is None else 0)
+                        player.set_thumbnail_state("loaded" if pix is not None else "")
 
                 def failed(_message):
                     if self.alive and serial == self.binding_serial:
-                        fallback.set_label("Preview unavailable · Play video")
-                        fallback.set_opacity(1)
+                        player.set_thumbnail_state("failed")
 
                 def release():
                     picture.set_paintable(None)
-                    fallback.set_label("Play video")
-                    fallback.set_opacity(1)
+                    player.set_thumbnail_state("")
                     window.images.unbind(picture)
 
                 self.image_releases.append((picture, release))
@@ -1996,6 +2116,13 @@ class PostRow(Gtk.Box):
         self.name_label.set_label("")
         self.handle_label.set_label("")
         self.timestamp.set_label("")
+        self.set_reading_marker(False)
+        if self.parent_peek is not None:
+            self.parent_peek.set_popover(None)
+            self.parent_peek.set_visible(False)
+            self.parent_peek.focus_key = None
+            self.peek_preview = None
+        self.position_pill.set_label("")
         self.position_pill.set_visible(False)
         self.author_button.focus_key = None
         self._value = None

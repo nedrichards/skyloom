@@ -94,6 +94,29 @@ class KeyboardTests(unittest.TestCase):
             self.assertFalse(interaction.command("manage-feeds"))
         self.assertEqual(len(links), 3)
 
+    def test_parent_peek_uses_retained_parent_and_dismisses_on_moderation_change(self):
+        parent = replace(self.posts[0], text="Invented parent context")
+        reply = replace(self.posts[1], parent=(parent.uri, parent.cid))
+        self.view.feed = object()
+        self.view.set_posts([reply, parent])
+        self.pump()
+        row = next(row for row in self.view.rows if row._value == reply)
+        self.assertTrue(row.parent_peek.get_visible())
+        row.parent_peek.popup()
+        self.pump()
+        popover = row.parent_peek.get_popover()
+        body = popover.get_child()
+        self.assertIn(parent.text, body.get_first_child().get_next_sibling().get_text())
+        self.assertEqual(self.events, [])
+        body.get_last_child().emit("clicked")
+        self.assertEqual(self.events, [("open", reply.uri)])
+        row.parent_peek.popup()
+        self.view.update_post(replace(parent, author=replace(parent.author, muted=True)))
+        self.pump()
+        self.assertIsNone(row.parent_peek.get_popover())
+        self.assertFalse(row.parent_peek.get_visible())
+        self.assertTrue(row.position_pill.get_visible())
+
     def key(self, key, modifiers=0):
         return self.window.interactions.key_pressed(None, key, key, modifiers)
 
@@ -427,11 +450,20 @@ class KeyboardTests(unittest.TestCase):
                 self.assertLessEqual(self.view.scroll.get_vadjustment().get_value(), 1)
                 self.assertEqual(self.view.interaction.capture().key, new.uri)
                 if not leading_gap:
+                    self.assertEqual(self.view.reading_marker, place.key)
                     self.assertTrue(self.window.interactions.undo())
                     self.pump()
                     restored = self.view.interaction.capture()
                     self.assertEqual(restored.key, place.key)
                     self.assertAlmostEqual(restored.offset, place.offset, delta=3)
+                    marker_row = next(
+                        row
+                        for row in self.view.rows
+                        if getattr(row._value, "uri", None) == place.key
+                    )
+                    self.assertTrue(marker_row.reading_marker.get_visible())
+                    self.view.set_posts([new])
+                    self.assertIsNone(self.view.reading_marker)
 
     def test_stale_undo_toast_cannot_execute_a_newer_action(self):
         calls = []

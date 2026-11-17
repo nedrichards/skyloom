@@ -1,5 +1,7 @@
 """One explicit native video player, with bounded stream and account lifetime."""
 
+from collections import OrderedDict
+
 from gi.repository import Adw, Gio, GLib, Gtk
 
 from .domain import safe_https_url
@@ -25,10 +27,11 @@ class Playback:
             self.fail("You’re offline. Reconnect and try again.")
         return True
 
-    def start(self):
+    def start(self, resume_at=0):
         if self.closed:
             return
         self.stop()
+        self.resume_at = resume_at
         self.retry.set_visible(False)
         if not self.source.local and self.window.read_only:
             self.fail("You’re offline. Reconnect and try again.")
@@ -46,7 +49,8 @@ class Playback:
         self.stream.connect("notify::prepared", self.changed)
         self.video.set_media_stream(self.stream)
         self.timeout = GLib.timeout_add_seconds(30, self.loading_timeout)
-        self.stream.play()
+        if not resume_at:
+            self.stream.play()
         self.changed(self.stream)
 
     def changed(self, stream, *_args):
@@ -59,6 +63,11 @@ class Playback:
                 GLib.source_remove(self.timeout)
                 self.timeout = None
             self.message.set_visible(False)
+            if self.resume_at:
+                target, self.resume_at = self.resume_at, 0
+                if stream.is_seekable() and target < stream.get_duration():
+                    stream.seek_for_resume(target)
+                stream.play()
 
     def loading_timeout(self):
         self.timeout = None
@@ -158,7 +167,7 @@ def open_video(window, video):
 class InlineVideo(Playback, Gtk.Box):
     """A feed player whose pipeline exists only after an explicit play action."""
 
-    def __init__(self, window, source, preview):
+    def __init__(self, window, source, preview, badge=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.window = window
         self.source = source
@@ -168,16 +177,18 @@ class InlineVideo(Playback, Gtk.Box):
         self.closed = False
         self.preview = preview
         self.poster = preview.get_first_child()
+        self.badge = badge
+        self.thumbnail_state = ""
+        self.resume_key = (source.playlist, source.local)
+        state = getattr(window, "video_resume", None)
+        if state is None or state[0] != self.generation or state[1] is not self.account:
+            state = window.video_resume = (self.generation, self.account, OrderedDict())
+        self.positions = state[2]
         self.preview.add_css_class("card")
         self.preview.set_overflow(Gtk.Overflow.HIDDEN)
         self.play = Gtk.Button(child=preview)
         self.play.add_css_class("flat")
         self.play.add_css_class("video-preview")
-        self.play.set_tooltip_text("Play video inline; streams when played")
-        self.play.update_property(
-            [Gtk.AccessibleProperty.LABEL],
-            [f"Play video · {source.alt}" if source.alt else "Play video"],
-        )
         self.play.connect("clicked", lambda *_: self.start())
         self.append(self.play)
         self.video = None
@@ -186,7 +197,26 @@ class InlineVideo(Playback, Gtk.Box):
         self.retry.connect("clicked", lambda *_: self.start())
         self.append(self.message)
         self.append(self.retry)
+        self.update_poster()
+        self.connect("map", lambda *_: self.update_poster())
         self.connect("unmap", lambda *_: self.close())
+
+    def set_thumbnail_state(self, state):
+        self.thumbnail_state = state
+        self.update_poster()
+
+    def update_poster(self):
+        seconds = self.positions.get(self.resume_key, 0) // 1_000_000
+        action = f"Resume at {seconds // 60}:{seconds % 60:02d}" if seconds else "Play video"
+        self.play.set_tooltip_text(
+            action if self.source.local else f"{action} · Streams when played"
+        )
+        name = f"{action} · {self.source.alt}" if self.source.alt else action
+        self.play.update_property([Gtk.AccessibleProperty.LABEL], [name])
+        if self.badge is not None:
+            prefix = "Preview unavailable · " if self.thumbnail_state == "failed" else ""
+            self.badge.set_label(prefix + action)
+            self.badge.set_opacity(1 if seconds or self.thumbnail_state != "loaded" else 0)
 
     def start(self):
         if self.closed or not self.get_mapped():
@@ -215,7 +245,33 @@ class InlineVideo(Playback, Gtk.Box):
             self.preview.set_child(self.video)
             self.prepend(self.preview)
         self.play.set_visible(False)
-        super().start()
+        super().start(self.positions.get(self.resume_key, 0))
+
+    def stop(self):
+        stream = self.stream
+        if (
+            stream is not None
+            and self.window.generation == self.generation
+            and self.window.service.account is self.account
+            and stream.is_prepared()
+            and stream.is_seekable()
+            and not stream.is_seeking()
+            and stream.get_error() is None
+        ):
+            timestamp = stream.get_timestamp()
+            if (
+                stream.get_ended()
+                or timestamp < 1_000_000
+                or stream.get_duration() - timestamp < 500_000
+            ):
+                self.positions.pop(self.resume_key, None)
+            else:
+                self.positions[self.resume_key] = timestamp
+                self.positions.move_to_end(self.resume_key)
+                if len(self.positions) > 32:
+                    self.positions.popitem(last=False)
+        super().stop()
+        self.update_poster()
 
     def close(self):
         self.stop()

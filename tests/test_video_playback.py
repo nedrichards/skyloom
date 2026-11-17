@@ -133,6 +133,8 @@ class NativeVideoPlayback(unittest.TestCase):
                     "-an",
                     "-c:v",
                     "libx264",
+                    "-g",
+                    "45",
                     "-pix_fmt",
                     "yuv420p",
                     "-y",
@@ -161,10 +163,26 @@ class NativeVideoPlayback(unittest.TestCase):
                 self.assertTrue(settle(window, ready=lambda: stream.get_timestamp() > 0))
                 self.assertIsNone(stream.get_error())
                 self.assertGreater(stream.sink.get_property("stats").get_value("rendered"), 0)
+                self.assertTrue(settle(window, ready=lambda: stream.get_timestamp() >= 1_100_000))
                 player.set_visible(False)
                 self.assertIsNone(player.stream)
                 self.assertIsNone(player.owner_watch)
                 self.assertIsNone(window.video_player)
+                player.set_visible(True)
+                self.assertTrue(settle(window))
+                self.assertIn("Resume at 0:01", player.play.get_tooltip_text())
+                self.assertIsNone(player.stream)
+                player.play.emit("clicked")
+                resumed = player.stream
+                initial = []
+
+                def advanced(stream, _prop):
+                    if stream.get_timestamp() > 0 and not stream.is_seeking():
+                        initial.append(stream.get_timestamp())
+
+                resumed.connect("notify::timestamp", advanced)
+                self.assertTrue(settle(window, ready=lambda: bool(initial)))
+                self.assertGreaterEqual(initial[0], 1_100_000)
             finally:
                 player.finished()
                 window.destroy()

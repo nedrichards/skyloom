@@ -30,6 +30,10 @@
   checkpoints during sustained scrolling, item-specific widgets and notification
   completion work. Obtain matched, adequately sampled baselines before claiming
   overall performance gains. Include photo-heavy feeds and additional hardware.
+- In the mixed-media scroll trace, count per-widget `compute_bounds()` calls in
+  `FeedView.load_visible_media()`. Test whether using row bounds to skip distant
+  media reduces work while preserving each nearby widget’s current load and
+  eviction thresholds, including on tall cards and during momentum scrolling.
 - Investigate Wayland frame-wait timeouts, unreliable Xwayland input injection,
   narrow-width reflow delays and the AdwGizmo snapshot-allocation warning during
   rapid resize reversal.

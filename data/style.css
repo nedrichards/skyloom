@@ -32,6 +32,12 @@
   background: alpha(currentColor, 0.06);
   color: var(--window-fg-color);
 }
+.conversation-peek > button {
+  border-radius: 99px;
+  padding: 2px 7px;
+  min-height: 24px;
+  font-size: smaller;
+}
 .opened-message { background: alpha(currentColor, 0.04); border-left-color: var(--accent-color); }
 .feed-thread-member { border-left: 2px solid var(--border-color); margin-left: 14px; }
 .conversation-loader:focus-visible {

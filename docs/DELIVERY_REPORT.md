@@ -4,6 +4,31 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Request recovery, image cache and reading prototypes — 17 November 2026
+
+Repeated worker admission failures keep distinct request identities. A publish
+failure before the draft save confirms that publishing did not start and leaves
+the current revision editable. The encoded image cache indexes size and recency
+after the initial scan and rebuilds that index following an I/O failure.
+
+In a local probe at the 2,048-file cap, 40 warm writes per version took a median
+of 19.21 ms before indexing and 0.70 ms after indexing. The probe used tiny
+invented payloads on a temporary filesystem and measured only cache writes.
+
+The Home prototypes show the previous reading position after a jump and preview
+an eligible retained parent from the conversation pill. Inline video resume
+keeps seek positions in memory and requires an explicit play action. Native
+coverage exercised the marker and Undo position, moderation updates while a
+preview is open, and an actual seek in a generated video after unmapping.
+
+The host GNOME 51 checkout and installed suites each passed 409 tests with zero
+skips. An offline Flatpak build exported and installed commit
+`bfb393ae2eb84bcf46abb0ad368419c323fc3a0ac1d1c3b22b188132c1d49d29`;
+all 56 installed Python modules matched the checkout. The installed refresh
+smoke passed. Installed demo captures at 800/light and 480/dark showed the
+reading marker and parent preview, and the marker preserved measured row height.
+Live-account behaviour, physical input and screen-reader acceptance remain open.
+
 ## Relative timestamps — 16 November 2026
 
 Added one window-owned 60-second BOOTTIME timer, including resume catch-up,

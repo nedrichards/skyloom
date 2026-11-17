@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Keep scoped request failures tied to the newest submission under worker load,
+  and report when a publish attempt stopped before the current draft was saved.
+- Index encoded image size and recency after the initial disk scan so steady-state
+  writes can enforce the same limits without rescanning the directory.
+- Prototype a reading marker after jumping to new posts, a preview from the Home
+  conversation pill when the parent is in the feed, and explicit inline video
+  resume within the current session.
+
 - Refresh relative post timestamps once per minute with a shared suspend-aware
   timer, on window activation and when cards become visible; change only labels
   whose displayed text differs.

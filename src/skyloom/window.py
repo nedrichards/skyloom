@@ -60,6 +60,7 @@ class Window(Adw.ApplicationWindow):
         self.read_only = False
         self.composer = None
         self.generation = 0
+        self.video_resume = None
         self.request = None
         self.restore_serial = 0
         self.closing = False
@@ -143,6 +144,8 @@ class Window(Adw.ApplicationWindow):
         self.revealed_labels.clear()
         for gate in list(self.content_gates):
             gate.sync()
+        for view in self.feed_views.values():
+            view.sync_parent_peeks()
 
     def toast(self, text):
         self.last_toast = Adw.Toast(title=text, timeout=5)
@@ -813,6 +816,11 @@ class Window(Adw.ApplicationWindow):
                 coordination.startup = False
                 coordination.unseen.clear()
             view.show_latest(current.projected(), arrivals)
+            if jump_origin:
+                origin = view.entries.get(jump_origin.key)
+                view.set_reading_marker(
+                    jump_origin.key if origin and isinstance(origin[1].post, Post) else None
+                )
             self.interactions.offer_position_undo("Moved to top", view, jump_origin)
         view.paging.complete(current.cursor, max(1, len(arrivals)) if current.posts else 0)
         if reading:
@@ -2061,6 +2069,7 @@ class Window(Adw.ApplicationWindow):
             if value != "signout":
                 return
             self.generation += 1
+            self.video_resume = None
             for request in self.page_requests.values():
                 if request:
                     request.cancel()

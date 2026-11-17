@@ -50,8 +50,11 @@ revoke the app password in Bluesky.
   video and AAC audio, at most 10 minutes and 300 MB. Failed publishing preserves the draft;
   after a timeout, check your profile before retrying.
 - New-post notifications keep your reading position. Go to top jumps to the
-  newest posts; Undo restores your position. Double-click Home or use Ctrl+Home
-  to fetch the newest page.
+  newest posts. A “Where you left off” marker identifies the previous position
+  when it remains in the feed, and Undo returns there. Double-click Home or use
+  Ctrl+Home to fetch the newest page.
+- Select a conversation position pill on Home to preview a reply’s parent when
+  that post is already in the feed. Open conversation continues into the thread.
 - Delete your own posts from their post menu. Deletion asks for confirmation and
   cannot be undone; a placeholder preserves the conversation and reading position.
 - Save posts from their menu and find them in Bookmarks. Bookmarks are private
@@ -61,7 +64,8 @@ revoke the app password in Bluesky.
   original post's controls. Hidden replies can still be opened directly.
 - Videos show a preview in the feed. Select Play video for inline native playback
   with sound and playback controls. Only one video plays at a time; leaving its
-  row stops playback. There is no feed autoplay.
+  row stops playback. A seekable video can offer Resume at the previous position
+  during the same session. There is no feed autoplay.
 - Preferences controls appearance, downloads and labelled-content warnings.
   Enable “Always show alt text” under Reading for descriptions below feed images
   (off by default). Open an image to read or copy its description at any time.
