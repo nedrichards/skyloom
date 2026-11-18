@@ -449,9 +449,34 @@ class StartupTests(StartupFixture, unittest.TestCase):
         service.storage.checkpoint(self.account.did, "following", pager, bookmark)
         service.offline = True
         self.open(self.restored_account)
-        self.wait(lambda: self.window.stack.get_visible_child_name() == "shell")
         self.window.is_active = lambda: True
-        self.wait(lambda: not self.window.page_requests)
+        covered_frames, reveal = [], []
+
+        def startup_frame(*_args):
+            window = self.window
+            view = window.feed_views.get("following")
+            if view is not None and window.home_restore_view is view and view.get_mapped():
+                covered_frames.append(
+                    (window.home_loading.get_mapped(), view.is_sensitive(), view.position_tick)
+                )
+            if view is not None and not window.startup_pending and not reveal:
+                reveal.append(
+                    (view.interaction.capture(), window.home_title.get_visible_child_name())
+                )
+            return True
+
+        tick = self.window.add_tick_callback(startup_frame)
+        try:
+            self.wait(lambda: bool(reveal))
+        finally:
+            self.window.remove_tick_callback(tick)
+        self.assertTrue(
+            any(mapped and not sensitive and tick for mapped, sensitive, tick in covered_frames)
+        )
+        place, title = reveal[0]
+        self.assertEqual(place.key, bookmark.uri)
+        self.assertAlmostEqual(place.offset, bookmark.offset, delta=3)
+        self.assertEqual(title, "title")
         view = self.window.feed_views["following"]
         self.assertTrue(settle(self.window, 500, lambda: view.position_tick is None))
         restored = self.window.pagers["following"]

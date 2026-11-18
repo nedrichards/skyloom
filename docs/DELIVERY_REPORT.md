@@ -4,6 +4,20 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Saved feed position startup reveal — 18 November 2026
+
+Startup keeps an opaque loading page over a saved viewport below the feed head
+while the virtualized list positions its rows. The reveal waits for position
+correction and a settled frame, then fades the loading page away before showing
+the feed selector. Reduced motion reveals the settled feed without a fade.
+
+`./scripts/check.sh` passed 412 tests with zero skips. The exported Flatpak
+was installed as commit
+`0d816489e39ee326708e6b17828904c99a043c08e7fa81c2e7a843d4165ad28e`.
+Both installed startup tests passed. An installed-app fixture with 150
+invented mixed-height posts restored post 110 at its saved −32 logical-pixel
+offset in both animated and reduced-motion modes.
+
 ## Content-warning focus on headless Wayland — 18 November 2026
 
 Both Wayland jobs in GitHub Actions run 44341566239 failed the same

@@ -373,6 +373,7 @@ class Window(Adw.ApplicationWindow):
             self.feed_picker, self, (self.compose_button, self.refresh_button)
         )
         self.startup_pending = True
+        self.home_restore_view = None
         self.home_title = Gtk.Stack(hhomogeneous=False, vhomogeneous=True)
         self.home_title.add_named(Adw.WindowTitle(title="Skyloom"), "title")
         self.home_title.add_named(self.feed_switcher, "feeds")
@@ -393,13 +394,13 @@ class Window(Adw.ApplicationWindow):
         self.feed_stack = Gtk.Stack(vexpand=True)
         self.home_box.append(self.feed_stack)
         self.home_loading = Adw.StatusPage(title="Loading your feed…", icon_name=APP_ID)
+        self.home_loading.add_css_class("home-loading")
         self.home_spinner = Gtk.Spinner(spinning=True, width_request=32, height_request=32)
         self.home_loading.set_child(self.home_spinner)
-        # Loading owns the content area: an overlay lets the list's loading
-        # footer and separator show through and exposes two progress messages.
+        self.home_feed = Gtk.Overlay(child=self.home_box)
         self.home_content = Gtk.Stack(vexpand=True)
         self.home_content.add_named(self.home_loading, "loading")
-        self.home_content.add_named(self.home_box, "feed")
+        self.home_content.add_named(self.home_feed, "feed")
         self.home_content.set_visible_child_name("loading")
         self.home_toolbar.set_content(self.home_content)
         self.home_page = Adw.NavigationPage.new(self.home_toolbar, "Following")
@@ -503,7 +504,7 @@ class Window(Adw.ApplicationWindow):
         self.stack.add_named(self.navigation.root, "shell")
 
     def finish_home_startup(self):
-        if not self.startup_pending:
+        if not self.startup_pending or self.home_restore_view is not None:
             return
         self.startup_pending = False
         self.home_spinner.set_spinning(False)
@@ -527,6 +528,52 @@ class Window(Adw.ApplicationWindow):
             return False
 
         self.home_content.add_tick_callback(rendered)
+
+    def stage_home_restore(self, view):
+        # Keep the native list mapped under the loading page so it can allocate
+        # and restore its bookmark without painting intermediate positions.
+        self.home_restore_view = view
+        self.home_box.set_sensitive(False)
+        self.home_content.remove(self.home_loading)
+        cover = Gtk.Revealer(
+            child=self.home_loading,
+            reveal_child=True,
+            transition_type=Gtk.RevealerTransitionType.CROSSFADE,
+            transition_duration=0,
+        )
+        self.home_feed.add_overlay(cover)
+        self.home_content.set_visible_child_name("feed")
+        content = self.home_content
+        positioned = False
+
+        def settled(_widget, _clock):
+            nonlocal positioned
+            if self.closing or content is not self.home_content:
+                return False
+            if view.get_mapped() and view.position_tick is not None:
+                positioned = False
+                return True
+            # Paint one settled frame underneath the cover before it fades.
+            if not positioned:
+                positioned = True
+                return True
+            cover.connect("notify::child-revealed", revealed)
+            cover.set_transition_duration(150 if allowed(self) else 0)
+            cover.set_reveal_child(False)
+            return False
+
+        def revealed(*_args):
+            if cover.get_child_revealed() or content is not self.home_content:
+                return
+            self.home_feed.remove_overlay(cover)
+            self.home_box.set_sensitive(True)
+            self.home_restore_view = None
+            if not self.closing and self.service.account is not None:
+                self.finish_home_startup()
+                if self.refresh_monitor:
+                    self.refresh_monitor.changed()
+
+        content.add_tick_callback(settled)
 
     def set_feeds(self, options):
         if options == self.feed_options:
@@ -627,11 +674,20 @@ class Window(Adw.ApplicationWindow):
             # Restart accepts a fresh server order when network policy permits it.
             policy.restore(None)
             self.pagers[feed] = pager
-            view.set_posts(pager.projected())
+            projected = pager.projected()
+            view.set_posts(projected)
             view.reading.ready = True
             view.reading.latest = (pager, value.bookmark)
-            if serial == view.input_serial:
-                view.reading.restore(value.bookmark)
+            bookmark = value.bookmark
+            if (
+                serial == view.input_serial
+                and view.reading.restore(bookmark)
+                and self.startup_pending
+                and self.home_restore_view is None
+                and feed == self.feed_id
+                and (bookmark.uri != getattr(projected[0], "uri", None) or bookmark.offset < -0.5)
+            ):
+                self.stage_home_restore(view)
             view.reading.changed()
             view.load_more = lambda: self.load_feed(feed, reset=not bool(pager.cursor))
             view.paging.complete(pager.cursor, 0)
@@ -1980,7 +2036,8 @@ class Window(Adw.ApplicationWindow):
 
     def redisplay_media(self, *_args):
         for view in self.views:
-            place = view.interaction.capture()
+            restoring = view is self.home_restore_view and view.position_tick is not None
+            place = None if restoring else view.interaction.capture()
             count = view.model.get_n_items()
             if count:
                 view.model.items_changed(0, count, count)

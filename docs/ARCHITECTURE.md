@@ -41,6 +41,12 @@ starts recover the exact tail continuation. If a legacy window has no safe real
 boundary, its readable data is preserved until normal feed reconciliation can
 supply one.
 
+On startup, a saved position below the feed head restores behind the opaque
+loading screen. The list stays mapped for virtualized layout and adjustment
+correction. Once the position settles and a frame can paint underneath, the
+loading screen fades away, followed by the feed selector. Motion preferences
+apply to both transitions.
+
 For scrolling issues, start with the shared list and reading-position code;
 conversations also have their own projection and loader handling. Use the
 [profiling guide](PERFORMANCE.md) for measurements.

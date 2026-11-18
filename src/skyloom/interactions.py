@@ -44,7 +44,7 @@ class Interactions:
             (
                 view
                 for view in reversed(self.window.views)
-                if (view.get_mapped() or not mapped)
+                if (not mapped or (view.get_mapped() and view.is_sensitive()))
                 and not view.paging.closed
                 and (page is None or view.is_ancestor(page))
             ),

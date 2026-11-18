@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Keep the loading screen in place while a saved feed position settles,
+  then crossfade to that position before revealing the feed selector.
+
 - Preserve focus when switching between Show content and Hide labelled content
   in a window that has no global input focus.
 
