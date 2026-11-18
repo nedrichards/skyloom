@@ -212,8 +212,8 @@ class LabelledContent(Gtk.Box):
         return self.revealer.get_reveal_child()
 
     def set_revealed(self, revealed):
-        focused = self.hide_button.has_focus() or (
-            self.show_button is not None and self.show_button.has_focus()
+        focused = self.hide_button.is_focus() or (
+            self.show_button is not None and self.show_button.is_focus()
         )
         states = self.window.revealed_labels
         states[self.key] = revealed

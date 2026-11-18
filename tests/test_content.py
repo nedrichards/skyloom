@@ -658,8 +658,9 @@ class ContentTests(unittest.TestCase):
         window = Gtk.Window(child=body, default_width=480, default_height=600)
         window.present()
         try:
-            settle(window)
+            self.assertTrue(settle(window))
             first.hide_button.grab_focus()
+            self.assertTrue(first.hide_button.is_focus())
             first.hide_button.emit("clicked")
             self.assertFalse(first.get_revealed())
             self.assertFalse(second.get_revealed())
@@ -678,6 +679,22 @@ class ContentTests(unittest.TestCase):
             first.chips[0].popdown()
         finally:
             window.destroy()
+
+    def test_label_controls_transfer_remembered_focus_in_an_inactive_window(self):
+        from skyloom.content import LabelledContent
+
+        gate = LabelledContent(
+            self.window, ("post", "inactive"), ("sexual",), lambda: Gtk.Label(label="Readable")
+        )
+        window = Gtk.Window(child=gate)
+        self.addCleanup(window.destroy)
+        window.set_focus(gate.hide_button)
+        self.assertTrue(gate.hide_button.is_focus())
+        self.assertFalse(gate.hide_button.has_focus())
+        gate.hide_button.emit("clicked")
+        self.assertTrue(gate.show_button.is_focus())
+        gate.show_button.emit("clicked")
+        self.assertTrue(gate.hide_button.is_focus())
 
     def test_label_popover_actions_copy_exact_value_and_open_preferences(self):
         from skyloom.content import LabelledContent

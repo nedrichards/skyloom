@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Preserve focus when switching between Show content and Hide labelled content
+  in a window that has no global input focus.
+
 - Add zoom, fit and pan to the image viewer, with independently scrollable
   descriptions beside portrait images on wide dialogs and below other images.
 - Browse a post’s images in the viewer with Previous, Next and a position

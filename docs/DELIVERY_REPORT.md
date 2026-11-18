@@ -4,6 +4,25 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Content-warning focus on headless Wayland — 18 November 2026
+
+Both Wayland jobs in GitHub Actions run 44341566239 failed the same
+Show content focus assertion. Both architectures passed their X11 generated
+cases and latest-SDK jobs. The content-warning handler now checks the
+toplevel's remembered focus before switching controls. The regression test
+sets that focus in an inactive GTK window and verifies both handoffs without
+requiring a compositor keyboard seat.
+
+The new assertion reproduced the focus failure before the fix. The final
+x86_64 GNOME 51 source suite passed 412 tests with zero skips under local
+headless Weston 16. Both installed focus tests and the installed labels smoke
+passed there. The offline Flatpak export was installed as commit
+`048108ffab91949c20b88862e44295a46d9afcf8ee0d78f09a8fc5b61fcd20be`;
+the installed content module matched the checkout. Lint, desktop metadata
+and schema checks passed. The desktop-display test attempt stalled on an
+unrelated scroll test and was stopped before switching to isolated Weston.
+The hosted runner used Weston 15. Hosted validation of the fix remains open.
+
 ## Image gallery navigation — 18 November 2026
 
 The viewer starts at the clicked thumbnail and shows Previous, Next and the
