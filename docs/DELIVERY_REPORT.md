@@ -4,6 +4,38 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Image gallery navigation — 18 November 2026
+
+The viewer starts at the clicked thumbnail and shows Previous, Next and the
+current position for multi-image posts. Arrow keys navigate in Fit mode while
+preserving description selection and zoomed panning. Switching images resets
+zoom and pan, updates the description and browser action, and rejects late
+results from superseded loads.
+
+`./scripts/check.sh` passed 411 tests with zero skips. The offline Flatpak
+export was installed as commit
+`21fb9c41f67dd0e2186bde5d0a8f2b6f6ddb4e754b60ce0be4c5631c13067df8`;
+all 57 Python modules matched the checkout. Both focused installed viewer
+tests and the installed media smoke passed. Reviewed the gallery header at
+480/dark and 1280/light. Physical keyboard and screen-reader acceptance
+remain open.
+
+## Image viewer controls — 18 November 2026
+
+The native viewer adds Fit, zoom controls and percentage, mouse drag and
+native scrolling on both axes. The description keeps its copy action and can
+be hidden or scrolled separately. Portrait images use a side description at
+wide sizes, and other layouts place it below the image.
+
+`./scripts/check.sh` passed 410 tests with zero skips. The offline Flatpak
+export was installed as commit
+`0bf1fd8aed9b6d332e76ea9b04a210e9a68d7d11fa191c4da60ff71883cbd888`;
+all 57 Python modules matched the checkout. The focused installed test covered
+retry, decoded aspect fallback and responsive placement. The installed media
+smoke exercised 400% zoom, both pan adjustments, Fit, and a long description.
+Reviewed installed demo captures at 1000/light and 480/dark. Physical gestures
+and screen-reader acceptance remain open.
+
 ## Request recovery, image cache and reading prototypes — 17 November 2026
 
 Repeated worker admission failures keep distinct request identities. A publish

@@ -28,7 +28,10 @@ flatpak run --filesystem="$PWD/screenshots/demo" com.nedrichards.Skyloom --demo 
 ```
 
 See `src/skyloom/__main__.py` for command-line options and `smoke.py` for
-scenario names. When invoking directly, expose the output directory with
+scenario names. The `media` scenario exercises image zoom, both pan
+adjustments, Fit, independent long-description scrolling and gallery navigation
+from a middle image to the last. When invoking
+directly, expose the output directory with
 Flatpak `--filesystem`. Repeat visual checks with `--env=ADW_DEBUG_HIGH_CONTRAST=1`
 and `--env=SKYLOOM_SMOKE_FONT="Adwaita Sans 16"` on the Flatpak command.
 

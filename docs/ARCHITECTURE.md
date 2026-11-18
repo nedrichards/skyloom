@@ -135,7 +135,17 @@ it does not inherit a picture's pixel-dependent natural size or propagate a resi
 to the list. Alt text remains an accessible image label. The default-off
 `show-alt-text` GSettings preference adds selectable captions below post images;
 changes redisplay existing lists while preserving their reading positions. Image
-overlays always retain descriptions and their copy action independently. Inline `Gtk.Video`
+overlays always retain descriptions and their copy action independently.
+The image viewer uses native scroll adjustments to pan a single bounded
+decoded texture. Fit follows the viewport, zoom retains the viewport centre
+where it can, and a separate description scroller caps the space below the
+image. Wide dialogs place portrait descriptions beside the image. Decoded
+dimensions resolve any missing or inaccurate aspect metadata.
+Multi-image posts pass their ordered attachments and clicked index to the
+viewer. Each selection resets zoom and scroll, releases the outgoing texture,
+and cancels and supersedes its request. The viewer loads only the selected
+image and updates its description and original-image action together.
+Inline `Gtk.Video`
 controls are created on the first explicit play action, not while binding a feed
 thumbnail. Thumbnail badge changes use opacity rather than changing layout.
 

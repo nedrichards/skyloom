@@ -1924,9 +1924,7 @@ class PostRow(Gtk.Box):
             group.media = None
             group.viewer.connect(
                 "clicked",
-                lambda _: (
-                    self.window.view_media(group.media) if self.alive and group.media else None
-                ),
+                lambda _: self.open_image(group, index),
             )
             group.pic.connect("unrealize", lambda *_: self.window.images.unbind(group.pic))
             group.alt = None
@@ -1999,6 +1997,13 @@ class PostRow(Gtk.Box):
             group.preview.set_child(group.placeholder)
         if group.get_parent() is None:
             content.append(group)
+
+    def open_image(self, group, index):
+        if self.alive and group.media is not None:
+            if len(self.post.images) > 1:
+                self.window.view_media(self.post.images, index)
+            else:
+                self.window.view_media(group.media)
 
     def update_counters(self, post):
         previous = self.post

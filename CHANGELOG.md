@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add zoom, fit and pan to the image viewer, with independently scrollable
+  descriptions beside portrait images on wide dialogs and below other images.
+- Browse a post’s images in the viewer with Previous, Next and a position
+  indicator, starting at the selected thumbnail.
+
 - Keep scoped request failures tied to the newest submission under worker load,
   and report when a publish attempt stopped before the current draft was saved.
 - Index encoded image size and recency after the initial disk scan so steady-state

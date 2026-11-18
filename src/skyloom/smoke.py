@@ -134,6 +134,8 @@ class Smoke:
             self.media_description,
             self.media_scroll,
             self.close_media,
+            self.media_gallery,
+            self.media_gallery_next,
             self.labelled_content,
             self.labelled_visible,
             self.labelled_details,
@@ -196,6 +198,7 @@ class Smoke:
                 "search": ("notifications", "search_cleared"),
                 "preferences": ("overflow_open", "sign_out_retry"),
                 "labels": ("labelled_content", "labelled_profile_revealed"),
+                "media": ("media", "media_gallery_next"),
                 "conversation": ("post_tiles", "ordered_refreshed"),
                 "paging": ("autoload_home", "autoload_finish"),
                 "refresh": ("refresh_setup", "refresh_cleanup"),
@@ -1138,17 +1141,59 @@ class Smoke:
 
     def media_scroll(self) -> bool:
         dialog = self.w.get_visible_dialog()
-        scroll = self.find_widget(dialog, Gtk.ScrolledWindow)
-        assert scroll is not None
+        if dialog.canvas.texture is None:
+            return False
         description = self.find_text_widget(dialog, self.media_alt)
         assert description is not None and description.get_lines() == -1
-        adjustment = scroll.get_vadjustment()
+        adjustment = dialog.description_scroll.get_vadjustment()
         assert adjustment.get_upper() > adjustment.get_page_size()
         adjustment.set_value(adjustment.get_upper() - adjustment.get_page_size())
-        return True
+        if dialog.canvas.zoom is None:
+            dialog.plus.emit("clicked")
+            assert 0 < dialog.canvas.zoom < 4
+            dialog.set_zoom(4)
+            return False
+        if dialog.center_tick is not None:
+            return False
+        assert all(a.get_upper() > a.get_page_size() for a in dialog.adjustments)
+        horizontal, vertical = dialog.adjustments
+        horizontal.set_value(horizontal.get_upper() - horizontal.get_page_size())
+        vertical.set_value(vertical.get_upper() - vertical.get_page_size())
+        assert horizontal.get_value() > 0 and vertical.get_value() > 0
+        return self.capture("image-zoom")
 
     def close_media(self) -> bool:
-        self.w.get_visible_dialog().close()
+        dialog = self.w.get_visible_dialog()
+        if dialog.canvas.zoom is not None:
+            dialog.fit.emit("clicked")
+            return False
+        if dialog.center_tick is not None:
+            return False
+        assert all(a.get_upper() <= a.get_page_size() for a in dialog.adjustments)
+        dialog.close()
+        return True
+
+    def media_gallery(self) -> bool:
+        media = next(p for p in self.w.service.posts if p.images).images[0]
+        self.w.view_media((media, replace(media, alt="Second invented image"), media), 1)
+        dialog = self.w.get_visible_dialog()
+        assert dialog.gallery_title.get_subtitle() == "2 of 3"
+        self.gallery_advanced = False
+        return True
+
+    def media_gallery_next(self) -> bool:
+        dialog = self.w.get_visible_dialog()
+        if dialog.canvas.texture is None:
+            return False
+        if not self.gallery_advanced:
+            dialog.next.emit("clicked")
+            self.gallery_advanced = True
+            return False
+        assert dialog.gallery_title.get_subtitle() == "3 of 3"
+        assert not dialog.next.get_sensitive() and dialog.previous.get_sensitive()
+        if not self.capture("image-gallery"):
+            return False
+        dialog.close()
         return True
 
     def labelled_content(self) -> bool:

@@ -69,6 +69,13 @@ revoke the app password in Bluesky.
 - Preferences controls appearance, downloads and labelled-content warnings.
   Enable “Always show alt text” under Reading for descriptions below feed images
   (off by default). Open an image to read or copy its description at any time.
+  Use the zoom buttons, +/−, or Ctrl+scroll to zoom. Press 0 to fit or 1 for
+  100% of the decoded size.
+  Drag or scroll to pan when zoomed. The description scrolls independently
+  and can be hidden with the description button.
+  For a post with multiple images, use Previous and Next in the viewer header
+  or the left and right arrow keys while fitted. Each image opens fitted with
+  its own description.
   Labelled content is visible by default; explicit mutes and blocks remain separate.
 - Open your profile to edit its name, description and images. Select follower or
   following counts on any profile to browse people.

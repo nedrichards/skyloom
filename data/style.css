@@ -1,5 +1,6 @@
 /* Deliberately retain Adwaita colour, typography and focus defaults. */
 .post-body { line-height: 1.3; }
+.viewer-image { background: alpha(currentColor, 0.05); }
 /* Native section headers contain whole pages here, not just heading text. */
 .page-intro { font-weight: normal; }
 

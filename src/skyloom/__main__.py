@@ -26,6 +26,7 @@ def main():
             "profile",
             "search",
             "labels",
+            "media",
             "conversation",
             "paging",
             "refresh",

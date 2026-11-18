@@ -13,7 +13,7 @@ from .composer import Composer
 from .content import LabelledContent
 from .conversation import Continuation, Conversation
 from .conversation_view import ConversationView
-from .domain import Pager, Post, find_post, reconcile_deleted, safe_url
+from .domain import Media, Pager, Post, find_post, reconcile_deleted
 from .errors import POST_UNAVAILABLE, UserError
 from .feed_coordination import FeedCoordination
 from .feed_state import FeedGap
@@ -167,61 +167,11 @@ class Window(Adw.ApplicationWindow):
 
         launch.launch(self, None, finished)
 
-    def view_media(self, media):
-        dialog = Adw.Dialog(title="Image", content_width=800, content_height=640)
-        toolbar = Adw.ToolbarView()
-        header = Adw.HeaderBar()
-        if uri := safe_url(media.fullsize or media.url):
-            header.pack_end(
-                button("web-browser-symbolic", "Open image in browser", lambda: self.open_uri(uri))
-            )
-        toolbar.add_top_bar(header)
-        body = box(spacing=12, margin=16)
-        pic = Gtk.Picture(
-            can_shrink=True, content_fit=Gtk.ContentFit.CONTAIN, vexpand=True, height_request=280
-        )
-        pic.set_alternative_text(media.alt if media.alt.strip() else "Image")
-        body.append(pic)
-        description = label(media.alt, selectable=True, visible=bool(media.alt.strip()))
-        body.append(description)
-        if media.alt.strip():
-            body.append(
-                button(
-                    "edit-copy-symbolic",
-                    "Copy image description",
-                    lambda: (self.get_clipboard().set(media.alt), self.toast("Description copied")),
-                    "Copy description",
-                )
-            )
-        toolbar.set_content(Gtk.ScrolledWindow(child=body, hscrollbar_policy=Gtk.PolicyType.NEVER))
-        dialog.set_child(toolbar)
-        alive = [True]
+    def view_media(self, images, index=0):
+        from .image_viewer import ImageViewer
 
-        def loaded(pix):
-            if alive[0]:
-                self.images.bind(pic, pix)
-                pic.set_paintable(pix)
-
-        def failed(msg):
-            if alive[0]:
-                description.set_visible(True)
-                description.set_label(
-                    "Image unavailable. " + msg + ("\n" + media.alt if media.alt.strip() else "")
-                )
-
-        task = self.worker.submit(
-            self.images.get(media.fullsize or media.url, media.local, explicit=True), loaded, failed
-        )
-
-        def closed(*_):
-            alive[0] = False
-            pic.set_paintable(None)
-            self.images.unbind(pic)
-            if task:
-                task.cancel()
-
-        dialog.connect("closed", closed)
-        dialog.present(self)
+        gallery = (images,) if isinstance(images, Media) else images
+        ImageViewer(self, gallery, index).present(self)
 
     def copy(self, text):
         self.get_clipboard().set(text)
