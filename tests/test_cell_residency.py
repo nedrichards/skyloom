@@ -33,6 +33,7 @@ class CellResidencyTests(unittest.TestCase):
         row = PostRow(first, fixture.window)
         self.addCleanup(row.cancel)
         avatar, content, actions = row.avatar_cell, row.content, row.actions
+        grid = row.image_grid
         media_cell = row.media_cells[0]
         picture, viewer = media_cell.pic, media_cell.viewer
         late_loaded = callbacks[0][0]
@@ -50,7 +51,8 @@ class CellResidencyTests(unittest.TestCase):
             self.assertIs(content.get_parent(), row.body)
             self.assertIs(actions.get_parent(), content)
             self.assertIs(row.media_cells[0], media_cell)
-            self.assertIs(media_cell.get_parent(), row.attachments)
+            self.assertIs(media_cell.get_parent(), grid)
+            self.assertIs(grid.get_parent(), row.attachments)
             self.assertIs(media_cell.pic, picture)
             self.assertIs(media_cell.viewer, viewer)
             self.assertEqual(media_cell.alt.get_text(), "ALT · " + media.alt)

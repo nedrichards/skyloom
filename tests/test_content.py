@@ -512,6 +512,8 @@ class ContentTests(unittest.TestCase):
             window.destroy()
 
     def test_links_and_reactions_keep_their_own_actions(self):
+        from gi.repository import Gdk
+
         from skyloom.widgets import PostRow
 
         opened, links, reactions = [], [], []
@@ -536,7 +538,18 @@ class ContentTests(unittest.TestCase):
         text = next(
             w for w in self.walk(row) if isinstance(w, Gtk.Label) and w.get_text() == post.text
         )
-        self.assertTrue(text.emit("activate-link", url))
+        claimed = []
+        text.select_region(1, 1)
+        self.assertEqual(text.get_current_uri(), url)
+        gesture = SimpleNamespace(
+            get_widget=lambda: text,
+            get_current_event_state=lambda: Gdk.ModifierType(0),
+            get_device=lambda: None,
+            set_state=claimed.append,
+        )
+        row.text_pressed(gesture, 1, 10, 10)
+        row.text_clicked(gesture, 1, 10, 10)
+        self.assertEqual(claimed, [Gtk.EventSequenceState.CLAIMED])
         like = next(
             w
             for w in self.walk(row)
@@ -1070,6 +1083,44 @@ class ContentTests(unittest.TestCase):
         self.assertIn("View image", self.labels(row))
         self.assertFalse(self.requests)
         self.assertFalse(any(text.startswith("ALT") for text in self.labels(row)))
+
+    def test_image_grid_reflows_recycled_cells_and_activates_in_post_order(self):
+        from skyloom.widgets import PostRow
+
+        image = self.post.images[0]
+        images = tuple(replace(image, alt=f"Invented photo {n}") for n in range(4))
+        post = replace(self.post, labels=(), images=images)
+        self.window.settings.set_boolean("load-images", False)
+        row = PostRow(post, self.window)
+        self.addCleanup(row.cancel)
+        opened = []
+        self.window.view_media = lambda *args: opened.append(args)
+        layouts = {
+            4: [(0, 0, 1, 1), (1, 0, 1, 1), (0, 1, 1, 1), (1, 1, 1, 1)],
+            3: [(0, 0, 2, 1), (0, 1, 1, 1), (1, 1, 1, 1)],
+            2: [(0, 0, 1, 1), (1, 0, 1, 1)],
+            1: [(0, 0, 1, 1)],
+            0: [],
+        }
+        cells = tuple(row.media_cells)
+        for count in (4, 3, 1, 2, 0, 4):
+            with self.subTest(count=count):
+                row.bind_post(replace(post, images=images[:count]))
+                self.assertEqual(tuple(row.media_cells), cells)
+                self.assertEqual(row.image_grid.get_visible(), bool(count))
+                visible = [cell for cell in cells if cell.get_visible()]
+                self.assertEqual(
+                    [tuple(row.image_grid.query_child(cell)) for cell in visible],
+                    layouts[count],
+                )
+                if count > 1:
+                    visible[-1].viewer.emit("clicked")
+                    self.assertEqual(opened[-1], (images[:count], count - 1))
+                    for cell in visible:
+                        self.assertLessEqual(
+                            cell.preview.measure(Gtk.Orientation.VERTICAL, 900)[1], 200
+                        )
+        self.assertFalse(self.requests)
 
     def test_alt_text_preference_and_recycled_image(self):
         from skyloom.widgets import PostRow

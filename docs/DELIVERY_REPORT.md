@@ -4,6 +4,28 @@ Live-account interoperability and human accessibility/hardware acceptance remain
 open; see [ROADMAP.md](ROADMAP.md). Default-renderer scrolling has no accepted
 matched performance baseline. Distribution follow-up is tracked in the roadmap.
 
+## Multi-image post grids and text links — 20 November 2026
+
+Shared post rows arrange multiple photos in two columns, cap preview heights,
+and reuse their image cells and viewport-managed requests. A three-photo post
+spans the first image across both columns. Selecting an image opens its position
+in the existing gallery. A click on an inline link, mention or tag now dispatches
+its browser action through the post label. Text selection and plain-text
+conversation activation still use the label and row gestures.
+
+The offline Flatpak export was installed as commit
+`72b28ab79ace38555a24d7a2fee2b7b969cc7b20223549eb3417a403f6ff6156`
+and its post widget module matched source. The installed media smoke verified
+zoom and gallery navigation. Invented posts rendered as a four-image grid at
+480 pixels in dark mode and a three-image grid at 800 pixels in light mode.
+A private Xvfb display delivered mouse clicks to invented link, mention, hashtag
+and regular text targets. Each dispatched its expected action once. The harness
+recorded browser destinations without opening them. Lint, desktop entry and
+schema checks passed. The first default-display run hit two layout-settling
+failures. The final installed suite passed all 413 tests with zero skips under
+X11/Cairo. Physical touch, a live feed and scrolling performance remain
+unmeasured.
+
 ## Saved feed position startup reveal — 18 November 2026
 
 Startup keeps an opaque loading page over a saved viewport below the feed head

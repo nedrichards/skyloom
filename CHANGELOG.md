@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Show multi-image posts in a compact grid and open the viewer at the selected image.
+- Activate links, mentions and hashtags directly from selectable post text.
+
 - Keep the loading screen in place while a saved feed position settles,
   then crossfade to that position before revealing the feed selector.
 

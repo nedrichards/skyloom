@@ -73,12 +73,17 @@ class ImagePreview(Gtk.Box):
         super().__init__()
         self.set_layout_manager(None)
         self.ratio = 4 / 3
+        self.tiled = False
         self.append(child)
 
-    def set_media(self, media):
-        ratio = media.width / media.height if media.width > 0 and media.height > 0 else 4 / 3
-        if self.ratio != ratio:
+    def set_media(self, media, tile_ratio=None):
+        tiled = tile_ratio is not None
+        ratio = tile_ratio or (
+            media.width / media.height if media.width > 0 and media.height > 0 else 4 / 3
+        )
+        if self.ratio != ratio or self.tiled != tiled:
             self.ratio = ratio
+            self.tiled = tiled
             self.queue_resize()
 
     def set_child(self, child):
@@ -92,7 +97,10 @@ class ImagePreview(Gtk.Box):
 
     def do_measure(self, orientation, for_size):
         if orientation == Gtk.Orientation.HORIZONTAL:
-            return 0, 720, -1, -1
+            return 0, 280 if self.tiled else 720, -1, -1
+        if self.tiled:
+            height = round(min(200, max(72, for_size / self.ratio))) if for_size >= 0 else 120
+            return height, height, -1, -1
         height = round(min(560, max(160, for_size / self.ratio))) if for_size >= 0 else 360
         return height, height, -1, -1
 
@@ -1372,7 +1380,7 @@ class PostRow(Gtk.Box):
         self.binding_serial = 0
         self.image_releases = []
         self.media_cells = []
-        self.media_bind_index = 0
+        self.image_grid = None
         self.gate = None
         self.add_css_class("post-tile")
         self.body = box(spacing=10, margin=16 if compact else 20)
@@ -1647,18 +1655,21 @@ class PostRow(Gtk.Box):
         # Native labels can select a character after only a pixel of pointer jitter.
         # A deliberate drag, existing selection or Shift-click stays native.
         selecting = self.text_dragged or (press is not None and (press[3] or press[4]))
-        if press is not None:
-            gesture.set_state(Gtk.EventSequenceState.CLAIMED)
-        if presses == 1 and press and not touch and not selecting and not text.get_current_uri():
+        if press is None:
+            return
+        # The grouped capture gesture receives the release before GTK's label
+        # gesture. Handle the active link here so it cannot open the row.
+        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+        if presses != 1 or not self.alive or selecting:
+            return
+        uri = text.get_current_uri()
+        if uri:
+            if not text.get_selection_bounds()[0]:
+                text.emit("activate-link", uri)
+            return
+        if not touch:
             text.select_region(0, 0)
-        if (
-            presses == 1
-            and self.alive
-            and not selecting
-            and not text.get_selection_bounds()[0]
-            and not text.get_current_uri()
-        ):
-            gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+        if not text.get_selection_bounds()[0]:
             self.cancel_text_open()
 
             def open_post():
@@ -1697,8 +1708,7 @@ class PostRow(Gtk.Box):
         # ListView cross-axis pass; eight stays below the row controls' minimum.
         text.set_width_chars(8)
         text.connect("activate-link", lambda _l, uri: (window.open_uri(uri), True)[1])
-        # Share the label's sequence so a plain click opens the post while drag/double-click
-        # selection and rich-text links retain their native behaviour.
+        # Share the label's sequence to keep native drag and double-click selection.
         selection_clicks = [
             controller
             for controller in text.observe_controllers()
@@ -1729,9 +1739,13 @@ class PostRow(Gtk.Box):
         self.text.focus_key = ("post-text", post.uri)
         self.text.select_region(0, 0)
         actions = getattr(self, "actions", None)
-        self.media_bind_index = 0
-        for media in post.images:
-            self.add_image(media, content)
+        if post.images and self.image_grid is None:
+            self.image_grid = Gtk.Grid(column_homogeneous=True, column_spacing=6, row_spacing=6)
+            content.prepend(self.image_grid)
+        if self.image_grid is not None:
+            self.image_grid.set_visible(bool(post.images))
+        for index, media in enumerate(post.images):
+            self.add_image(media, index, len(post.images))
         if post.video:
             from .video_player import InlineVideo
 
@@ -1910,10 +1924,14 @@ class PostRow(Gtk.Box):
         pop.set_child(choices)
         menu.set_popover(pop)
 
-    def add_image(self, media, content):
+    def add_image(self, media, index, count):
         serial = self.binding_serial
-        index = self.media_bind_index
-        self.media_bind_index += 1
+        wide = count == 3 and index == 0
+        if count == 3:
+            column, row, span = (0, 0, 2) if wide else (index - 1, 1, 1)
+        else:
+            row, column = divmod(index, 2)
+            span = 1
         if index == len(self.media_cells):
             group = box(spacing=4)
             group.add_css_class("card")
@@ -1933,11 +1951,25 @@ class PostRow(Gtk.Box):
             self.media_cells.append(group)
         else:
             group = self.media_cells[index]
+        grid = self.image_grid
+        if group.get_parent() is None:
+            grid.attach(group, column, row, span, 1)
+        elif tuple(grid.query_child(group)) != (column, row, span, 1):
+            position = grid.get_layout_manager().get_layout_child(group)
+            position.set_column(column)
+            position.set_row(row)
+            position.set_column_span(span)
         group.media = media
-        group.preview.set_media(media)
+        tile_ratio = (3 if wide else 1.5) if count > 1 else None
+        group.preview.set_media(media, tile_ratio)
         pic, viewer = group.pic, group.viewer
         pic.set_alternative_text(media.alt if media.alt.strip() else "Image")
         viewer.set_tooltip_text("View image and description")
+        description = f"View image {index + 1} of {count}" if count > 1 else "View image"
+        viewer.update_property(
+            [Gtk.AccessibleProperty.LABEL, Gtk.AccessibleProperty.DESCRIPTION],
+            [description, media.alt.strip()],
+        )
         group.set_visible(True)
         if media.alt.strip() and self.window.settings.get_boolean("show-alt-text"):
             if group.alt is None:
@@ -1995,8 +2027,6 @@ class PostRow(Gtk.Box):
             if group.placeholder is None:
                 group.placeholder = Gtk.Label(label="View image")
             group.preview.set_child(group.placeholder)
-        if group.get_parent() is None:
-            content.append(group)
 
     def open_image(self, group, index):
         if self.alive and group.media is not None:
@@ -2089,7 +2119,7 @@ class PostRow(Gtk.Box):
             self.gate = None
         if self.content is not None:
             for child in tuple(list_children(self.attachments)):
-                if child not in self.media_cells:
+                if child is not self.image_grid:
                     if hasattr(child, "finished"):
                         child.finished()
                     self.attachments.remove(child)

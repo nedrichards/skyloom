@@ -73,10 +73,12 @@ revoke the app password in Bluesky.
   100% of the decoded size.
   Drag or scroll to pan when zoomed. The description scrolls independently
   and can be hidden with the description button.
-  For a post with multiple images, use Previous and Next in the viewer header
-  or the left and right arrow keys while fitted. Each image opens fitted with
-  its own description.
+  Multi-image posts show a compact grid. Select any thumbnail to open that
+  image fitted with its own description. Use Previous and Next in the viewer
+  header or the left and right arrow keys while fitted.
   Labelled content is visible by default; explicit mutes and blocks remain separate.
+- Select a link, mention or hashtag in a post to open its destination in your
+  browser. Drag across the post text to select it.
 - Open your profile to edit its name, description and images. Select follower or
   following counts on any profile to browse people.
 - Use F1 or Ctrl+? for keyboard help. Preferences and About are in the main menu.

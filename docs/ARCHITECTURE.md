@@ -129,13 +129,16 @@ overlay. Undo still uses the existing key and offset. Home parent previews use
 the current feed’s matching URI and CID, honour content warnings and account
 visibility, and reuse ordinary conversation navigation.
 
-Feed image previews reserve height from immutable `Media` dimensions supplied by
+Single-image previews reserve height from immutable `Media` dimensions supplied by
 the image embed's optional `aspectRatio`. Native height-for-width measurement is
 bounded to 160–560 logical pixels, with a 4:3 fallback for older records. The preview
 draws immutable textures with a centred cover crop; image arrival/eviction and
 download-policy placeholders do not change the reserved rectangle. This uses
 constant arithmetic during layout, with no pixel/subject analysis, decode or
 network work added to scrolling. Dimension fields survive cached post round trips.
+Multiple images use an equal-width, two-column GTK grid with previews capped at
+200 logical pixels before button padding. Three images put the first across the
+top. Recycled rows reuse the same image cells and viewport-managed loads.
 `PreviewTexture` queues drawing only when decoded pixels arrive or are released;
 it does not inherit a picture's pixel-dependent natural size or propagate a resize
 to the list. Alt text remains an accessible image label. The default-off
