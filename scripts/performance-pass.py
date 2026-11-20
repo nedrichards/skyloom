@@ -34,6 +34,49 @@ def distribution(values):
     }
 
 
+def trace_media_geometry(view, counters, load, widget_type):
+    """Audit row-based rejection against the unmodified native media pass."""
+    height = view.scroll.get_height()
+    rejected = set()
+    for row in tuple(view.rows):
+        media = [
+            request.widget
+            for request in row._media_requests
+            if request in view.media_bindings and request.widget.get_mapped()
+        ]
+        # A row bounds check cannot save calls when there is only one widget.
+        if len(media) < 2 or not row.get_mapped():
+            continue
+        counters["media_candidate_row_bounds"] += 1
+        valid, bounds = row.compute_bounds(view.scroll)
+        if valid and (
+            bounds.origin.y + bounds.size.height < -height or bounds.origin.y > 2 * height
+        ):
+            rejected.update(media)
+
+    compute_bounds = widget_type.compute_bounds
+
+    def measured(widget, target):
+        valid, bounds = compute_bounds(widget, target)
+        counters["media_widget_bounds"] += 1
+        if widget in rejected:
+            counters["media_candidate_skipped_bounds"] += 1
+            if (
+                valid
+                and bounds.origin.y + bounds.size.height >= -height
+                and bounds.origin.y <= 2 * height
+            ):
+                counters["media_candidate_mismatches"] += 1
+        return valid, bounds
+
+    counters["media_passes"] += 1
+    widget_type.compute_bounds = measured
+    try:
+        load(view)
+    finally:
+        widget_type.compute_bounds = compute_bounds
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
@@ -52,7 +95,9 @@ def main():
         "--scroll-speed", type=float, default=1800, help="Logical pixels per second"
     )
     parser.add_argument(
-        "--trace-layout", action="store_true", help="Diagnose row churn and preview layout counts"
+        "--trace-layout",
+        action="store_true",
+        help="Diagnose row churn, preview layout and media geometry",
     )
     parser.add_argument("--profile", action="store_true", help="Separate main-thread cProfile run")
     parser.add_argument("--reduced-motion", action="store_true")
@@ -122,6 +167,17 @@ def main():
                 return super().do_size_allocate(width, height, baseline)
 
         widgets.ImagePreview = TracedPreview
+        counters.update(
+            media_passes=0,
+            media_widget_bounds=0,
+            media_candidate_row_bounds=0,
+            media_candidate_skipped_bounds=0,
+            media_candidate_mismatches=0,
+        )
+        load_visible_media = FeedView.load_visible_media
+        FeedView.load_visible_media = lambda view: trace_media_geometry(
+            view, counters, load_visible_media, Gtk.Widget
+        )
     counters.update(preview_measures=0, preview_allocations=0)
     bind, unbind, image_get = FeedView.bind, FeedView.unbind, application.images.get
 
@@ -610,7 +666,7 @@ def main():
     window = application.window
     report = {
         "report_version": 1,
-        "workload_version": 6,
+        "workload_version": 7 if args.trace_layout else 6,
         "scroll_seconds": args.scroll_seconds,
         "scroll_speed": args.scroll_speed,
         "layout_events": layout_events,

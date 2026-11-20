@@ -16,6 +16,8 @@
 - Browse a post’s images in the viewer with Previous, Next and a position
   indicator, starting at the selected thumbnail.
 
+- Count viewport media bounds calls in the local layout trace.
+
 - Keep scoped request failures tied to the newest submission under worker load,
   and report when a publish attempt stopped before the current draft was saved.
 - Index encoded image size and recency after the initial disk scan so steady-state

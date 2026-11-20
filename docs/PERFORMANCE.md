@@ -29,13 +29,22 @@ feed. This isolates row layout/rendering and does not simulate remote download
 latency, distinct-photo decoding or physical momentum.
 
 For sustained row-tracker diagnostics, add `--scroll-seconds 12 --scroll-speed
-6000 --trace-layout`. The trace counts factory binds/unbinds, media measurements
-and allocations, and records counts on slow paint spans. Record generated posts,
-active row count and actual travel together: the active pager window can be
-smaller than the generated history. Trace instrumentation adds overhead; use a
-separate run without `--trace-layout` for frame comparisons. The comparator also
-checks speed, duration and trace mode. A short, warm scroll is insufficient to
+6000 --trace-layout`. The trace counts factory binds/unbinds, media measurements,
+allocations and viewport bounds calls, and records counts on slow paint spans.
+Record generated posts, active row count and actual travel together. The active
+pager window can be smaller than the generated history. Trace instrumentation
+adds overhead. Use a separate run without `--trace-layout` for frame comparisons.
+The comparator also checks speed, duration and trace mode. A short, warm scroll is insufficient to
 exercise mixed-height tracker oscillation.
+
+The viewport trace counts the existing per-widget checks for mapped media. It
+also measures rows with two or more mapped media widgets as a possible shortcut.
+The shortcut would skip widget bounds only for a row entirely outside the
+existing retention band. Subtract `media_candidate_skipped_bounds` from
+`media_candidate_row_bounds` to get the change in calls. Any
+`media_candidate_mismatches` means the shortcut would have released a widget
+the existing check would retain. The trace leaves media loading and eviction to
+the existing widget checks.
 
 Focused probes in `scripts/` cover post-cell binding, label/row measurement,
 media residency and thread prefetch. Their `--help` describes inputs. Construction

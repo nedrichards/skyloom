@@ -91,6 +91,28 @@ smoke exercised 400% zoom, both pan adjustments, Fit, and a long description.
 Reviewed installed demo captures at 1000/light and 480/dark. Physical gestures
 and screen-reader acceptance remain open.
 
+## Viewport media geometry — 17 November 2026
+
+Traced the installed GNOME 51 app under Wayland/Vulkan with 150 invented posts,
+eight seconds per direction at 6,000 logical pixels per second. Each run covered
+about 95,000 logical pixels over the two scroll phases with zero row rebinds.
+
+| Feed | Width | Media passes | Widget bounds calls | Candidate row bounds calls | Widget calls skipped |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Mixed photos and video thumbnails | 1100 | 477 | 1,009 | 0 | 0 |
+| Mixed photos and video thumbnails | 480 | 477 | 1,032 | 0 | 0 |
+| Two-image posts and quotes | 1100 | 476 | 1,249 | 497 | 0 |
+
+The mixed feed supplies one media widget per row. The gallery trace supplied
+multi-widget candidates, but none were fully outside the retention band. A
+row bounds precheck would have added 497 calls in that run. Skyloom keeps
+its existing per-widget load and eviction thresholds. These are call counts
+from scripted scrolling with trace instrumentation. Physical momentum and
+general scrolling performance remain unverified.
+
+`./scripts/check.sh` passed 409 checkout tests with zero skips after the trace
+change. The trace ran in the installed Flatpak against its existing app modules.
+
 ## Request recovery, image cache and reading prototypes — 17 November 2026
 
 Repeated worker admission failures keep distinct request identities. A publish
